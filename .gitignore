@@ -1,0 +1,42 @@
+# ── Environment / Secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Firebase service account keys ─────────────────────────────────────────────
+**/firebase_service_account.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# ── Node / JS ─────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Flutter / Dart ────────────────────────────────────────────────────────────
+# (each Flutter sub-project has its own .gitignore — this is the root catch-all)
+*.dart_tool/
+.dart_tool/
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.iml
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

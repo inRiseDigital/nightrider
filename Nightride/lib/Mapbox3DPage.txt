@@ -1,0 +1,55 @@
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' as geo;
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:turf/turf.dart' as turf;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  MapboxOptions.setAccessToken("pk.eyJ1Ijoia2FsaGFyYWQiLCJhIjoiY21obTZ4d3IzMXg0MjJzcTFxZjh1NWRhMSJ9.GdAJPXQwbnLkO3akD3CPJw");
+  runApp(const MaterialApp(home: MapApp()));
+}
+
+class MapApp extends StatefulWidget {
+  const MapApp({super.key});
+  @override
+  State<MapApp> createState() => _MapAppState();
+}
+
+class _MapAppState extends State<MapApp> {
+  MapboxMap? mapboxMap;
+
+  _onMapCreated(MapboxMap controller) async {
+    mapboxMap = controller;
+
+    var permission = await Permission.locationWhenInUse.request();
+    if (permission.isGranted) {
+      geo.Position position = await geo.Geolocator.getCurrentPosition(
+        locationSettings: const geo.LocationSettings(accuracy: geo.LocationAccuracy.high),
+      );
+
+      await controller.flyTo(
+        CameraOptions(
+            center: Point(coordinates: Position(position.longitude, position.latitude)),
+            zoom: 18.0,
+            pitch: 30.0
+        ),
+        MapAnimationOptions(duration: 1000),
+      );
+
+      await controller.location.updateSettings(LocationComponentSettings(
+        enabled: true,
+        puckBearingEnabled: true,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: MapWidget(
+        onMapCreated: _onMapCreated,
+      ),
+    );
+  }
+}

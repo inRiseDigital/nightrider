@@ -1,0 +1,10 @@
+Testing 'Parties in Japan' (Should only return DB data)...
+Calling get_agent_response...
+Raw response: {"response_text": "Here is a party happening in Japan:", "party_recommendations": [{"title": "Tokyo City Lights Festival", "location": "Shibuya Crossing Area, Tokyo", "country": "Japan", "time": "Sat \u2022 08:00 PM", "images": ["https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=1000&auto=format&fit=crop", "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop"]}]}
+Returned titles: ['Tokyo City Lights Festival']
+✅ Correctly found 'Tokyo City Lights Festival'.
+✅ No hallucinations found.
+
+Testing 'Parties in Mars' (Should return nothing)...
+✅ Correctly returned no parties for Mars.
+✅ Correctly stated no info.

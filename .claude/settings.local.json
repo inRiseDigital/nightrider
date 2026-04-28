@@ -103,7 +103,15 @@
       "WebFetch(domain:docs.predicthq.com)",
       "Bash(python predicthq_sync.py)",
       "Bash(Get-Content \"C:\\\\Users\\\\USER\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-USER-Downloads-PartyApp-PartyApp\\\\e0e3c696-fbd7-4f1d-9b59-d6a01ecc2b13\\\\tasks\\\\bfavkf9pl.output\" -Raw)",
-      "Bash(curl -s --max-time 5 http://localhost:8000/)"
+      "Bash(curl -s --max-time 5 http://localhost:8000/)",
+      "Bash(cat .gitmodules)",
+      "Bash(git submodule *)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git rm *)",
+      "Bash(rm -rf \"c:/Users/USER/Downloads/PartyApp/PartyApp/Nightride/.git\")",
+      "Bash(rm -rf \"c:/Users/USER/Downloads/PartyApp/PartyApp/nightride-webpanel/.git\")"
     ]
   }
 }

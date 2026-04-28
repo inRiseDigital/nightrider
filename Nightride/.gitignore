@@ -1,0 +1,65 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+flutter_*.log
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# Flutter generated
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Generated.xcconfig
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Android
+android/.gradle/
+android/local.properties
+android/gradlew
+android/gradlew.bat
+android/app/release/
+android/app/build/
+android/app/*.keystore
+android/app/*.jks
+
+# iOS
+ios/.generated/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Runner.xcworkspace/
+ios/Pods/
+ios/Podfile.lock
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Misc
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+.env
+.env.*
+
+# Firebase private key — never commit
+firebase_service_account.json
+**/firebase_service_account.json
+
+# Python cache
+__pycache__/
+*.py[cod]

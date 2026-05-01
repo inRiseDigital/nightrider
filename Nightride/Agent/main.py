@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from agent import get_agent_response
@@ -7,6 +8,16 @@ from ticketmaster_sync import fetch_and_sync_events
 from data_source import refresh_party_data
 
 app = FastAPI(title="Nightride Party Agent API")
+
+# CORS — required so the Flutter web build (any origin) can call this API
+# from a browser. Without this, browsers block the POST after preflight.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChatMessage(BaseModel):
     role: str # 'user' or 'assistant'

@@ -4,7 +4,7 @@
 <dict>
  <!--  MAPBOX ACCESS TOKEN  -->
     <key>MBXAccessToken</key>
-    <string>sk.eyJ1Ijoia2FsaGFyYWQiLCJhIjoiY21rNTNvaWVnMDFlczNkc2J4Ym5xMWdjbCJ9.5nqMb84dqsymGAW5JuaBsw</string>
+    <string>$(MAPBOX_SECRET_TOKEN)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
     <string>We need your location to show your position on the map.</string>
 	<key>CFBundleDevelopmentRegion</key>

@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -221,6 +222,7 @@ final mapEventsProvider = StreamProvider<List<MapBottomCardData>>((ref) {
 // ── Location & distance helpers ──────────────────────────────────────────────
 
 final userLocationProvider = StreamProvider<geo.Position?>((ref) async* {
+  if (kIsWeb) { yield null; return; }
   final status = await Permission.locationWhenInUse.request();
   if (!status.isGranted) { yield null; return; }
   try {
@@ -299,19 +301,20 @@ bool _matchesCategory(String tag, String selected) => matchesGenre(tag, selected
 
 final availableCountriesProvider = StreamProvider<List<String>>((ref) {
   ref.keepAlive();
+  const pinned = {'JP', 'LK'};
   final uid = ref.watch(authStateProvider).asData?.value?.uid;
-  if (uid == null) return Stream.value([]);
+  if (uid == null) return Stream.value(pinned.toList()..sort());
   return FirebaseFirestore.instance
       .collection('events')
       .limit(500)
       .snapshots()
       .map((snap) {
-        final seen = <String>{};
-        return snap.docs
+        final seen = <String>{...pinned};
+        final fromFirestore = snap.docs
             .map((d) => (d.data()['country_code'] as String? ?? '').toUpperCase())
             .where((c) => c.isNotEmpty && seen.add(c))
-            .toList()
-          ..sort();
+            .toList();
+        return [...pinned, ...fromFirestore]..sort();
       });
 });
 

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -13,12 +15,14 @@ class ProfileHeader extends StatelessWidget {
     required this.onEdit,
     required this.onSave,
     required this.onCancel,
+    this.avatarBase64,
   });
 
   final ProfileState state;
   final VoidCallback onEdit;
   final VoidCallback onSave;
   final VoidCallback onCancel;
+  final String? avatarBase64;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +31,7 @@ class ProfileHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
-        _Avatar(url: d.avatarUrl),
+        _Avatar(url: d.avatarUrl, avatarBase64: avatarBase64),
         SizedBox(width: 14.w),
         Expanded(
           child: Column(
@@ -113,32 +117,37 @@ class _StatText extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.url});
+  const _Avatar({required this.url, this.avatarBase64});
   final String url;
+  final String? avatarBase64;
 
   @override
   Widget build(BuildContext context) {
     final double s = 86.w;
+    Widget child;
+
+    if (avatarBase64 != null && avatarBase64!.isNotEmpty) {
+      child = Image.memory(base64Decode(avatarBase64!), fit: BoxFit.cover);
+    } else if (url.isNotEmpty && url.startsWith('http')) {
+      child = CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.06)),
+        errorWidget: (_, __, ___) => Icon(Icons.person_rounded, color: Colors.white38, size: 44.sp),
+      );
+    } else {
+      child = Icon(Icons.person_rounded, color: Colors.white38, size: 44.sp);
+    }
+
     return Container(
       width: s,
       height: s,
       padding: EdgeInsets.all(3.w),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: AppTheme.primary.withValues(alpha: 0.65),
-          width: 2,
-        ),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.65), width: 2),
       ),
-      child: ClipOval(
-        child: Image.asset(
-          'assets/images/business-man-smiling-free-photo.jpg',
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(color: Colors.white.withValues(alpha: 0.06));
-          },
-        ),
-      ),
+      child: ClipOval(child: child),
     );
   }
 }

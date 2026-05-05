@@ -1,4 +1,5 @@
 // lib/common/widgets/splash_screen.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -9,7 +10,6 @@ import 'package:nightride/pages/onboard_questionnaire_page.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/user_profile_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -27,14 +27,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _navigateAfterDelay() async {
     await Future.delayed(const Duration(seconds: 2));
-    
     if (!mounted) return;
-    
-    final authState = ref.read(authStateProvider);
-    final user = authState.value;
 
-    final prefs = await SharedPreferences.getInstance();
-    final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+    // Wait for Firebase to restore the session, with a 3s safety timeout
+    final user = await ref.read(authStateProvider.future).timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => FirebaseAuth.instance.currentUser,
+    );
 
     if (!mounted) return;
 
@@ -45,13 +44,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       await svc.cleanupDummyDataIfNeeded(user.uid);
       final role = await svc.getUserRole(user.uid);
       if (!mounted) return;
-      destination = role == 'organizer' ? const OrganizerShellPage() : AppShellPage();
-    } else if (onboardingCompleted) {
-      destination = const SignInPage();
+      if (role == 'organizer') {
+        destination = const OrganizerShellPage();
+      } else {
+        final onboardingDone = await svc.hasCompletedOnboarding(user.uid);
+        destination = onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage();
+      }
     } else {
-      destination = const OnboardQuestionnaireTemplatePage();
+      destination = const SignInPage();
     }
 
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => destination),
     );

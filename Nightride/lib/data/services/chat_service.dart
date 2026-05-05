@@ -1,65 +1,93 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/chat_message.dart';
 
-class ChatService {
-  // Replace with your local IP if testing on a physical device
-  static const String _baseUrl = 'http://192.168.1.81:8000'; // Local backend
+/// Handle returned by [ChatService.streamMessage].
+/// Call [cancel] to abort the in-flight request.
+class ChatStreamHandle {
+  final Stream<Map<String, dynamic>> events;
+  final http.Client _client;
 
-  Future<Map<String, dynamic>> sendMessage(
-    String message, 
-    List<ChatMessage> history, 
-    {double? latitude, double? longitude}
-  ) async {
+  ChatStreamHandle(this.events, this._client);
+
+  void cancel() => _client.close();
+}
+
+class ChatService {
+  static const String _baseUrl =
+      'https://9050-2406-2d40-6173-a008-bc37-814e-145-ab19.ngrok-free.app';
+
+  // ── Streaming ──────────────────────────────────────────────────────────────
+
+  ChatStreamHandle streamMessage(
+    String message,
+    List<ChatMessage> history, {
+    double? latitude,
+    double? longitude,
+  }) {
+    final client = http.Client();
+    final stream = _streamImpl(
+      client,
+      message,
+      history,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    return ChatStreamHandle(stream, client);
+  }
+
+  Stream<Map<String, dynamic>> _streamImpl(
+    http.Client client,
+    String message,
+    List<ChatMessage> history, {
+    double? latitude,
+    double? longitude,
+  }) async* {
     try {
-      final body = {
+      final body = <String, dynamic>{
         'message': message,
         'history': history.map((m) => m.toJson()).toList(),
       };
-      
-      // Add location if provided
       if (latitude != null && longitude != null) {
         body['latitude'] = latitude;
         body['longitude'] = longitude;
       }
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
+      final request =
+          http.Request('POST', Uri.parse('$_baseUrl/chat/stream'));
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode(body);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        String text = data['response'] as String;
-        // String leading/trailing quotes if LLM added them
-        text = text.trim();
-        if (text.startsWith('"') && text.endsWith('"')) {
-          text = text.substring(1, text.length - 1);
-        }
-        
-        // Extract suggestions
-        List<String> suggestions = [];
-        if (data['suggestions'] != null) {
-          suggestions = List<String>.from(data['suggestions']);
-        }
-        
-        return {
-          'response': text.trim(),
-          'suggestions': suggestions,
-        };
-      } else {
-        throw Exception('Failed to connect to agent: ${response.statusCode}');
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        yield {'type': 'error', 'text': 'Server error: ${response.statusCode}'};
+        return;
       }
-    } catch (e) {
-      return {
-        'response': "I'm having trouble connecting to the server. Please make sure the backend is running.",
-        'suggestions': <String>[],
-      };
+
+      final lines = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      await for (final line in lines) {
+        if (line.startsWith('data: ')) {
+          final data = line.substring(6).trim();
+          if (data == '[DONE]') return;
+          try {
+            yield jsonDecode(data) as Map<String, dynamic>;
+          } catch (_) {}
+        }
+      }
+    } catch (_) {
+      // Client closed (cancelled) or network error — just stop yielding.
     }
   }
 
-  Future<void> sendInteraction(String messageId, String type, bool value) async {
+  // ── Interaction ────────────────────────────────────────────────────────────
+
+  Future<void> sendInteraction(
+      String messageId, String type, bool value) async {
     try {
       await http.post(
         Uri.parse('$_baseUrl/interaction'),
@@ -71,7 +99,7 @@ class ChatService {
         }),
       );
     } catch (e) {
-      print('Failed to send interaction: $e');
+      // ignore interaction failures
     }
   }
 }

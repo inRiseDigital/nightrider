@@ -1,5 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:nightride/components/home_language_sheet.dart';
@@ -170,6 +173,82 @@ class _NotificationsPageState extends ConsumerState<_NotificationsPage> {
   }
 }
 
+// ── Delete account ───────────────────────────────────────────────────────────
+
+Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: AppTheme.surface,
+      title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
+      content: const Text(
+        'This will permanently delete your account and all your data. This cannot be undone.',
+        style: TextStyle(color: Colors.white70),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final uid = user.uid;
+
+    // Delete Firestore data
+    final db = FirebaseFirestore.instance;
+    await Future.wait([
+      db.collection('users').doc(uid).delete(),
+      db.collection('avatars').doc(uid).delete(),
+    ]);
+
+    // Clear onboarding so it shows again on next launch
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('onboarding_completed');
+    await prefs.remove('ob_ageRange');
+    await prefs.remove('ob_genres');
+    await prefs.remove('ob_vibes');
+    await prefs.remove('ob_features');
+    await prefs.remove('ob_goOutTime');
+    await prefs.remove('ob_budget');
+
+    // Delete Firebase Auth account
+    await user.delete();
+
+    // Sign out and go to sign-in (onboarding will show after they create a new account)
+    await ref.read(authServiceProvider).signOut();
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const SignInPage()),
+        (route) => false,
+      );
+    }
+  } on FirebaseAuthException catch (e) {
+    if (!context.mounted) return;
+    if (e.code == 'requires-recent-login') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign out and sign in again before deleting your account.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.message}'), backgroundColor: Colors.redAccent),
+      );
+    }
+  }
+}
+
 // ── Privacy & Security ───────────────────────────────────────────────────────
 
 class _PrivacyPage extends ConsumerWidget {
@@ -222,18 +301,7 @@ class _PrivacyPage extends ConsumerWidget {
               icon: Icons.delete_outline_rounded,
               label: 'Delete Account',
               color: Colors.redAccent,
-              onTap: () => showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  backgroundColor: AppTheme.surface,
-                  title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
-                  content: const Text('This action cannot be undone. All your data will be permanently deleted.', style: TextStyle(color: Colors.white70)),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Delete', style: TextStyle(color: Colors.redAccent))),
-                  ],
-                ),
-              ),
+              onTap: () => _confirmDeleteAccount(context, ref),
             ),
           ],
         ),

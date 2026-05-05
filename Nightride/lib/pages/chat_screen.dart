@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,7 +8,7 @@ import 'package:photo_view/photo_view_gallery.dart';
 import 'package:geolocator/geolocator.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/chat_session.dart';
-import '../data/services/chat_service.dart';
+import '../data/services/chat_service.dart' show ChatService, ChatStreamHandle;
 import '../data/services/chat_history_service.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -27,10 +28,13 @@ class _ChatScreenState extends State<ChatScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   bool _isLoading = false;
+  String? _statusText;
+  ChatStreamHandle? _streamHandle;
   double? _userLatitude;
   double? _userLongitude;
   List<ChatSession> _sessions = [];
   String? _currentSessionId;
+  StreamSubscription<List<ChatSession>>? _sessionsSub;
 
   static const kPrimary = Color(0xFF9F7AEA);
   static const kBackground = Color(0xFFF8F7FF);
@@ -50,12 +54,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _checkLocationStatus();
-    _loadSessions();
-  }
-
-  Future<void> _loadSessions() async {
-    final sessions = await _historyService.loadSessions();
-    if (mounted) setState(() => _sessions = sessions);
+    _sessionsSub = _historyService.sessionsStream().listen((sessions) {
+      if (mounted) setState(() => _sessions = sessions);
+    });
   }
 
   Future<void> _checkLocationStatus() async {
@@ -97,14 +98,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // Fire-and-forget save so current session persists when switching tabs
+    if (_messages.isNotEmpty) {
+      _historyService.upsertSession(_currentSessionId, List.from(_messages));
+    }
+    _sessionsSub?.cancel();
     _focusNode.dispose();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
+  Future<void> _autoSave() async {
+    if (_messages.isEmpty) return;
+    _currentSessionId = await _historyService.upsertSession(_currentSessionId, _messages);
+  }
+
   Future<void> _startNewChat() async {
-    if (_messages.isNotEmpty) await _historyService.saveSession(_messages);
+    await _autoSave();
     if (!mounted) return;
     setState(() {
       _messages.clear();
@@ -116,12 +127,11 @@ class _ChatScreenState extends State<ChatScreen> {
         "Weekend schedule",
       ];
     });
-    await _loadSessions();
     if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _loadSession(ChatSession session) async {
-    if (_messages.isNotEmpty) await _historyService.saveSession(_messages);
+    await _autoSave();
     if (!mounted) return;
     setState(() {
       _currentSessionId = session.id;
@@ -150,7 +160,6 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       if (mounted) Navigator.of(context).pop(); // close drawer
     }
-    await _loadSessions();
   }
 
   Future<void> _clearCurrentChat() async {
@@ -194,36 +203,99 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _handleSend({String? text}) async {
     final messageText = text ?? _controller.text.trim();
     if (messageText.isEmpty || _isLoading) return;
+
+    final historySnapshot = List<ChatMessage>.from(_messages);
     setState(() {
       _messages.add(ChatMessage(content: messageText, role: 'user'));
       _isLoading = true;
+      _statusText = 'Thinking...';
       if (text == null) _controller.clear();
     });
     _scrollToBottom();
+
+    final handle = _chatService.streamMessage(
+      messageText,
+      historySnapshot,
+      latitude: _userLatitude,
+      longitude: _userLongitude,
+    );
+    _streamHandle = handle;
+
+    ChatMessage? assistantMsg;
+
     try {
-      final responseData = await _chatService.sendMessage(
-        messageText,
-        _messages.sublist(0, _messages.length - 1),
-        latitude: _userLatitude,
-        longitude: _userLongitude,
-      );
-      if (!mounted) return;
+      await for (final event in handle.events) {
+        if (!mounted) break;
+        final type = event['type'] as String? ?? '';
+
+        if (type == 'status') {
+          setState(() => _statusText = event['text'] as String?);
+        } else if (type == 'token') {
+          final token = event['text'] as String? ?? '';
+          if (assistantMsg == null) {
+            assistantMsg = ChatMessage(content: token, role: 'assistant');
+            setState(() {
+              _messages.add(assistantMsg!);
+              _statusText = null; // hide thinking indicator
+            });
+          } else {
+            setState(() => assistantMsg!.content += token);
+          }
+          _scrollToBottom();
+        } else if (type == 'done') {
+          final recs = (event['recommendations'] as List<dynamic>?) ?? [];
+          final suggestions =
+              ((event['suggestions'] as List<dynamic>?) ?? []).cast<String>();
+          if (recs.isNotEmpty && assistantMsg != null) {
+            setState(() {
+              assistantMsg!.content += _buildRecsMarkdown(recs);
+              if (suggestions.isNotEmpty) _suggestions = suggestions;
+            });
+          } else if (suggestions.isNotEmpty) {
+            setState(() => _suggestions = suggestions);
+          }
+        } else if (type == 'error') {
+          if (assistantMsg == null) {
+            setState(() {
+              _messages.add(ChatMessage(
+                content: "Sorry, I'm having trouble connecting right now. 😅",
+                role: 'assistant',
+              ));
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (mounted) {
       setState(() {
-        _messages.add(ChatMessage(content: responseData['response'], role: 'assistant'));
         _isLoading = false;
-        final aiSuggestions = responseData['suggestions'] as List<String>;
-        if (aiSuggestions.isNotEmpty) _suggestions = aiSuggestions;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _messages.add(ChatMessage(
-            content: "Sorry, I'm having trouble connecting right now. 😅",
-            role: 'assistant'));
-        _isLoading = false;
+        _statusText = null;
       });
     }
+    _streamHandle = null;
     _scrollToBottom();
+    _autoSave();
+  }
+
+  String _buildRecsMarkdown(List<dynamic> recs) {
+    final sb = StringBuffer('\n\n');
+    for (final raw in recs) {
+      final party = raw as Map<String, dynamic>;
+      sb.write('- **${party['title']}**\n');
+      final images = ((party['images'] as List<dynamic>?) ?? [])
+          .cast<String>()
+          .where((img) => img.isNotEmpty && img.startsWith('http'))
+          .toList();
+      if (images.isNotEmpty) {
+        sb.write(
+            '  - ${images.map((img) => '![thumbnail]($img)').join(' ')}\n');
+      }
+      sb.write(
+          '  - **Location**: ${party['location']}, **${party['country']}**\n');
+      sb.write('  - **Time**: ${party['time']}\n');
+    }
+    return sb.toString();
   }
 
   void _handleInteraction(ChatMessage message, String type) {
@@ -266,9 +338,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop && _messages.isNotEmpty) {
-          await _historyService.saveSession(_messages);
-        }
+        if (didPop) await _autoSave();
       },
       child: Theme(
         data: ThemeData(
@@ -293,7 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemBuilder: (context, index) => _buildMessageRow(_messages[index]),
                       ),
               ),
-              if (_isLoading) _buildLoadingIndicator(),
+              _buildLoadingIndicator(),
               _buildInputArea(),
             ],
           ),
@@ -424,7 +494,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                   if (confirmed == true && mounted) {
                     await _historyService.clearAll();
-                    await _loadSessions();
                     if (mounted) Navigator.of(context).pop();
                   }
                 },
@@ -489,6 +558,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildLoadingIndicator() {
+    // Only shown while waiting for first token (statusText is set)
+    if (_statusText == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
       child: Row(
@@ -502,7 +573,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
           ),
           const SizedBox(width: 12),
-          Text('Thinking...', style: GoogleFonts.outfit(color: kTextMuted, fontSize: 13)),
+          Text(_statusText!,
+              style: GoogleFonts.outfit(color: kTextMuted, fontSize: 13)),
         ],
       ),
     );
@@ -766,20 +838,39 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    IconButton(
-                      onPressed:
-                          _controller.text.trim().isEmpty ? null : _handleSend,
-                      icon: const Icon(Icons.arrow_upward_rounded),
-                      color: Colors.white,
-                      style: IconButton.styleFrom(
-                        backgroundColor: _controller.text.trim().isNotEmpty
-                            ? kPrimary
-                            : Colors.transparent,
-                        shape: const CircleBorder(),
-                        padding: const EdgeInsets.all(8),
-                        disabledForegroundColor: Colors.white24,
+                    if (_isLoading)
+                      IconButton(
+                        onPressed: () {
+                          _streamHandle?.cancel();
+                          _streamHandle = null;
+                          setState(() {
+                            _isLoading = false;
+                            _statusText = null;
+                          });
+                        },
+                        icon: const Icon(Icons.stop_rounded),
+                        color: Colors.white,
+                        style: IconButton.styleFrom(
+                          backgroundColor: kAccent,
+                          shape: const CircleBorder(),
+                          padding: const EdgeInsets.all(8),
+                        ),
+                      )
+                    else
+                      IconButton(
+                        onPressed:
+                            _controller.text.trim().isEmpty ? null : _handleSend,
+                        icon: const Icon(Icons.arrow_upward_rounded),
+                        color: Colors.white,
+                        style: IconButton.styleFrom(
+                          backgroundColor: _controller.text.trim().isNotEmpty
+                              ? kPrimary
+                              : Colors.transparent,
+                          shape: const CircleBorder(),
+                          padding: const EdgeInsets.all(8),
+                          disabledForegroundColor: Colors.white24,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

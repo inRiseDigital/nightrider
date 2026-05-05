@@ -12,7 +12,9 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
 
 /// Provider for GoogleSignIn instance
 final googleSignInProvider = Provider<GoogleSignIn>((ref) {
-  return GoogleSignIn();
+  return GoogleSignIn(
+    clientId: '218660887469-uqtutg9a7qd7dqu6jva7qpbk8ujm358n.apps.googleusercontent.com',
+  );
 });
 
 /// Stream provider for auth state changes
@@ -111,7 +113,13 @@ class AuthService {
       );
 
       final cred = await _auth.signInWithCredential(credential);
-      if (cred.user != null) await _profileService.createIfAbsent(cred.user!);
+      if (cred.user != null) {
+        await _profileService.createIfAbsent(cred.user!);
+        // Save onboarding answers for first-time Google sign-in users
+        if (cred.additionalUserInfo?.isNewUser == true) {
+          await _flushOnboardingAnswers(cred.user!.uid);
+        }
+      }
       return cred;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);

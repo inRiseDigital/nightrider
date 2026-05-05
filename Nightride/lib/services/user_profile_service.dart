@@ -111,6 +111,18 @@ class UserProfileService {
     } catch (_) {}
   }
 
+  /// Returns true if the user has completed onboarding (ageRange is non-empty).
+  Future<bool> hasCompletedOnboarding(String uid) async {
+    try {
+      final snap = await _col.doc(uid).get(const GetOptions(source: Source.server));
+      if (!snap.exists) return false;
+      final ageRange = snap.data()?['ageRange'] as String? ?? '';
+      return ageRange.isNotEmpty;
+    } catch (_) {
+      return true; // on error, don't block the user
+    }
+  }
+
   /// Save all onboarding answers at once.
   Future<void> saveOnboardingAnswers({
     required String uid,

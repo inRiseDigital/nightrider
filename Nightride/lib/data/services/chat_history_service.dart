@@ -8,11 +8,13 @@ class ChatHistoryService {
   static const _maxSessions = 30;
 
   CollectionReference<Map<String, dynamic>>? _col() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return null;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    // Key by email; fall back to uid for anonymous / no-email accounts
+    final docKey = user.email ?? user.uid;
     return FirebaseFirestore.instance
         .collection('users')
-        .doc(uid)
+        .doc(docKey)
         .collection('chat_sessions');
   }
 
@@ -29,20 +31,26 @@ class ChatHistoryService {
             .toList());
   }
 
-  Future<void> saveSession(List<ChatMessage> messages) async {
-    if (messages.isEmpty) return;
+  /// Creates a new session or updates an existing one. Returns the session ID.
+  Future<String> upsertSession(String? sessionId, List<ChatMessage> messages) async {
+    if (messages.isEmpty) return sessionId ?? '';
     final col = _col();
-    if (col == null) return;
+    if (col == null) return sessionId ?? '';
     final now = DateTime.now();
-    final id = const Uuid().v4();
-    final session = ChatSession(
-      id: id,
-      title: _makeTitle(messages),
-      messages: List.from(messages),
-      createdAt: now,
-      updatedAt: now,
-    );
-    await col.doc(id).set(session.toJson());
+    final id = sessionId ?? const Uuid().v4();
+    final data = <String, dynamic>{
+      'id': id,
+      'title': _makeTitle(messages),
+      'messages': messages.map((m) => m.toJsonFull()).toList(),
+      'updatedAt': now.toIso8601String(),
+    };
+    if (sessionId == null) {
+      data['createdAt'] = now.toIso8601String();
+      await col.doc(id).set(data);
+    } else {
+      await col.doc(id).set(data, SetOptions(merge: true));
+    }
+    return id;
   }
 
   Future<void> deleteSession(String id) async {

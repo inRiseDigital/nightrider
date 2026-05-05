@@ -1,15 +1,18 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:http/http.dart' as http;
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as ll;
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide MapOptions;
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:nightride/components/category_chips_row.dart';
@@ -56,6 +59,9 @@ class _MapPageState extends ConsumerState<MapPage>
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return _buildWebMap(context);
+    }
     // Fly to event location when tapped from detail page
     ref.listen<MapFocus?>(mapFocusProvider, (_, focus) {
       if (focus == null) return;
@@ -591,6 +597,85 @@ class _MapPageState extends ConsumerState<MapPage>
       builder: (BuildContext ctx) => VenueSearchSheet(
         initialVenues: _currentEvents.isNotEmpty ? _currentEvents : kBottomCards,
         onVenueSelect: (venue) => _onVenueSelected(venue),
+      ),
+    );
+  }
+
+  Widget _buildWebMap(BuildContext context) {
+    final liveEvents = ref.watch(mapEventsProvider).asData?.value ?? [];
+    final allEvents = liveEvents.isNotEmpty ? liveEvents : kBottomCards;
+    final List<MapBottomCardData> displayEvents = _selectedCategoryIndex == null
+        ? allEvents
+        : allEvents.where((e) {
+            final label = kMapCategories[_selectedCategoryIndex!].label;
+            return e.tags.any((t) => matchesGenre(t, label)) ||
+                matchesGenre(e.subtitle, label);
+          }).toList();
+
+    return Scaffold(
+      backgroundColor: AppTheme.scaffold,
+      body: Stack(
+        children: [
+          FlutterMap(
+            options: MapOptions(
+              initialCenter: const ll.LatLng(20.0, 0.0),
+              initialZoom: 2.0,
+              onTap: (_, __) => setState(() => _selectedVenue = null),
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.therisetechvillage.nightride',
+              ),
+              MarkerLayer(
+                markers: displayEvents
+                    .where((e) => e.lat != 0 && e.lng != 0)
+                    .map((e) => Marker(
+                          point: ll.LatLng(e.lat, e.lng),
+                          width: 40,
+                          height: 40,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedVenue = e),
+                            child: const Icon(
+                              Icons.location_pin,
+                              color: Color(0xFFE53935),
+                              size: 36,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 0),
+              child: CategoryChipsRow(
+                items: kMapCategories,
+                selectedIndex: _selectedCategoryIndex,
+                onSelected: (int? idx) => setState(() => _selectedCategoryIndex = idx),
+              ),
+            ),
+          ),
+          if (_selectedVenue != null)
+            Positioned(
+              left: 14.w,
+              right: 14.w,
+              bottom: 50.h,
+              child: VenueCard(
+                data: _selectedVenue!,
+                onTap: () => _showVenueModal(context, _selectedVenue!),
+                onMoreDetails: () {
+                  final v = _selectedVenue!;
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => v.id.isNotEmpty
+                        ? EventDetailPage(id: v.id)
+                        : VenueDetailsPage(data: v),
+                  ));
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

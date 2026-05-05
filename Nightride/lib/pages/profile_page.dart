@@ -6,9 +6,9 @@ import 'package:nightride/components/profile_header.dart';
 import 'package:nightride/components/profile_interests.dart';
 import 'package:nightride/components/profile_social_links.dart';
 import 'package:nightride/components/profile_top_bar.dart';
-
 import '../../../../core/theme/app_theme.dart';
 import '../providers/profile_providers.dart';
+import 'package:nightride/services/user_profile_service.dart';
 import 'package:nightride/pages/settings_page.dart';
 
 class ProfilePage extends ConsumerWidget {
@@ -18,6 +18,7 @@ class ProfilePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(profileProvider);
     final controller = ref.read(profileProvider.notifier);
+    final avatarBase64 = ref.watch(avatarBase64Provider).asData?.value;
 
     final bool editing = state.isEditing;
 
@@ -56,6 +57,7 @@ class ProfilePage extends ConsumerWidget {
                   onEdit: controller.enterEdit,
                   onSave: controller.saveEdit,
                   onCancel: controller.cancelEdit,
+                  avatarBase64: avatarBase64,
                 ),
                 SizedBox(height: 20.h),
 

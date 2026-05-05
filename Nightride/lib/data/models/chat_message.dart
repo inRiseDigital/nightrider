@@ -2,7 +2,7 @@ import 'package:uuid/uuid.dart';
 
 class ChatMessage {
   final String id;
-  final String content;
+  String content;
   final String role; // 'user' or 'assistant'
   final DateTime timestamp;
   bool isLiked;

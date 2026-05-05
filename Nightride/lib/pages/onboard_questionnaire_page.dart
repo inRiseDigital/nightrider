@@ -9,7 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/theme/app_theme.dart';
-import 'package:nightride/pages/auth/sign_in_page.dart';
+import 'package:nightride/pages/app_shell_page.dart';
 import 'package:nightride/services/user_profile_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -224,6 +224,11 @@ class OnboardQuestionnaireFlowNotifier
     state = state.copyWith(stepIndex: state.stepIndex + 1);
   }
 
+  void previousStep() {
+    if (state.stepIndex <= 0) return;
+    state = state.copyWith(stepIndex: state.stepIndex - 1);
+  }
+
   void skipStep() => nextStep();
 
   Future<void> completeOnboarding(BuildContext context) async {
@@ -256,8 +261,9 @@ class OnboardQuestionnaireFlowNotifier
     await prefs.setString('ob_budget',   (sel[5] ?? {}).firstOrNull ?? '');
 
     if (context.mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const SignInPage()),
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => AppShellPage()),
+        (route) => false,
       );
     }
   }
@@ -384,56 +390,53 @@ class _OnboardQuestionnaireTemplatePageState
 
                         const Spacer(),
 
-                        /// ✅ “alive” button when enabled (very subtle)
-                        _PrimaryButtonBreathing(
-                          label:
-                              s.stepIndex == kTotalSteps - 1
-                                  ? 'Finish'
-                                  : 'Next',
-                          enabled: enabled,
-                          breathe: enabled,
-                          onTap:
-                              enabled
-                                  ? () {
-                                      if (s.stepIndex == kTotalSteps - 1) {
-                                        ref
-                                            .read(
-                                              onboardQuestionnaireFlowProvider
-                                                  .notifier,
-                                            )
-                                            .completeOnboarding(context);
-                                      } else {
-                                        ref
-                                            .read(
-                                              onboardQuestionnaireFlowProvider
-                                                  .notifier,
-                                            )
-                                            .nextStep();
+                        // Previous + Next/Finish row
+                        Row(
+                          children: [
+                            if (s.stepIndex > 0) ...[
+                              _GhostButton(
+                                label: 'Back',
+                                onTap: () => ref
+                                    .read(onboardQuestionnaireFlowProvider.notifier)
+                                    .previousStep(),
+                              ),
+                              SizedBox(width: 12.w),
+                            ],
+                            Expanded(
+                              child: _PrimaryButtonBreathing(
+                                label: s.stepIndex == kTotalSteps - 1 ? 'Finish' : 'Next',
+                                enabled: enabled,
+                                breathe: enabled,
+                                onTap: enabled
+                                    ? () {
+                                        if (s.stepIndex == kTotalSteps - 1) {
+                                          ref
+                                              .read(onboardQuestionnaireFlowProvider.notifier)
+                                              .completeOnboarding(context);
+                                        } else {
+                                          ref
+                                              .read(onboardQuestionnaireFlowProvider.notifier)
+                                              .nextStep();
+                                        }
                                       }
-                                    }
-                                  : null,
+                                    : null,
+                              ),
+                            ),
+                          ],
                         ),
                         Gap(18.h),
 
-                        /// ✅ Skip hidden on LAST screen only
+                        // Skip — hidden on last step
                         if (s.stepIndex != kTotalSteps - 1)
                           Align(
                             alignment: Alignment.centerRight,
                             child: GestureDetector(
-                              onTap:
-                                  () =>
-                                      ref
-                                          .read(
-                                            onboardQuestionnaireFlowProvider
-                                                .notifier,
-                                          )
-                                          .skipStep(),
+                              onTap: () => ref
+                                  .read(onboardQuestionnaireFlowProvider.notifier)
+                                  .skipStep(),
                               behavior: HitTestBehavior.translucent,
                               child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 6.w,
-                                  vertical: 6.h,
-                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 6.h),
                                 child: Text(
                                   'skip',
                                   style: TextStyle(
@@ -747,6 +750,38 @@ class _OptionChip extends StatelessWidget {
 /// ─────────────────────────────────────────────────────────────────────────────
 /// BUTTON (subtle breathing when enabled)
 /// ─────────────────────────────────────────────────────────────────────────────
+
+class _GhostButton extends StatelessWidget {
+  const _GhostButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 58.h,
+        padding: EdgeInsets.symmetric(horizontal: 20.w),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22.r),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          color: Colors.white.withValues(alpha: 0.05),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.70),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _PrimaryButtonBreathing extends StatefulWidget {
   const _PrimaryButtonBreathing({

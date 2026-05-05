@@ -9,10 +9,10 @@ import 'package:nightride/components/auth_process_scaffold.dart';
 import 'package:nightride/pages/app_shell_page.dart';
 import 'package:nightride/pages/auth/sign_up_page.dart';
 import 'package:nightride/pages/forgotPw/forgot_pw.dart';
+import 'package:nightride/pages/onboard_questionnaire_page.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/user_profile_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:nightride/l10n/app_localizations.dart';
 import '../../../../../core/theme/app_theme.dart';
@@ -58,15 +58,20 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       if (mounted) {
         final user = cred.user;
         String role = 'user';
+        bool onboardingDone = true;
         if (user != null) {
-          await ref.read(userProfileServiceProvider).createIfAbsent(user);
-          role = await ref.read(userProfileServiceProvider).getUserRole(user.uid);
+          final svc = ref.read(userProfileServiceProvider);
+          await svc.createIfAbsent(user);
+          role = await svc.getUserRole(user.uid);
+          if (role != 'organizer') {
+            onboardingDone = await svc.hasCompletedOnboarding(user.uid);
+          }
         }
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => role == 'organizer'
                 ? const OrganizerShellPage()
-                : const AppShellPage()),
+                : onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage()),
           );
         }
       }
@@ -90,15 +95,20 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       if (mounted) {
         final user = cred.user;
         String role = 'user';
+        bool onboardingDone = true;
         if (user != null) {
-          await ref.read(userProfileServiceProvider).createIfAbsent(user);
-          role = await ref.read(userProfileServiceProvider).getUserRole(user.uid);
+          final svc = ref.read(userProfileServiceProvider);
+          await svc.createIfAbsent(user);
+          role = await svc.getUserRole(user.uid);
+          if (role != 'organizer') {
+            onboardingDone = await svc.hasCompletedOnboarding(user.uid);
+          }
         }
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => role == 'organizer'
                 ? const OrganizerShellPage()
-                : const AppShellPage()),
+                : onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage()),
           );
         }
       }

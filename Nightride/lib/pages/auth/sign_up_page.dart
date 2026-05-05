@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:nightride/components/auth_process_scaffold.dart';
-import 'package:nightride/pages/app_shell_page.dart';
+import 'package:nightride/pages/onboard_questionnaire_page.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/services/auth_service.dart';
 
@@ -66,7 +66,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => _selectedRole == 'organizer'
               ? const OrganizerShellPage()
-              : const AppShellPage()),
+              : const OnboardQuestionnaireTemplatePage()),
         );
       }
     } catch (e) {
@@ -88,7 +88,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       await ref.read(authServiceProvider).signInWithGoogle();
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const AppShellPage()),
+          MaterialPageRoute(builder: (_) => const OnboardQuestionnaireTemplatePage()),
         );
       }
     } catch (e) {

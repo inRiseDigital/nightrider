@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import 'package:nightride/core/responsive/app_responsive.dart';
+
 class ProfileSectionCard extends StatelessWidget {
   const ProfileSectionCard({
     super.key,
@@ -15,9 +17,10 @@ class ProfileSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pad = AppResponsive.profileCardPadding(context);
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 14.h),
+      padding: EdgeInsets.fromLTRB(pad, pad - 2, pad, pad),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(18.r),
@@ -34,7 +37,7 @@ class ProfileSectionCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12.5.sp,
+                    fontSize: AppResponsive.profileCardTitleFont(context),
                     fontWeight: FontWeight.w900,
                     color: Colors.white.withValues(alpha: 0.80),
                     letterSpacing: 0.4,
@@ -44,7 +47,7 @@ class ProfileSectionCard extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
-          SizedBox(height: 10.h),
+          SizedBox(height: AppResponsive.gap(context, 8)),
           child,
         ],
       ),

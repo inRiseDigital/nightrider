@@ -12,11 +12,12 @@ class ForgotPwPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.sizeOf(context).width;
     return AuthProcessScaffold(
       title: 'Forgot password',
       subtitle:
           "Enter your email and we'll send you a OTP to reset your password",
-      titleTopGap: 88,
+      titleTopGap: screenW > 600 ? 16.0 : 88.0,
       reservedBottomGap: 380,
       bottomPanel: const _ForgotBottomPanel(),
       bottomOverlay: Positioned(
@@ -124,11 +125,26 @@ class _ForgotBottomPanel extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: 44.h,
-            left: 22.w,
-            right: 22.w,
-            child: Column(
-              children: const [_EmailField(), Gap(22), _SendButton()],
+            top: 20.h,
+            left: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width > 600
+                      ? (MediaQuery.sizeOf(context).width * 0.88).clamp(480.0, 640.0)
+                      : 480.0,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 22.w.clamp(0.0, 32.0),
+                  ),
+                  child: const Column(
+                    children: [_EmailField(), Gap(18), _SendButton()],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -231,7 +247,7 @@ class _SendButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 62.h,
-      width: 1.sw,
+      width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
           Navigator.of(context).push(

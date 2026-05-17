@@ -171,8 +171,8 @@ class _VenueSearchSheetState extends State<VenueSearchSheet> {
                               Padding(
                                 padding: EdgeInsets.only(right: 10.w),
                                 child: SizedBox(
-                                  width: 16.w,
-                                  height: 16.w,
+                                  width: 16.sp,
+                                  height: 16.sp,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: AppTheme.primary,
@@ -306,8 +306,8 @@ class _SearchResultItem extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 44.w,
-              height: 44.w,
+              width: 44.sp,
+              height: 44.sp,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10.r),

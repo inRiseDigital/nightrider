@@ -23,11 +23,6 @@ class FeaturedCarouselIndexNotifier extends Notifier<int> {
   void setIndex(int index) => state = index;
 }
 
-/// Like state per event id
-final trendingLikeProvider = StateProvider.family<bool, String>(
-  (ref, id) => false,
-);
-
 /// Dark mode UI toggle (UI only)
 final homeDarkToggleProvider = StateProvider<bool>((ref) => true);
 
@@ -118,16 +113,18 @@ TrendingEvent _toTrending(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
   final city = d['city'] as String? ?? '';
   final country = d['country'] as String? ?? '';
   final loc = [city, country].where((s) => s.isNotEmpty).join(', ');
+  final rawDate = d['date'] as String? ?? '';
   return TrendingEvent(
     id: doc.id,
     title: d['name'] as String? ?? '',
     locationText: loc.isNotEmpty ? loc : 'Unknown',
-    dateText: _fmtDate(d['date'] as String? ?? ''),
+    dateText: _fmtDate(rawDate),
     categoryTag: (d['genre'] as String? ?? 'Music').toUpperCase(),
     imageUrl: d['cover_image'] as String? ?? '',
     interestedCountText: d['price_hint'] as String? ?? 'Tickets',
     countryCode: d['country_code'] as String? ?? '',
     language: d['language'] as String? ?? '',
+    rawDate: rawDate,
   );
 }
 

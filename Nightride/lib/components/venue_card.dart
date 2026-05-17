@@ -1,8 +1,8 @@
 // lib/features/map/presentation/widgets/venue_card.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:gap/gap.dart';
 import 'package:nightride/components/marquee_text.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
 
@@ -20,9 +20,16 @@ class VenueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cardHeight = AppResponsive.mapBottomCardHeight(context);
+    final imageWidth = AppResponsive.mapBottomCardImageSize(context);
+    final innerPadding = AppResponsive.gap(context, 10);
+    final radius = AppResponsive.radius(context, 22);
+    final imageRadius = AppResponsive.radius(context, 16);
+    final buttonHeight = AppResponsive.gap(context, 30).clamp(28.0, 36.0);
+
     final TextStyle titleStyle = TextStyle(
       color: Colors.white,
-      fontSize: 15.8.sp,
+      fontSize: AppResponsive.font(context, 15.5),
       fontWeight: FontWeight.w900,
       letterSpacing: 0.2,
       height: 1.05,
@@ -30,7 +37,7 @@ class VenueCard extends StatelessWidget {
 
     final TextStyle metaStyle = TextStyle(
       color: Colors.white.withValues(alpha: 0.70),
-      fontSize: 12.2.sp,
+      fontSize: AppResponsive.font(context, 12),
       fontWeight: FontWeight.w700,
     );
 
@@ -38,12 +45,12 @@ class VenueCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22.r),
+        borderRadius: BorderRadius.circular(radius),
         child: Container(
-          height: 118.h,
-          padding: EdgeInsets.all(10.r),
+          height: cardHeight,
+          padding: EdgeInsets.all(innerPadding),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22.r),
+            borderRadius: BorderRadius.circular(radius),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -70,12 +77,13 @@ class VenueCard extends StatelessWidget {
             ],
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               /// IMAGE
               ClipRRect(
-                borderRadius: BorderRadius.circular(16.r),
+                borderRadius: BorderRadius.circular(imageRadius),
                 child: SizedBox(
-                  width: 110.w,
+                  width: imageWidth,
                   height: double.infinity,
                   child: Stack(
                     fit: StackFit.expand,
@@ -129,27 +137,27 @@ class VenueCard extends StatelessWidget {
                 ),
               ),
 
-              Gap(10.w),
+              SizedBox(width: AppResponsive.gap(context, 10)),
 
               /// TEXT + BUTTON
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
-                    SizedBox(
-                      height: 18.h,
+                    Flexible(
                       child: MarqueeText(text: data.title, style: titleStyle),
                     ),
-                    Gap(6.h),
+                    SizedBox(height: AppResponsive.gap(context, 6)),
                     Row(
                       children: <Widget>[
                         Icon(
                           Icons.access_time_rounded,
-                          size: 14.sp,
+                          size: AppResponsive.icon(context, 14),
                           color: Colors.white.withValues(alpha: 0.58),
                         ),
-                        Gap(6.w),
+                        SizedBox(width: AppResponsive.gap(context, 6)),
                         Expanded(
                           child: MarqueeText(
                             text: data.openText,
@@ -158,11 +166,11 @@ class VenueCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    Gap(10.h),
+                    SizedBox(height: AppResponsive.gap(context, 10)),
 
                     /// MORE DETAILS BUTTON
                     SizedBox(
-                      height: 34.h,
+                      height: buttonHeight,
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: onMoreDetails,
@@ -174,6 +182,8 @@ class VenueCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14.r),
                           ),
                           padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: Text(
                           'More details',

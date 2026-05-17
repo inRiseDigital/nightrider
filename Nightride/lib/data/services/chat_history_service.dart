@@ -10,8 +10,7 @@ class ChatHistoryService {
   CollectionReference<Map<String, dynamic>>? _col() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
-    // Key by email; fall back to uid for anonymous / no-email accounts
-    final docKey = user.email ?? user.uid;
+    final docKey = user.uid;
     return FirebaseFirestore.instance
         .collection('users')
         .doc(docKey)

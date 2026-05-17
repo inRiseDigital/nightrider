@@ -179,8 +179,8 @@ class _SearchAppBarRowState extends ConsumerState<SearchAppBarRow> {
                       onTap: _clear,
                       borderRadius: BorderRadius.circular(999.r),
                       child: Container(
-                        width: 30.w,
-                        height: 30.w,
+                        width: 30.sp,
+                        height: 30.sp,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(
                             alpha: glowOn ? 0.08 : 0.06,

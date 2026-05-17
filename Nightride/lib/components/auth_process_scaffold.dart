@@ -30,9 +30,11 @@ class AuthProcessScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ FIX: One single, fixed horizontal start for ALL pages using this scaffold.
-    // Never allow per-page padding overrides (prevents title/subtitle start shifting).
-    final horizontalPadding = EdgeInsets.symmetric(horizontal: 22.w);
+    final screenW = MediaQuery.sizeOf(context).width;
+    final hPad = screenW > 600
+        ? ((screenW - (screenW * 0.88).clamp(460.0, 640.0)) / 2).clamp(16.0, 80.0)
+        : 22.w;
+    final horizontalPadding = EdgeInsets.symmetric(horizontal: hPad);
 
     return Scaffold(
       backgroundColor: AppTheme.scaffold,
@@ -61,8 +63,8 @@ class AuthProcessScaffold extends StatelessWidget {
                           Row(
                             children: [
                               Container(
-                                width: 38.w,
-                                height: 38.w,
+                                width: 38.sp,
+                                height: 38.sp,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFEDE9FE),
                                   borderRadius: BorderRadius.circular(10.r),
@@ -110,19 +112,15 @@ class AuthProcessScaffold extends StatelessWidget {
 
                           Gap(12.h),
 
-                          // ✅ Subtitle: fixed width like your design, wraps but never shifts start.
-                          SizedBox(
-                            width: 320.w,
-                            child: Text(
-                              subtitle,
-                              textAlign: TextAlign.left,
-                              softWrap: true,
-                              style: TextStyle(
-                                fontSize: 14.5.sp,
-                                height: 1.35,
-                                color: AppTheme.primaryLight.withOpacity(0.55),
-                                letterSpacing: 0.1,
-                              ),
+                          Text(
+                            subtitle,
+                            textAlign: TextAlign.left,
+                            softWrap: true,
+                            style: TextStyle(
+                              fontSize: 14.5.sp,
+                              height: 1.35,
+                              color: AppTheme.primaryLight.withOpacity(0.55),
+                              letterSpacing: 0.1,
                             ),
                           ),
 

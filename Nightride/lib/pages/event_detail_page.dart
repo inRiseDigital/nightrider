@@ -117,7 +117,8 @@ class _DetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String mapToken = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
+    String mapToken = '';
+    try { mapToken = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? ''; } catch (_) {}
     final String staticMapUrl = (mapToken.isNotEmpty && _lat != 0 && _lng != 0)
         ? 'https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/'
             'pin-l+9f7aea($_lng,$_lat)/$_lng,$_lat,14,0/600x260@2x'

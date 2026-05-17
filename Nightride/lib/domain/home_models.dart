@@ -45,6 +45,7 @@ class TrendingEvent {
     this.avatars = const <String>[],
     this.countryCode = '',
     this.language = '',
+    this.rawDate = '',
   });
 
   final String id;
@@ -57,4 +58,6 @@ class TrendingEvent {
   final List<String> avatars;
   final String countryCode;
   final String language;
+  /// Raw ISO date string (YYYY-MM-DD) used for notification scheduling and countdown display.
+  final String rawDate;
 }

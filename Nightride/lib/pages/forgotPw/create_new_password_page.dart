@@ -11,11 +11,11 @@ class CreateNewPasswordPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.sizeOf(context).width;
     return AuthProcessScaffold(
-      title: 'Create New Password',
+      title: "Create New Password",
       subtitle: "Set a strong password that you haven’t used before.",
-      // match the screenshot spacing (a bit lower than forgot screen)
-      titleTopGap: 88,
+      titleTopGap: screenW > 600 ? 16.0 : 88.0,
       reservedBottomGap: 380,
       bottomPanel: const _NewPasswordBottomPanel(),
     );
@@ -99,17 +99,32 @@ class _NewPasswordBottomPanel extends StatelessWidget {
 
           // Content
           Positioned(
-            top: 48.h,
-            left: 22.w,
-            right: 22.w,
-            child: Column(
-              children: const [
-                _PasswordField(hint: 'Password'),
-                Gap(18),
-                _PasswordField(hint: 'Confirm Password'),
-                Gap(34),
-                _ResetPasswordButton(),
-              ],
+            top: 20.h,
+            left: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width > 600
+                      ? (MediaQuery.sizeOf(context).width * 0.88).clamp(480.0, 640.0)
+                      : 480.0,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 22.w.clamp(0.0, 32.0),
+                  ),
+                  child: const Column(
+                    children: [
+                      _PasswordField(hint: 'Password'),
+                      Gap(18),
+                      _PasswordField(hint: 'Confirm Password'),
+                      Gap(34),
+                      _ResetPasswordButton(),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -228,7 +243,7 @@ class _ResetPasswordButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 62.h,
-      width: 1.sw,
+      width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
           // Go back to Sign In page and clear the navigation stack

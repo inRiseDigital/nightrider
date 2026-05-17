@@ -15,10 +15,12 @@ class ChatStreamHandle {
 }
 
 class ChatService {
-  static const String _baseUrl =
-      'https://9050-2406-2d40-6173-a008-bc37-814e-145-ab19.ngrok-free.app';
+  static const String _baseUrl = String.fromEnvironment(
+    'BACKEND_URL',
+    defaultValue: 'https://your-nightride-agent.onrender.com',
+  );
 
-  // ── Streaming ──────────────────────────────────────────────────────────────
+  static const String _apiKey = String.fromEnvironment('APP_API_KEY');
 
   ChatStreamHandle streamMessage(
     String message,
@@ -30,7 +32,6 @@ class ChatService {
     final stream = _streamImpl(
       client,
       message,
-      history,
       latitude: latitude,
       longitude: longitude,
     );
@@ -39,67 +40,50 @@ class ChatService {
 
   Stream<Map<String, dynamic>> _streamImpl(
     http.Client client,
-    String message,
-    List<ChatMessage> history, {
+    String message, {
     double? latitude,
     double? longitude,
   }) async* {
     try {
       final body = <String, dynamic>{
         'message': message,
-        'history': history.map((m) => m.toJson()).toList(),
+        'history': [],
+        if (latitude != null && longitude != null) 'latitude': latitude,
+        if (latitude != null && longitude != null) 'longitude': longitude,
       };
-      if (latitude != null && longitude != null) {
-        body['latitude'] = latitude;
-        body['longitude'] = longitude;
-      }
 
-      final request =
-          http.Request('POST', Uri.parse('$_baseUrl/chat/stream'));
+      final request = http.Request('POST', Uri.parse('$_baseUrl/chat/stream'));
       request.headers['Content-Type'] = 'application/json';
+      if (_apiKey.isNotEmpty) request.headers['X-API-Key'] = _apiKey;
       request.body = jsonEncode(body);
 
-      final response = await client.send(request);
+      final streamedResponse = await client.send(request);
 
-      if (response.statusCode != 200) {
-        yield {'type': 'error', 'text': 'Server error: ${response.statusCode}'};
+      if (streamedResponse.statusCode != 200) {
+        yield {'type': 'error', 'text': 'Server error: ${streamedResponse.statusCode}'};
         return;
       }
 
-      final lines = response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
-
-      await for (final line in lines) {
-        if (line.startsWith('data: ')) {
-          final data = line.substring(6).trim();
-          if (data == '[DONE]') return;
-          try {
-            yield jsonDecode(data) as Map<String, dynamic>;
-          } catch (_) {}
+      // Parse SSE: each event is separated by \n\n, lines start with "data: "
+      String leftover = '';
+      await for (final bytes in streamedResponse.stream) {
+        final chunk = leftover + utf8.decode(bytes);
+        final parts = chunk.split('\n\n');
+        leftover = parts.removeLast(); // may be an incomplete event
+        for (final part in parts) {
+          for (final line in part.split('\n')) {
+            final trimmed = line.trim();
+            if (!trimmed.startsWith('data: ')) continue;
+            final data = trimmed.substring(6).trim();
+            if (data == '[DONE]') return;
+            try {
+              yield jsonDecode(data) as Map<String, dynamic>;
+            } catch (_) {}
+          }
         }
       }
     } catch (_) {
-      // Client closed (cancelled) or network error — just stop yielding.
-    }
-  }
-
-  // ── Interaction ────────────────────────────────────────────────────────────
-
-  Future<void> sendInteraction(
-      String messageId, String type, bool value) async {
-    try {
-      await http.post(
-        Uri.parse('$_baseUrl/interaction'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'message_id': messageId,
-          'type': type,
-          'value': value,
-        }),
-      );
-    } catch (e) {
-      // ignore interaction failures
+      yield {'type': 'error', 'text': 'Network error'};
     }
   }
 }

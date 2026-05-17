@@ -119,7 +119,8 @@ class UserProfileService {
       final ageRange = snap.data()?['ageRange'] as String? ?? '';
       return ageRange.isNotEmpty;
     } catch (_) {
-      return true; // on error, don't block the user
+      // On Firestore error, send to onboarding rather than silently skipping it.
+      return false;
     }
   }
 
@@ -146,11 +147,22 @@ class UserProfileService {
   }
 
   /// Save a profile photo as base64 in a separate Firestore document.
-  /// The image should already be compressed (use imageQuality + maxWidth in image_picker).
+  /// Enforces a 300 KB limit to keep Firestore document size sane.
   Future<void> saveAvatarBase64(String uid, File imageFile) async {
     final bytes = await imageFile.readAsBytes();
+    if (bytes.length > 307200) { // 300 KB
+      throw Exception('Image is too large. Please choose a smaller photo (max 300 KB).');
+    }
     final base64Str = base64Encode(bytes);
     await _db.collection('avatars').doc(uid).set({'data': base64Str});
+  }
+
+  static String _sanitizeText(String value, {int maxLength = 200}) {
+    return value
+        .replaceAll(RegExp(r'<[^>]*>'), '') // strip HTML tags
+        .replaceAll(RegExp(r'[^\x20-\x7E -￿]'), '') // strip control chars
+        .trim()
+        .substring(0, value.trim().length.clamp(0, maxLength));
   }
 
   /// Update editable profile fields.
@@ -167,15 +179,15 @@ class UserProfileService {
     String? city,
   }) async {
     await _col.doc(uid).set({
-      'displayName': displayName,
-      'username': username,
-      'pronouns': pronouns,
-      'bio': bio,
-      'interests': interests,
-      'instagram': instagram,
-      'facebook': facebook,
-      if (phone != null) 'phone': phone,
-      if (city != null) 'city': city,
+      'displayName': _sanitizeText(displayName, maxLength: 64),
+      'username': _sanitizeText(username, maxLength: 32),
+      'pronouns': _sanitizeText(pronouns, maxLength: 32),
+      'bio': _sanitizeText(bio, maxLength: 300),
+      'interests': interests.map((i) => _sanitizeText(i, maxLength: 32)).toList(),
+      'instagram': _sanitizeText(instagram, maxLength: 64),
+      'facebook': _sanitizeText(facebook, maxLength: 64),
+      if (phone != null) 'phone': _sanitizeText(phone, maxLength: 20),
+      if (city != null) 'city': _sanitizeText(city, maxLength: 64),
     }, SetOptions(merge: true));
   }
 
@@ -220,5 +232,34 @@ class UserProfileService {
       budget: d['budget'] as String? ?? '',
       role: d['role'] as String? ?? 'user',
     );
+  }
+
+  /// Awards daily login points. Idempotent — safe to call on every app open.
+  Future<void> awardDailyPoints(String uid) async {
+    try {
+      final docRef = _col.doc(uid);
+      final snap = await docRef.get(const GetOptions(source: Source.server));
+      if (!snap.exists) return;
+
+      final d = snap.data()!;
+      final lastActive = d['lastActiveDate'] as String? ?? '';
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (lastActive == today) return; // already awarded today
+
+      final isFirstTime = (d['rank'] as int? ?? 0) == 0 && lastActive.isEmpty;
+      final pts = isFirstTime ? 50 : 10;
+
+      final yesterday = DateTime.now()
+          .subtract(const Duration(days: 1))
+          .toIso8601String()
+          .substring(0, 10);
+      final streakContinues = lastActive == yesterday;
+
+      await docRef.set({
+        'rank': FieldValue.increment(pts),
+        'lastActiveDate': today,
+        'streakDays': streakContinues ? FieldValue.increment(1) : 1,
+      }, SetOptions(merge: true));
+    } catch (_) {}
   }
 }

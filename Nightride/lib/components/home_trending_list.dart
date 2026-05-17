@@ -5,12 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
+// ignore: unused_import
+import 'package:nightride/core/responsive/app_dimensions.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/home_dummy_data.dart';
 import 'package:nightride/domain/home_models.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/event_detail_page.dart';
 import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/services/auth_service.dart';
+import 'package:nightride/services/favourites_service.dart';
 
 class HomeTrendingList extends ConsumerWidget {
   const HomeTrendingList({super.key});
@@ -30,14 +35,12 @@ class HomeTrendingList extends ConsumerWidget {
     // No Firestore data at all → show dummy fallback
     if (allLive.isEmpty) return _buildList(kTrendingEvents);
 
-    // Filter active but nothing matches
+    // Filter active but nothing in Firestore matches → fall back to dummy events
     if (filtered.isEmpty && (cat != 'ALL' || country != 'ALL')) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 32.h),
-          child: Text(AppLocalizations.of(context)!.noEventsMatchFilter, style: TextStyle(color: Colors.white38, fontSize: 14.sp)),
-        ),
-      );
+      final fallback = cat == 'ALL'
+          ? kTrendingEvents
+          : kTrendingEvents.where((e) => e.categoryTag == cat).toList();
+      return _buildList(fallback.isNotEmpty ? fallback : kTrendingEvents);
     }
 
     return _buildList(filtered.isNotEmpty ? filtered : allLive);
@@ -62,7 +65,15 @@ class _TrendingCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bool liked = ref.watch(trendingLikeProvider(event.id));
+    final favs = ref.watch(favouritesStreamProvider).asData?.value ?? [];
+    final bool liked = favs.any((f) => f['id'] == event.id);
+
+    final cardHeight = AppResponsive.eventCardHeight(context);
+    final pad = AppResponsive.gap(context, 14).clamp(12.0, 16.0);
+    // Width reserved on the right side for the heart (top) and View (bottom)
+    // buttons. Keeps the title/meta/interested column from running underneath
+    // those buttons — this is what was causing the V3 overlap.
+    final actionCol = AppResponsive.trendingActionColumnWidth(context);
 
     return InkWell(
       onTap: () => Navigator.of(context).push(
@@ -71,89 +82,85 @@ class _TrendingCard extends ConsumerWidget {
       borderRadius: BorderRadius.circular(24.r),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24.r),
-        child: Container(
-          height: 178.h,
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 30.r,
-                offset: Offset(0, 18.h),
-              ),
-            ],
-          ),
+        child: SizedBox(
+          height: cardHeight,
           child: Stack(
             fit: StackFit.expand,
             children: <Widget>[
+              // 1. Background image
               CachedNetworkImage(
                 imageUrl: event.imageUrl,
                 fit: BoxFit.cover,
-                placeholder:
-                    (_, __) =>
-                        Container(color: Colors.white.withValues(alpha: 0.06)),
-                errorWidget:
-                    (_, __, ___) => Container(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.broken_image_rounded,
-                        color: Colors.white.withValues(alpha: 0.55),
-                      ),
-                    ),
+                placeholder: (_, __) =>
+                    Container(color: Colors.white.withValues(alpha: 0.06)),
+                errorWidget: (_, __, ___) => Container(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.broken_image_rounded,
+                    color: Colors.white.withValues(alpha: 0.55),
+                  ),
+                ),
               ),
-              DecoratedBox(
+              // 2. Gradient overlay
+              const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: <Color>[
-                      Colors.black.withValues(alpha: 0.10),
-                      Colors.black.withValues(alpha: 0.30),
-                      Colors.black.withValues(alpha: 0.85),
+                      Color(0x1A000000),
+                      Color(0x4D000000),
+                      Color(0xD9000000),
                     ],
-                    stops: const <double>[0.0, 0.55, 1.0],
+                    stops: <double>[0.0, 0.55, 1.0],
                   ),
                 ),
               ),
+
+              // 3. Heart button — top-right (in the reserved right column).
               Positioned(
-                left: 12.w,
-                right: 12.w,
-                top: 12.h,
-                child: Row(
-                  children: <Widget>[
-                    _TagPill(text: event.categoryTag),
-                    const Spacer(),
-                    _HeartIconButton(
-                      active: liked,
-                      onTap:
-                          () =>
-                              ref
-                                  .read(trendingLikeProvider(event.id).notifier)
-                                  .state = !liked,
-                    ),
-                  ],
+                top: pad,
+                right: pad,
+                child: _HeartIconButton(
+                  active: liked,
+                  onTap: () => _toggleFavourite(ref, liked),
                 ),
               ),
+
+              // 4. SINGLE text column (tag-pill + title + meta + interested
+              //    row). Putting the tag-pill *inside* the same Column as the
+              //    title makes overlap structurally impossible — they share
+              //    the column's vertical layout and a Spacer between them
+              //    naturally absorbs whatever extra height the card has.
+              //    `right: pad + actionCol` reserves space on the right for
+              //    the heart and View buttons so text doesn't run under them.
               Positioned(
-                left: 14.w,
-                right: 14.w,
-                bottom: 14.h,
+                left: pad,
+                top: pad,
+                right: pad + actionCol,
+                bottom: pad,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: _TagPill(text: event.categoryTag),
+                    ),
+                    const Spacer(),
                     Text(
                       event.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      softWrap: false,
                       style: TextStyle(
-                        fontSize: 17.sp,
+                        fontSize: AppResponsive.font(context, 16).clamp(13.5, 17.0),
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                         letterSpacing: 0.2,
                       ),
                     ),
-                    Gap(7.h),
+                    SizedBox(height: AppResponsive.gap(context, 6)),
                     Row(
                       children: <Widget>[
                         _Meta(
@@ -161,10 +168,13 @@ class _TrendingCard extends ConsumerWidget {
                           text: event.dateText,
                         ),
                         if (event.language.isNotEmpty) ...[
-                          Gap(10.w),
-                          _Meta(icon: Icons.language_rounded, text: event.language),
+                          SizedBox(width: AppResponsive.gap(context, 8)),
+                          _Meta(
+                            icon: Icons.language_rounded,
+                            text: event.language,
+                          ),
                         ],
-                        Gap(10.w),
+                        SizedBox(width: AppResponsive.gap(context, 8)),
                         Expanded(
                           child: _Meta(
                             icon: Icons.location_on_rounded,
@@ -174,25 +184,31 @@ class _TrendingCard extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    Gap(12.h),
-                    Row(
-                      children: <Widget>[
-                        _InterestedRow(
-                          avatars: event.avatars,
-                          countText: event.interestedCountText,
-                        ),
-                        const Spacer(),
-                        _ActionPill(
-                          text: AppLocalizations.of(context)!.view,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => EventDetailPage(id: event.id)),
-                          ),
-                        ),
-                      ],
+                    SizedBox(height: AppResponsive.gap(context, 8)),
+                    _InterestedRow(
+                      avatars: event.avatars,
+                      countText: event.interestedCountText,
                     ),
                   ],
                 ),
               ),
+
+              // 5. View button — bottom-right (won't overlap text because
+              //    the text column above reserved `actionCol` of right space).
+              Positioned(
+                right: pad,
+                bottom: pad,
+                child: _ActionPill(
+                  text: AppLocalizations.of(context)!.view,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => EventDetailPage(id: event.id),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 7. Hairline border outline
               Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
@@ -212,6 +228,27 @@ class _TrendingCard extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _toggleFavourite(WidgetRef ref, bool isLiked) async {
+    final svc = ref.read(favouritesServiceProvider);
+    final user = ref.read(authStateProvider).asData?.value;
+    if (user == null) return;
+    if (isLiked) {
+      await svc.remove(user.uid, event.id);
+    } else {
+      await svc.add(user.uid, {
+        'id': event.id,
+        'name': event.title,
+        'title': event.title,
+        'cover_image': event.imageUrl,
+        'city': event.locationText,
+        'country': event.countryCode,
+        'country_code': event.countryCode,
+        'date': event.rawDate,
+        'genre': event.categoryTag,
+      });
+    }
+  }
 }
 
 class _Meta extends StatelessWidget {
@@ -227,7 +264,7 @@ class _Meta extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        fontSize: 12.2.sp,
+        fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
         fontWeight: FontWeight.w700,
         color: Colors.white.withValues(alpha: 0.78),
       ),
@@ -236,9 +273,13 @@ class _Meta extends StatelessWidget {
     return Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       children: <Widget>[
-        Icon(icon, size: 14.sp, color: Colors.white.withValues(alpha: 0.72)),
-        Gap(5.w),
-        expand ? Expanded(child: label) : label,
+        Icon(
+          icon,
+          size: AppResponsive.metaIconSize(context),
+          color: Colors.white.withValues(alpha: 0.72),
+        ),
+        SizedBox(width: AppResponsive.gap(context, 5)),
+        expand ? Expanded(child: label) : Flexible(child: label),
       ],
     );
   }
@@ -287,15 +328,15 @@ class _InterestedRow extends StatelessWidget {
     return Row(
       children: <Widget>[
         SizedBox(
-          height: 26.w,
-          width: (show == 0) ? 0 : (26.w + (show - 1) * 16.w),
+          height: 26.sp,
+          width: (show == 0) ? 0 : (26.sp + (show - 1) * 16.w),
           child: Stack(
             children: List<Widget>.generate(show, (int i) {
               return Positioned(
                 left: i * 16.w,
                 child: Container(
-                  width: 26.w,
-                  height: 26.w,
+                  width: 26.sp,
+                  height: 26.sp,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -352,18 +393,24 @@ class _ActionPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999.r),
+      borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 9.h),
+        height: AppResponsive.trendingViewButtonHeight(context),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.gap(context, 14),
+        ),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(999.r),
+          borderRadius: BorderRadius.circular(999),
           border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
         ),
         child: Text(
           text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 12.5.sp,
+            fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.0),
             fontWeight: FontWeight.w900,
             color: Colors.white.withValues(alpha: 0.92),
           ),
@@ -372,6 +419,8 @@ class _ActionPill extends StatelessWidget {
     );
   }
 }
+
+// ── Heart button ─────────────────────────────────────────────────────────────
 
 class _HeartIconButton extends StatelessWidget {
   const _HeartIconButton({required this.active, required this.onTap});
@@ -386,11 +435,11 @@ class _HeartIconButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        width: 40.w,
-        height: 40.w,
+        width: AppResponsive.trendingFavoriteSize(context),
+        height: AppResponsive.trendingFavoriteSize(context),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.12),
             width: 1,
@@ -399,7 +448,7 @@ class _HeartIconButton extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(
           active ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-          size: 18.sp,
+          size: AppResponsive.icon(context, 18).clamp(15.0, 20.0),
           color:
               active
                   ? AppTheme.primary.withValues(alpha: 0.95)

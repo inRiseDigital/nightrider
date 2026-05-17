@@ -1,15 +1,27 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:nightride/core/theme/app_theme.dart';
+import 'package:nightride/providers/settings_providers.dart';
 
-class OrganizerHomePage extends StatelessWidget {
+class OrganizerHomePage extends ConsumerWidget {
   const OrganizerHomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isOrganizer = ref.watch(isOrganizerProvider).asData?.value ?? false;
+    if (!isOrganizer) {
+      return Scaffold(
+        backgroundColor: AppTheme.scaffold,
+        appBar: AppBar(backgroundColor: AppTheme.scaffold, title: const Text('My Events', style: TextStyle(color: Colors.white))),
+        body: const Center(
+          child: Text('Access denied. Organizer account required.', style: TextStyle(color: Colors.white54)),
+        ),
+      );
+    }
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(

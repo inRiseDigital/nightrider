@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:nightride/components/profile_chip.dart';
 import 'package:nightride/components/profile_section_card.dart';
 import 'package:nightride/components/profile_tiny_hint.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 
 class ProfileInterests extends StatelessWidget {
   const ProfileInterests({
@@ -126,9 +127,12 @@ class ProfileInterests extends StatelessWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 160),
                       curve: Curves.easeOut,
+                      constraints: BoxConstraints(
+                        minHeight: AppResponsive.interestChipHeight(context),
+                      ),
                       padding: EdgeInsets.symmetric(
-                        horizontal: 14.w,
-                        vertical: 8.h,
+                        horizontal: AppResponsive.profileChipPaddingH(context),
+                        vertical: AppResponsive.profileChipPaddingV(context),
                       ),
                       decoration: BoxDecoration(
                         color:
@@ -149,19 +153,21 @@ class ProfileInterests extends StatelessWidget {
                           if (active) ...<Widget>[
                             Icon(
                               Icons.check_rounded,
-                              size: 16.sp,
+                              size: AppResponsive.icon(context, 16),
                               color: Colors.white.withValues(alpha: 0.9),
                             ),
-                            SizedBox(width: 6.w),
+                            SizedBox(width: AppResponsive.gap(context, 6)),
                           ],
-                          Text(
-                            opt,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white.withValues(alpha: 0.88),
+                          Flexible(
+                            child: Text(
+                              opt,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppResponsive.profileChipFont(context),
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white.withValues(alpha: 0.88),
+                              ),
                             ),
                           ),
                         ],

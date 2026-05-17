@@ -12,8 +12,8 @@ class SearchSectionHeader extends StatelessWidget {
     return Row(
       children: <Widget>[
         Container(
-          width: 8.w,
-          height: 8.w,
+          width: 8.sp,
+          height: 8.sp,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppTheme.primary.withValues(alpha: 0.9),

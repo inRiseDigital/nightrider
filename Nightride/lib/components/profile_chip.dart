@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import 'package:nightride/core/responsive/app_responsive.dart';
 import '../../../../../core/theme/app_theme.dart';
 
 class ProfileChip extends StatelessWidget {
@@ -19,27 +19,35 @@ class ProfileChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: editable ? onTap : null,
-      borderRadius: BorderRadius.circular(999.r),
+      borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+        constraints: BoxConstraints(
+          minHeight: AppResponsive.interestChipHeight(context),
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.profileChipPaddingH(context),
+          vertical: AppResponsive.profileChipPaddingV(context),
+        ),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(999.r),
+          borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color:
-                editable
-                    ? AppTheme.primary.withValues(alpha: 0.22)
-                    : Colors.white.withValues(alpha: 0.10),
+            color: editable
+                ? AppTheme.primary.withValues(alpha: 0.22)
+                : Colors.white.withValues(alpha: 0.10),
           ),
         ),
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12.sp,
-            fontWeight: FontWeight.w800,
-            color: Colors.white.withValues(alpha: 0.86),
+        child: Center(
+          widthFactor: 1.0,
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: AppResponsive.profileChipFont(context),
+              fontWeight: FontWeight.w800,
+              color: Colors.white.withValues(alpha: 0.86),
+            ),
           ),
         ),
       ),

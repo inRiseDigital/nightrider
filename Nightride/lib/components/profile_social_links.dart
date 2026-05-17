@@ -67,8 +67,8 @@ class _SocialRow extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Container(
-            width: 34.w,
-            height: 34.w,
+            width: 34.sp,
+            height: 34.sp,
             decoration: BoxDecoration(
               color: AppTheme.primary.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(12.r),

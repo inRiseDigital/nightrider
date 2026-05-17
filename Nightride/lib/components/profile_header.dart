@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
+import 'package:nightride/domain/rank_system.dart';
 import 'package:nightride/pages/badges_collection_page.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -27,32 +29,41 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = state.data;
+    final sideImage = AppResponsive.profileSideImageSize(context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         _Avatar(url: d.avatarUrl, avatarBase64: avatarBase64),
-        SizedBox(width: 14.w),
+        SizedBox(width: AppResponsive.profileHeaderGap(context)),
         Expanded(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
                 d.username,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18.sp,
+                  fontSize: AppResponsive.profileUsernameFont(context),
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              Text(
-                d.pronouns,
-                style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 12.sp,
+              if (d.pronouns.isNotEmpty)
+                Text(
+                  d.pronouns,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontSize: AppResponsive.profilePronounsFont(context),
+                  ),
                 ),
-              ),
-              SizedBox(height: 8.h),
+              SizedBox(height: AppResponsive.gap(context, 5)),
+              _RankBadge(points: d.rank),
+              SizedBox(height: AppResponsive.gap(context, 6)),
               _StatText(label: 'Network', value: d.networkCount.toString()),
             ],
           ),
@@ -62,28 +73,29 @@ class ProfileHeader extends StatelessWidget {
             MaterialPageRoute(builder: (context) => const BadgesCollectionPage()),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 60.w,
-                height: 60.w,
+                width: sideImage,
+                height: sideImage,
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16.r),
+                  borderRadius: BorderRadius.circular(AppResponsive.radius(context, 16)),
                   border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
                 ),
-                padding: EdgeInsets.all(10.r),
+                padding: EdgeInsets.all(AppResponsive.gap(context, 10)),
                 child: Image.network(
                   'https://cdn-icons-png.flaticon.com/512/8644/8644445.png',
                   color: Colors.pinkAccent,
                 ),
               ),
-              SizedBox(height: 4.h),
+              SizedBox(height: AppResponsive.gap(context, 4)),
               Container(
-                height: 6.h,
-                width: 40.w,
+                height: AppResponsive.gap(context, 6),
+                width: sideImage * 0.55,
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2.r),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ],
@@ -101,15 +113,16 @@ class _StatText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = AppResponsive.profileNetworkFont(context);
     return Row(
       children: [
         Text(
           '$label ',
-          style: TextStyle(color: Colors.white60, fontSize: 13.sp),
+          style: TextStyle(color: Colors.white60, fontSize: size),
         ),
         Text(
           value,
-          style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -123,7 +136,8 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double s = 86.w;
+    final double s = AppResponsive.profileAvatarSize(context);
+    final double fallbackIcon = s * 0.5;
     Widget child;
 
     if (avatarBase64 != null && avatarBase64!.isNotEmpty) {
@@ -133,16 +147,16 @@ class _Avatar extends StatelessWidget {
         imageUrl: url,
         fit: BoxFit.cover,
         placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.06)),
-        errorWidget: (_, __, ___) => Icon(Icons.person_rounded, color: Colors.white38, size: 44.sp),
+        errorWidget: (_, __, ___) => Icon(Icons.person_rounded, color: Colors.white38, size: fallbackIcon),
       );
     } else {
-      child = Icon(Icons.person_rounded, color: Colors.white38, size: 44.sp);
+      child = Icon(Icons.person_rounded, color: Colors.white38, size: fallbackIcon);
     }
 
     return Container(
       width: s,
       height: s,
-      padding: EdgeInsets.all(3.w),
+      padding: EdgeInsets.all(3),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: AppTheme.primary.withValues(alpha: 0.65), width: 2),
@@ -223,6 +237,40 @@ class _PrimaryButton extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.92),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _RankBadge extends StatelessWidget {
+  const _RankBadge({required this.points});
+  final int points;
+
+  @override
+  Widget build(BuildContext context) {
+    final tier = RankSystem.tierFor(points);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: tier.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: tier.color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(tier.emoji, style: TextStyle(fontSize: 10.sp)),
+          SizedBox(width: 4.w),
+          Text(
+            tier.name,
+            style: TextStyle(
+              color: tier.color,
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -117,13 +117,14 @@ _COUNTRY_LANGUAGES = {
     "HU": "Hungarian", "RO": "Romanian",
     "TR": "Turkish",
     "TH": "Thai",     "ID": "Indonesian", "MY": "Malay",
+    "LK": "Sinhala",
 }
 
 _COUNTRY_CODES = [
     "US", "GB", "DE", "AU", "CA",
     "NL", "FR", "ES", "IT", "JP",
     "BR", "MX", "NZ", "BE", "SE",
-    "AE", "SA", "SG",
+    "AE", "SA", "SG", "LK",
 ]
 
 _EDM_KEYWORDS = ["EDM", "DJ", "rave", "techno", "house music", "electronic"]
@@ -132,6 +133,7 @@ _EDM_COUNTRIES = ["US", "GB", "DE", "AU", "NL", "FR", "BE"]
 async def fetch_and_sync_events(size: int = 200, pages_per_country: int = 2) -> dict:
     _init_firebase()
     api_key = os.getenv("TICKETMASTER_API_KEY", "")
+    sri_lanka_key = os.getenv("SRILANKA_TICKET_CONSUMER_KEY", "")
     if not api_key or api_key == "your_ticketmaster_key_here":
         return {"error": "TICKETMASTER_API_KEY not set", "synced": 0}
 
@@ -144,9 +146,10 @@ async def fetch_and_sync_events(size: int = 200, pages_per_country: int = 2) -> 
 
     async with httpx.AsyncClient(timeout=20) as client:
         for country in _COUNTRY_CODES:
+            country_key = sri_lanka_key if country == "LK" and sri_lanka_key else api_key
             for page in range(pages_per_country):
                 params = {
-                    "apikey": api_key,
+                    "apikey": country_key,
                     "classificationName": "music",
                     "countryCode": country,
                     "size": size,

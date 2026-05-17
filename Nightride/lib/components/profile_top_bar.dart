@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../../../core/theme/app_theme.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import '../../domain/profile_models.dart';
 
 class ProfileTopBar extends StatelessWidget {
@@ -28,8 +28,10 @@ class ProfileTopBar extends StatelessWidget {
             children: <Widget>[
               Text(
                 'My Profile',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 18.sp,
+                  fontSize: AppResponsive.profilePageTitleFont(context),
                   fontWeight: FontWeight.w900,
                   color: Colors.white.withValues(alpha: 0.95),
                   letterSpacing: -0.5,

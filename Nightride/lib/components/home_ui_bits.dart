@@ -35,8 +35,8 @@ class MiniIconButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14.r),
       child: Container(
-        width: 38.w,
-        height: 38.w,
+        width: 38.sp,
+        height: 38.sp,
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.30),
           borderRadius: BorderRadius.circular(14.r),
@@ -68,8 +68,8 @@ class IconPillButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14.r),
       child: Container(
-        width: 36.w,
-        height: 36.w,
+        width: 36.sp,
+        height: 36.sp,
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(14.r),
@@ -100,7 +100,7 @@ class TextPillButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14.r),
       child: Container(
-        height: 36.w,
+        height: 36.sp,
         padding: EdgeInsets.symmetric(horizontal: 10.w),
         decoration: BoxDecoration(
           color: AppTheme.surface,

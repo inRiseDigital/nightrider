@@ -7,6 +7,8 @@ import 'package:gap/gap.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
 import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/services/auth_service.dart';
+import 'package:nightride/services/favourites_service.dart';
 
 class VenueDetailsPage extends ConsumerWidget {
   const VenueDetailsPage({super.key, required this.data});
@@ -15,6 +17,8 @@ class VenueDetailsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final favs = ref.watch(favouritesStreamProvider).asData?.value ?? [];
+    final bool liked = favs.any((f) => f['id'] == data.id);
     final userPos = ref.watch(userLocationProvider).asData?.value;
 
     final double km = (userPos != null && data.lat != 0 && data.lng != 0)
@@ -81,8 +85,31 @@ class VenueDetailsPage extends ConsumerWidget {
                           ),
                           child: IconButton(
                             padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.favorite_border_rounded, color: Colors.white, size: 20),
-                            onPressed: () {},
+                            icon: Icon(
+                              liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              color: liked ? AppTheme.accent : Colors.white,
+                              size: 20,
+                            ),
+                            onPressed: () async {
+                              final user = ref.read(authStateProvider).asData?.value;
+                              if (user == null) return;
+                              final svc = ref.read(favouritesServiceProvider);
+                              if (liked) {
+                                await svc.remove(user.uid, data.id);
+                              } else {
+                                await svc.add(user.uid, {
+                                  'id': data.id,
+                                  'name': data.title,
+                                  'title': data.title,
+                                  'cover_image': data.imageUrl,
+                                  'city': data.locationLine,
+                                  'date': data.openText,
+                                  'genre': data.subtitle,
+                                  'lat': data.lat,
+                                  'lng': data.lng,
+                                });
+                              }
+                            },
                           ),
                         ),
                       ),

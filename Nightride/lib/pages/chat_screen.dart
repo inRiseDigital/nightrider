@@ -18,7 +18,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   final ChatService _chatService = ChatService();
@@ -53,10 +53,19 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkLocationStatus();
     _sessionsSub = _historyService.sessionsStream().listen((sessions) {
       if (mounted) setState(() => _sessions = sessions);
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-fetch location when the user returns to the app (e.g. after granting permission).
+    if (state == AppLifecycleState.resumed && _userLatitude == null) {
+      _checkLocationStatus();
+    }
   }
 
   Future<void> _checkLocationStatus() async {
@@ -98,6 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     // Fire-and-forget save so current session persists when switching tabs
     if (_messages.isNotEmpty) {
       _historyService.upsertSession(_currentSessionId, List.from(_messages));
@@ -278,6 +288,22 @@ class _ChatScreenState extends State<ChatScreen> {
     _autoSave();
   }
 
+  String _stripHtml(String html) {
+    return html
+        .replaceAll(RegExp(r'<br\s*/?>',      caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</p>\s*<p[^>]*>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<p[^>]*>',        caseSensitive: false), '')
+        .replaceAll(RegExp(r'</p>',            caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<[^>]+>'),        '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;',  '&')
+        .replaceAll('&lt;',   '<')
+        .replaceAll('&gt;',   '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+  }
+
   String _buildRecsMarkdown(List<dynamic> recs) {
     final sb = StringBuffer('\n\n');
     for (final raw in recs) {
@@ -302,10 +328,8 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       if (type == 'like') {
         message.isLiked = !message.isLiked;
-        _chatService.sendInteraction(message.id, 'like', message.isLiked);
       } else if (type == 'heart') {
         message.isFavorited = !message.isFavorited;
-        _chatService.sendInteraction(message.id, 'heart', message.isFavorited);
       }
     });
   }
@@ -670,11 +694,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildAssistantText(ChatMessage message) {
-    final allImages = _extractImages(message.content);
+    final cleaned = _stripHtml(message.content);
+    final allImages = _extractImages(cleaned);
     return Padding(
       padding: const EdgeInsets.only(left: 4, right: 20),
       child: MarkdownBody(
-        data: message.content,
+        data: cleaned,
         styleSheet: MarkdownStyleSheet(
           p: GoogleFonts.outfit(
               color: kTextDark.withValues(alpha: 0.85), fontSize: 16, height: 1.6),

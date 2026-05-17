@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:nightride/components/profile_section_card.dart'
     show ProfileSectionCard;
+import 'package:nightride/core/responsive/app_responsive.dart';
 
 class ProfileBioCard extends StatelessWidget {
   const ProfileBioCard({
@@ -25,7 +25,7 @@ class ProfileBioCard extends StatelessWidget {
               : Text(
                 value,
                 style: TextStyle(
-                  fontSize: 12.8.sp,
+                  fontSize: AppResponsive.profileBodyFont(context),
                   fontWeight: FontWeight.w600,
                   height: 1.35,
                   color: Colors.white.withValues(alpha: 0.78),
@@ -67,7 +67,7 @@ class _BioEditorState extends State<_BioEditor> {
       minLines: 1,
       onChanged: widget.onChanged,
       style: TextStyle(
-        fontSize: 12.8.sp,
+        fontSize: AppResponsive.profileBodyFont(context),
         fontWeight: FontWeight.w600,
         color: Colors.white.withValues(alpha: 0.92),
       ),
@@ -75,7 +75,7 @@ class _BioEditorState extends State<_BioEditor> {
         border: InputBorder.none,
         hintText: 'Write something about you…',
         hintStyle: TextStyle(
-          fontSize: 12.8.sp,
+          fontSize: AppResponsive.profileBodyFont(context),
           fontWeight: FontWeight.w600,
           color: Colors.white.withValues(alpha: 0.35),
         ),

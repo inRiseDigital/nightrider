@@ -10,6 +10,15 @@ final profileProvider = NotifierProvider<ProfileController, ProfileState>(
   ProfileController.new,
 );
 
+/// Side-effect provider: awards daily login points once per session launch.
+/// Watch it in the profile page so it fires when the user opens the app.
+final dailyPointsProvider = Provider<void>((ref) {
+  final uid = ref.watch(authStateProvider).asData?.value?.uid;
+  if (uid != null) {
+    ref.read(userProfileServiceProvider).awardDailyPoints(uid);
+  }
+});
+
 class ProfileController extends Notifier<ProfileState> {
   @override
   ProfileState build() {

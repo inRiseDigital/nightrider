@@ -100,20 +100,22 @@ class SettingsPage extends ConsumerWidget {
               ),
             ],
           ),
-          Gap(24.h),
-          _SettingsSection(
-            title: 'Admin',
-            children: [
-              _NavigableTile(
-                icon: Icons.admin_panel_settings_rounded,
-                label: 'Admin Panel',
-                iconColor: AppTheme.accent,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AdminPanelPage()),
+          if (ref.watch(isAdminProvider).asData?.value == true) ...[
+            Gap(24.h),
+            _SettingsSection(
+              title: 'Admin',
+              children: [
+                _NavigableTile(
+                  icon: Icons.admin_panel_settings_rounded,
+                  label: 'Admin Panel',
+                  iconColor: AppTheme.accent,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AdminPanelPage()),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
           Gap(40.h),
           TextButton(
             onPressed: () async {
@@ -204,12 +206,25 @@ Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
     if (user == null) return;
     final uid = user.uid;
 
-    // Delete Firestore data
+    // Delete all user data — subcollections must be removed before the parent doc
     final db = FirebaseFirestore.instance;
-    await Future.wait([
-      db.collection('users').doc(uid).delete(),
-      db.collection('avatars').doc(uid).delete(),
+    final userRef = db.collection('users').doc(uid);
+
+    final subcollections = await Future.wait([
+      userRef.collection('favourites').get(),
+      userRef.collection('chat_sessions').get(),
+      userRef.collection('settings').get(),
     ]);
+
+    final batch = db.batch();
+    for (final snap in subcollections) {
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+    }
+    batch.delete(userRef);
+    batch.delete(db.collection('avatars').doc(uid));
+    await batch.commit();
 
     // Clear onboarding so it shows again on next launch
     final prefs = await SharedPreferences.getInstance();
@@ -243,7 +258,7 @@ Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.message}'), backgroundColor: Colors.redAccent),
+        const SnackBar(content: Text('Could not delete account. Please try again.'), backgroundColor: Colors.redAccent),
       );
     }
   }
@@ -424,8 +439,8 @@ class _AboutPageState extends State<_AboutPage> {
               children: [
                 Gap(12.h),
                 Container(
-                  width: 80.w,
-                  height: 80.w,
+                  width: 80.sp,
+                  height: 80.sp,
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20.r),
@@ -610,8 +625,8 @@ class _ColorDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34.w,
-      height: 34.w,
+      width: 34.sp,
+      height: 34.sp,
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,

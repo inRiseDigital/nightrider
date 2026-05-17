@@ -80,7 +80,7 @@ class _AvatarCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double s = 46.w;
+    final double s = 46.sp;
 
     return Container(
       width: s,

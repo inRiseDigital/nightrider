@@ -15,14 +15,27 @@ import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/splash_page.dart';
 import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    await NotificationService.init();
+    await NotificationService.requestPermission();
+  } catch (_) {}
 
   if (!kIsWeb) {
-    await dotenv.load(fileName: '.env');
-    final String token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
+    // Primary source: --dart-define=MAPBOX_ACCESS_TOKEN=pk.xxx at build time.
+    // Fallback for local dev: .env file (NOT bundled in production builds).
+    const String dartDefineToken = String.fromEnvironment('MAPBOX_ACCESS_TOKEN');
+    String token = dartDefineToken;
+    try {
+      await dotenv.load(fileName: '.env');
+      token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dartDefineToken;
+    } catch (_) {
+      // .env is not bundled in production — dart-define token is used.
+    }
     if (token.isNotEmpty) {
       MapboxOptions.setAccessToken(token);
     }
@@ -57,10 +70,20 @@ class MyApp extends ConsumerWidget {
     final HomeLanguage lang = ref.watch(homeLanguageProvider);
     final Color accent = kAccentColors[ref.watch(accentColorIndexProvider)];
 
+    // Prevent ScreenUtil .w from over-inflating on foldables/tablets.
+    // On phones (≤390 dp) the design size stays 390×844 — no change.
+    // On wide devices (e.g. Honor Magic V3 unfolded ~719–821 dp) the design
+    // width is capped at 480 dp so .w values grow at most ~23% instead of ~85%.
+    // AppResponsive still receives the real screen width via MaterialApp's
+    // own MediaQuery, so all adaptive layout helpers remain correct.
+    final view = WidgetsBinding.instance.platformDispatcher.views.first;
+    final physW = view.physicalSize.width / view.devicePixelRatio;
+    final suDesignWidth = physW.clamp(390.0, 480.0);
+
     return ScreenUtilInit(
-      designSize: const Size(390, 844),
+      designSize: Size(suDesignWidth, 844),
       minTextAdapt: true,
-      splitScreenMode: false,
+      splitScreenMode: true,
       builder: (context, child) {
         return MaterialApp(
           title: 'NightLife',

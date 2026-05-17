@@ -106,17 +106,21 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
-    final requiredPanelPx = 660.h;
-
+    final screenW = MediaQuery.sizeOf(context).width;
+    final requiredPanelPx = 600.h;
     final basePanelPx = 0.63.sh;
-    final panelPx = math.min(0.80.sh, math.max(basePanelPx, requiredPanelPx));
+    final panelPx = math.min(
+      screenW > 600 ? 0.72.sh : 0.80.sh,
+      math.max(basePanelPx, requiredPanelPx),
+    );
 
     final reservedGapDesignUnits = panelPx / ScreenUtil().scaleHeight;
+    final topGap = screenW > 600 ? 16.0 : 88.0;
 
     return AuthProcessScaffold(
       title: 'Sign up',
       subtitle: 'Create your account to get started',
-      titleTopGap: 88,
+      titleTopGap: topGap,
       reservedBottomGap: reservedGapDesignUnits,
       bottomPanel: _SignUpBottomPanel(
         panelHeightPx: panelPx,
@@ -158,9 +162,6 @@ class _SignUpBottomPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final requiredContentPx = 660.h;
-    final needsScroll = panelHeightPx < requiredContentPx;
-
     return SizedBox(
       height: panelHeightPx,
       width: 1.sw,
@@ -229,37 +230,37 @@ class _SignUpBottomPanel extends StatelessWidget {
             ),
           ),
 
-          // Content
+          // Content — centered with max width for wide screens
           Positioned(
-            top: 44.h,
-            left: 22.w,
-            right: 22.w,
+            top: 20.h,
+            left: 0,
+            right: 0,
             bottom: 18.h,
-            child:
-                needsScroll
-                    ? SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
-                      child: _PanelContent(
-                        emailController: emailController,
-                        passwordController: passwordController,
-                        confirmPasswordController: confirmPasswordController,
-                        isLoading: isLoading,
-                        selectedRole: selectedRole,
-                        onRoleChanged: onRoleChanged,
-                        onSignUp: onSignUp,
-                        onGoogleSignUp: onGoogleSignUp,
-                      ),
-                    )
-                    : _PanelContent(
-                      emailController: emailController,
-                      passwordController: passwordController,
-                      confirmPasswordController: confirmPasswordController,
-                      isLoading: isLoading,
-                      selectedRole: selectedRole,
-                      onRoleChanged: onRoleChanged,
-                      onSignUp: onSignUp,
-                      onGoogleSignUp: onGoogleSignUp,
-                    ),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width > 600
+                      ? (MediaQuery.sizeOf(context).width * 0.88).clamp(480.0, 640.0)
+                      : 480.0,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 22.w.clamp(0.0, 32.0),
+                  ),
+                  child: _PanelContent(
+                    emailController: emailController,
+                    passwordController: passwordController,
+                    confirmPasswordController: confirmPasswordController,
+                    isLoading: isLoading,
+                    selectedRole: selectedRole,
+                    onRoleChanged: onRoleChanged,
+                    onSignUp: onSignUp,
+                    onGoogleSignUp: onGoogleSignUp,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -307,30 +308,30 @@ class _PanelContent extends StatelessWidget {
             ],
           ),
         ),
-        Gap(18.h),
+        Gap(14.h),
         _InputField(
           controller: emailController,
           icon: Icons.mail_outline_rounded,
           hint: AppLocalizations.of(context)!.email,
           isPassword: false,
         ),
-        Gap(18.h),
+        Gap(14.h),
         _InputField(
           controller: passwordController,
           icon: Icons.lock_outline_rounded,
           hint: 'Enter New Password',
           isPassword: true,
         ),
-        Gap(18.h),
+        Gap(14.h),
         _InputField(
           controller: confirmPasswordController,
           icon: Icons.lock_outline_rounded,
           hint: 'Confirm Password',
           isPassword: true,
         ),
-        Gap(28.h),
+        Gap(18.h),
         _SignUpButton(onPressed: onSignUp, isLoading: isLoading),
-        Gap(22.h),
+        Gap(14.h),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -357,7 +358,7 @@ class _PanelContent extends StatelessWidget {
           ],
         ),
 
-        Gap(22.h),
+        Gap(14.h),
 
         Row(
           children: [
@@ -387,7 +388,7 @@ class _PanelContent extends StatelessWidget {
           ],
         ),
 
-        Gap(22.h),
+        Gap(14.h),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -400,7 +401,7 @@ class _PanelContent extends StatelessWidget {
           ],
         ),
 
-        Gap(28.h),
+        Gap(16.h),
 
         GestureDetector(
           onTap: () {},
@@ -573,7 +574,7 @@ class _SignUpButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 62.h,
-      width: 1.sw,
+      width: double.infinity,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -617,14 +618,14 @@ class _SocialIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = 40.w;
+    final size = 40.sp;
 
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
         width: size,
         height: size,
-        child: Center(child: _Logo(kind: kind, size: 32.w)),
+        child: Center(child: _Logo(kind: kind, size: 32.sp)),
       ),
     );
   }

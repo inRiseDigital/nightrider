@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nightride/data/models/chat_session.dart';
 import 'package:nightride/data/services/chat_history_service.dart';
@@ -22,3 +24,20 @@ final privacyServiceProvider = Provider<PrivacyService>(
 final privacySettingsProvider = StreamProvider<PrivacySettings>((ref) {
   return ref.watch(privacyServiceProvider).stream();
 });
+
+// ── Role checks ───────────────────────────────────────────────────────────────
+// Read the user's Firestore profile and surface boolean role flags.
+// Both default to false if the field is absent or the user is not logged in.
+
+StreamProvider<bool> _userRoleProvider(String field) => StreamProvider<bool>((ref) {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return Stream.value(false);
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map((snap) => snap.data()?[field] as bool? ?? false);
+});
+
+final isAdminProvider = _userRoleProvider('isAdmin');
+final isOrganizerProvider = _userRoleProvider('isOrganizer');

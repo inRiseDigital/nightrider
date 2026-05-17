@@ -37,7 +37,7 @@ class _OtpPageState extends State<OtpPage> {
     return AuthProcessScaffold(
       title: 'Enter OTP',
       subtitle: 'Please enter the 6-digit code sent to your email',
-      titleTopGap: 88,
+      titleTopGap: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 88.0,
       reservedBottomGap: 380,
       bottomPanel: _OtpBottomPanel(
         pinController: _pinController,
@@ -74,8 +74,8 @@ class _OtpBottomPanel extends StatelessWidget {
     final focusedBorderColor = AppTheme.primary;
 
     final defaultPinTheme = PinTheme(
-      width: 56.w,
-      height: 56.w,
+      width: 56.sp,
+      height: 56.sp,
       textStyle: TextStyle(
         fontSize: 18.sp,
         fontWeight: FontWeight.w600,
@@ -153,70 +153,82 @@ class _OtpBottomPanel extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: 54.h,
-            left: 22.w,
-            right: 22.w,
-            child: Column(
-              children: [
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Pinput(
-                    length: 5,
-                    controller: pinController,
-                    focusNode: pinFocusNode,
-                    defaultPinTheme: defaultPinTheme,
-                    separatorBuilder: (index) => SizedBox(width: 14.w),
-                    hapticFeedbackType: HapticFeedbackType.lightImpact,
-                    showCursor: false,
-                    keyboardType: TextInputType.number,
-                    focusedPinTheme: defaultPinTheme.copyWith(
-                      decoration: defaultPinTheme.decoration!.copyWith(
-                        border: Border.all(color: focusedBorderColor, width: 2),
-                        borderRadius: BorderRadius.circular(16.r),
-                      ),
-                    ),
-                    submittedPinTheme: defaultPinTheme.copyWith(
-                      decoration: defaultPinTheme.decoration!.copyWith(
-                        border: Border.all(
-                          color: focusedBorderColor,
-                          width: 1.6,
+            top: 20.h,
+            left: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width > 600
+                      ? (MediaQuery.sizeOf(context).width * 0.88).clamp(480.0, 640.0)
+                      : 480.0,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 22.w.clamp(0.0, 32.0),
+                  ),
+                  child: Column(
+                    children: [
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Pinput(
+                          length: 5,
+                          controller: pinController,
+                          focusNode: pinFocusNode,
+                          defaultPinTheme: defaultPinTheme,
+                          separatorBuilder: (index) => SizedBox(width: 14.w),
+                          hapticFeedbackType: HapticFeedbackType.lightImpact,
+                          showCursor: false,
+                          keyboardType: TextInputType.number,
+                          focusedPinTheme: defaultPinTheme.copyWith(
+                            decoration: defaultPinTheme.decoration!.copyWith(
+                              border: Border.all(color: focusedBorderColor, width: 2),
+                              borderRadius: BorderRadius.circular(16.r),
+                            ),
+                          ),
+                          submittedPinTheme: defaultPinTheme.copyWith(
+                            decoration: defaultPinTheme.decoration!.copyWith(
+                              border: Border.all(color: focusedBorderColor, width: 1.6),
+                              borderRadius: BorderRadius.circular(16.r),
+                            ),
+                          ),
+                          errorPinTheme: defaultPinTheme.copyWith(
+                            decoration: defaultPinTheme.decoration!.copyWith(
+                              border: Border.all(color: Colors.redAccent),
+                            ),
+                          ),
+                          onCompleted: (pin) {},
                         ),
-                        borderRadius: BorderRadius.circular(16.r),
                       ),
-                    ),
-                    errorPinTheme: defaultPinTheme.copyWith(
-                      decoration: defaultPinTheme.decoration!.copyWith(
-                        border: Border.all(color: Colors.redAccent),
+                      Gap(54.h),
+                      _VerifyButton(onTap: onVerify),
+                      Gap(42.h),
+                      Text(
+                        "Didn't receive code?",
+                        style: TextStyle(
+                          fontSize: 13.5.sp,
+                          color: Colors.white.withOpacity(0.55),
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                    ),
-                    onCompleted: (pin) {},
+                      Gap(10.h),
+                      GestureDetector(
+                        onTap: onResend,
+                        child: Text(
+                          'resend',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: AppTheme.primaryLight.withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Gap(54.h),
-                _VerifyButton(onTap: onVerify),
-                Gap(42.h),
-                Text(
-                  "Didn't receive code?",
-                  style: TextStyle(
-                    fontSize: 13.5.sp,
-                    color: Colors.white.withOpacity(0.55),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                Gap(10.h),
-                GestureDetector(
-                  onTap: onResend,
-                  child: Text(
-                    'resend',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      color: AppTheme.primaryLight.withOpacity(0.9),
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -234,7 +246,7 @@ class _VerifyButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 62.h,
-      width: 1.sw,
+      width: double.infinity,
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(

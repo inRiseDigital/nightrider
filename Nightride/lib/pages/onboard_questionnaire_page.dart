@@ -588,8 +588,8 @@ class _BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34.w,
-      height: 34.w,
+      width: 34.sp,
+      height: 34.sp,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(10.r),

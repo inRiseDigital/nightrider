@@ -23,8 +23,8 @@ class SearchEmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Container(
-              width: 62.w,
-              height: 62.w,
+              width: 62.sp,
+              height: 62.sp,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(20.r),

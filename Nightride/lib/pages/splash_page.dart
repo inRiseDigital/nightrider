@@ -39,16 +39,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     Widget destination;
     if (user != null) {
-      final svc = ref.read(userProfileServiceProvider);
-      await svc.createIfAbsent(user);
-      await svc.cleanupDummyDataIfNeeded(user.uid);
-      final role = await svc.getUserRole(user.uid);
-      if (!mounted) return;
-      if (role == 'organizer') {
-        destination = const OrganizerShellPage();
-      } else {
-        final onboardingDone = await svc.hasCompletedOnboarding(user.uid);
-        destination = onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage();
+      try {
+        final svc = ref.read(userProfileServiceProvider);
+        await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
+        await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
+        final role = await svc.getUserRole(user.uid).timeout(const Duration(seconds: 5));
+        if (!mounted) return;
+        if (role == 'organizer') {
+          destination = const OrganizerShellPage();
+        } else {
+          final onboardingDone = await svc.hasCompletedOnboarding(user.uid).timeout(const Duration(seconds: 5));
+          destination = onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage();
+        }
+      } catch (_) {
+        // Network/Firestore unavailable — proceed to the main shell anyway.
+        destination = AppShellPage();
       }
     } else {
       destination = const SignInPage();
@@ -78,8 +83,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             /// Center Logo
             Center(
               child: Container(
-                width: 96.w,
-                height: 96.w,
+                width: 96.sp,
+                height: 96.sp,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(22.r),

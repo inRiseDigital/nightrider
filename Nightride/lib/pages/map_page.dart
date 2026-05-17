@@ -21,6 +21,7 @@ import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/components/venue_card.dart';
 import 'package:nightride/components/venue_modal.dart';
 import 'package:nightride/components/venue_search_sheet.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
 import 'package:nightride/pages/event_detail_page.dart';
@@ -198,9 +199,25 @@ class _MapPageState extends ConsumerState<MapPage>
           ),
 
           // ── World view button ──────────────────────────────────────────
+          // Derive the bottom offset from the same inputs the bottom event
+          // card uses, so the globe always sits a fixed gap *above* the card
+          // instead of getting buried behind it on wide/foldable layouts.
+          //
+          //   bottom = nav height + safe-area + gap(12) below card     ── matches card.bottom
+          //          + mapBottomCardHeight + 6 (PageView buffer)       ── card slot height
+          //          + gap(12) above card                              ── visible clearance
+          //
+          // The +6 PageView buffer is included unconditionally so the offset
+          // is identical whether the card is the selected-venue single card
+          // or the multi-event PageView.
           Positioned(
-            right: 14.w,
-            bottom: 190.h,
+            right: AppResponsive.gap(context, 14).clamp(12.0, 18.0),
+            bottom: AppResponsive.bottomNavHeight(context) +
+                MediaQuery.viewPaddingOf(context).bottom +
+                AppResponsive.gap(context, 12) +
+                AppResponsive.mapBottomCardHeight(context) +
+                6 +
+                AppResponsive.gap(context, 12),
             child: GestureDetector(
               onTap: () => _mapboxMap?.flyTo(
                 CameraOptions(
@@ -211,8 +228,8 @@ class _MapPageState extends ConsumerState<MapPage>
                 MapAnimationOptions(duration: 900),
               ),
               child: Container(
-                width: 44.w,
-                height: 44.w,
+                width: 44.sp,
+                height: 44.sp,
                 decoration: BoxDecoration(
                   color: AppTheme.surface.withValues(alpha: 0.95),
                   borderRadius: BorderRadius.circular(14.r),
@@ -226,27 +243,41 @@ class _MapPageState extends ConsumerState<MapPage>
 
           if (_selectedVenue != null)
             Positioned(
-              left: 14.w,
-              right: 14.w,
-              bottom: 50.h,
-              child: VenueCard(
-                data: _selectedVenue!,
-                onTap: () => _showVenueModal(context, _selectedVenue!),
-                onMoreDetails: () {
-                  final v = _selectedVenue!;
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => v.id.isNotEmpty ? EventDetailPage(id: v.id) : VenueDetailsPage(data: v),
-                  ));
-                },
+              left: AppResponsive.pagePadding(context),
+              right: AppResponsive.pagePadding(context),
+              bottom: AppResponsive.bottomNavHeight(context) +
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  AppResponsive.gap(context, 12),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                  ),
+                  child: VenueCard(
+                    data: _selectedVenue!,
+                    onTap: () => _showVenueModal(context, _selectedVenue!),
+                    onMoreDetails: () {
+                      final v = _selectedVenue!;
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => v.id.isNotEmpty ? EventDetailPage(id: v.id) : VenueDetailsPage(data: v),
+                      ));
+                    },
+                  ),
+                ),
               ),
             )
           else
             Positioned(
               left: 0,
               right: 0,
-              bottom: 50.h,
+              bottom: AppResponsive.bottomNavHeight(context) +
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  AppResponsive.gap(context, 12),
               child: SizedBox(
-                height: 122.h,
+                // Match the responsive card height + a little breathing room
+                // so the PageView never clips the card and never overflows
+                // its parent stack on shorter screens.
+                height: AppResponsive.mapBottomCardHeight(context) + 6,
                 child: PageView.builder(
                   controller: _bottomCardsController,
                   itemCount: displayEvents.length,

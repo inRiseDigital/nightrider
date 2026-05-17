@@ -176,8 +176,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 child: Stack(
                   children: [
                     Container(
-                      width: 90.w,
-                      height: 90.w,
+                      width: 90.sp,
+                      height: 90.sp,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppTheme.surface,
@@ -195,8 +195,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                       bottom: 0,
                       right: 0,
                       child: Container(
-                        width: 28.w,
-                        height: 28.w,
+                        width: 28.sp,
+                        height: 28.sp,
                         decoration: BoxDecoration(
                           color: AppTheme.primary,
                           shape: BoxShape.circle,

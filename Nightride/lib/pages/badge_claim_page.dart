@@ -186,8 +186,8 @@ class _BadgePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 120.w,
-      height: 120.w,
+      width: 120.sp,
+      height: 120.sp,
       decoration: BoxDecoration(
         color: AppTheme.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,

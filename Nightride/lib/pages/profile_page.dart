@@ -4,10 +4,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:nightride/components/profile_bio_card.dart';
 import 'package:nightride/components/profile_header.dart';
 import 'package:nightride/components/profile_interests.dart';
-import 'package:nightride/components/profile_social_links.dart';
 import 'package:nightride/components/profile_top_bar.dart';
+import 'package:nightride/components/rank_card.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
+import 'package:nightride/domain/rank_system.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/profile_providers.dart';
+import 'package:nightride/services/favourites_service.dart';
 import 'package:nightride/services/user_profile_service.dart';
 import 'package:nightride/pages/settings_page.dart';
 
@@ -16,9 +19,11 @@ class ProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(dailyPointsProvider); // awards daily login points
     final state = ref.watch(profileProvider);
     final controller = ref.read(profileProvider.notifier);
     final avatarBase64 = ref.watch(avatarBase64Provider).asData?.value;
+    final partiesCount = ref.watch(favouritesStreamProvider).asData?.value.length ?? state.data.partiesAttended;
 
     final bool editing = state.isEditing;
 
@@ -26,8 +31,13 @@ class ProfilePage extends ConsumerWidget {
     final List<String> shownInterests =
         editing ? state.draftInterests : state.data.interests;
 
+    final hPad = AppResponsive.pagePadding(context);
+    final bottomNavSpace = AppResponsive.bottomNavHeight(context) +
+        AppResponsive.gap(context, 24);
+
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -36,77 +46,99 @@ class ProfilePage extends ConsumerWidget {
               colors: <Color>[AppTheme.background, AppTheme.scaffold],
             ),
           ),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 18.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                ProfileTopBar(
-                  data: state.data,
-                  isEditing: editing,
-                  onMenu: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const SettingsPage()),
-                  ),
-                  onCancel: controller.cancelEdit,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.maxContentWidth(context),
+              ),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  hPad,
+                  AppResponsive.gap(context, 14),
+                  hPad,
+                  bottomNavSpace,
                 ),
-                SizedBox(height: 25.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    ProfileTopBar(
+                      data: state.data,
+                      isEditing: editing,
+                      onMenu: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const SettingsPage()),
+                      ),
+                      onCancel: controller.cancelEdit,
+                    ),
+                    SizedBox(height: AppResponsive.profileSectionGap(context)),
 
-                ProfileHeader(
-                  state: state,
-                  onEdit: controller.enterEdit,
-                  onSave: controller.saveEdit,
-                  onCancel: controller.cancelEdit,
-                  avatarBase64: avatarBase64,
-                ),
-                SizedBox(height: 20.h),
+                    ProfileHeader(
+                      state: state,
+                      onEdit: controller.enterEdit,
+                      onSave: controller.saveEdit,
+                      onCancel: controller.cancelEdit,
+                      avatarBase64: avatarBase64,
+                    ),
+                    SizedBox(height: AppResponsive.profileSectionGap(context)),
 
-                ProfileBioCard(
-                  isEditing: editing,
-                  value: editing ? state.draftBio : state.data.bio,
-                  onChanged: controller.setDraftBio,
-                ),
-                SizedBox(height: 18.h),
+                    RankCard(data: state.data),
+                    SizedBox(height: AppResponsive.profileSectionGap(context)),
 
-                // Interests 
-                ProfileInterests(
-                  isEditing: editing,
-                  selectedInterests: shownInterests,
-                  allOptions: controller.allInterestOptions,
-                  isSelected: controller.isInterestSelected,
-                  onToggle: controller.toggleInterest,
-                  onRemove: controller.removeInterest,
-                ),
-                SizedBox(height: 20.h),
+                    ProfileBioCard(
+                      isEditing: editing,
+                      value: editing ? state.draftBio : state.data.bio,
+                      onChanged: controller.setDraftBio,
+                    ),
+                    SizedBox(height: AppResponsive.profileSectionGap(context)),
 
-                // Gamified Stats Grid
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12.w,
-                  mainAxisSpacing: 12.h,
-                  childAspectRatio: 2.2,
-                  children: [
-                    _StatFeatureCard(label: 'PARTIES', value: '${state.data.partiesAttended}', icon: Icons.celebration_rounded),
-                    _StatFeatureCard(label: 'FRIENDS', value: '${state.data.friendsCount}', icon: Icons.people_alt_rounded),
-                    _StatFeatureCard(label: 'STREAK', value: '${state.data.streakDays} DAYS', icon: Icons.local_fire_department_rounded),
-                    _StatFeatureCard(label: 'RANK', value: state.data.rank > 0 ? '#${state.data.rank}' : '—', icon: Icons.leaderboard_rounded),
+                    // Interests
+                    ProfileInterests(
+                      isEditing: editing,
+                      selectedInterests: shownInterests,
+                      allOptions: controller.allInterestOptions,
+                      isSelected: controller.isInterestSelected,
+                      onToggle: controller.toggleInterest,
+                      onRemove: controller.removeInterest,
+                    ),
+                    SizedBox(height: AppResponsive.profileSectionGap(context)),
+
+                    // Gamified Stats Grid
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: AppResponsive.gap(context, 12),
+                      mainAxisSpacing: AppResponsive.gap(context, 12),
+                      childAspectRatio: AppResponsive.profileStatGridAspectRatio(context),
+                      children: [
+                        _StatFeatureCard(label: 'PARTIES', value: '$partiesCount', icon: Icons.celebration_rounded),
+                        _StatFeatureCard(label: 'FRIENDS', value: '${state.data.friendsCount}', icon: Icons.people_alt_rounded),
+                        _StatFeatureCard(label: 'STREAK', value: '${state.data.streakDays} DAYS', icon: Icons.local_fire_department_rounded),
+                        _StatFeatureCard(
+                          label: 'RANK',
+                          value: () {
+                            final t = RankSystem.tierFor(state.data.rank);
+                            return '${t.emoji} ${t.name}';
+                          }(),
+                          icon: Icons.leaderboard_rounded,
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: AppResponsive.gap(context, 32)),
+                    Center(
+                      child: Text(
+                        state.data.joinedText,
+                        style: TextStyle(
+                          fontSize: AppResponsive.font(context, 11),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-
-                SizedBox(height: 40.h),
-                Center(
-                  child: Text(
-                    state.data.joinedText,
-                    style: TextStyle(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white.withValues(alpha: 0.35),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

@@ -1,9 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/favourites_service.dart';
@@ -23,11 +23,16 @@ class FavouritesPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 8.h),
+              padding: EdgeInsets.fromLTRB(
+                AppResponsive.gap(context, 20).clamp(16.0, 24.0),
+                AppResponsive.gap(context, 20).clamp(16.0, 24.0),
+                AppResponsive.gap(context, 20).clamp(16.0, 24.0),
+                8,
+              ),
               child: Text(
                 'Favourites',
                 style: GoogleFonts.inter(
-                  fontSize: 26.sp,
+                  fontSize: AppResponsive.font(context, 26).clamp(22.0, 28.0),
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -48,9 +53,12 @@ class FavouritesPage extends ConsumerWidget {
                     );
                   }
                   return ListView.separated(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.gap(context, 16).clamp(12.0, 20.0),
+                      vertical: 8,
+                    ),
                     itemCount: favs.length,
-                    separatorBuilder: (_, __) => Gap(12.h),
+                    separatorBuilder: (_, __) => const Gap(12),
                     itemBuilder: (context, i) {
                       final fav = favs[i];
                       return _FavCard(fav: fav);
@@ -67,19 +75,27 @@ class FavouritesPage extends ConsumerWidget {
 
   Widget _empty(String msg) => Center(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 32.w),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.favorite_border_rounded, color: Colors.white24, size: 56.sp),
-              Gap(16.h),
-              Text(
-                msg,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 15.sp,
-                  color: Colors.white38,
-                  height: 1.6,
+              Builder(
+                builder: (context) => Icon(
+                  Icons.favorite_border_rounded,
+                  color: Colors.white24,
+                  size: AppResponsive.icon(context, 56).clamp(40.0, 56.0),
+                ),
+              ),
+              const Gap(16),
+              Builder(
+                builder: (context) => Text(
+                  msg,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
+                    color: Colors.white38,
+                    height: 1.6,
+                  ),
                 ),
               ),
             ],
@@ -106,7 +122,7 @@ class _FavCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: IntrinsicHeight(
@@ -115,30 +131,37 @@ class _FavCard extends ConsumerWidget {
           children: [
             // Thumbnail — stretches to match the column height
             ClipRRect(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16.r),
-                bottomLeft: Radius.circular(16.r),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
               ),
               child: CachedNetworkImage(
                 imageUrl: image,
-                width: 100.w,
+                width: AppResponsive.gap(context, 100).clamp(80.0, 110.0),
                 fit: BoxFit.cover,
-                placeholder: (_, __) => SizedBox(width: 100.w, child: Container(color: Colors.white10)),
+                placeholder: (_, __) => SizedBox(
+                  width: AppResponsive.gap(context, 100).clamp(80.0, 110.0),
+                  child: Container(color: Colors.white10),
+                ),
                 errorWidget: (_, __, ___) => SizedBox(
-                  width: 100.w,
+                  width: AppResponsive.gap(context, 100).clamp(80.0, 110.0),
                   child: Container(
                     color: Colors.white10,
                     alignment: Alignment.center,
-                    child: Icon(Icons.music_note_rounded, color: Colors.white24, size: 28.sp),
+                    child: Icon(
+                      Icons.music_note_rounded,
+                      color: Colors.white24,
+                      size: AppResponsive.icon(context, 28).clamp(22.0, 28.0),
+                    ),
                   ),
                 ),
               ),
             ),
-            Gap(12.w),
+            const Gap(12),
             // Info
             Expanded(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12.h),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -149,25 +172,28 @@ class _FavCard extends ConsumerWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                        fontSize: 14.sp,
+                        fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                     ),
                     if (city.isNotEmpty) ...[
-                      Gap(4.h),
+                      const Gap(4),
                       Text(
                         city,
-                        style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.white54),
+                        style: GoogleFonts.inter(
+                          fontSize: AppResponsive.font(context, 12).clamp(10.0, 13.0),
+                          color: Colors.white54,
+                        ),
                       ),
                     ],
                     if (genre.isNotEmpty || daysLeft != null) ...[
-                      Gap(6.h),
+                      const Gap(6),
                       Row(
                         children: [
                           if (genre.isNotEmpty) _Chip(genre),
                           if (daysLeft != null) ...[
-                            Gap(6.w),
+                            const Gap(6),
                             _Chip(
                               daysLeft == 0
                                   ? 'Today!'
@@ -218,16 +244,16 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6.r),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 10.sp,
+          fontSize: AppResponsive.font(context, 10).clamp(8.0, 11.0),
           fontWeight: FontWeight.w600,
           color: color == AppTheme.accent ? AppTheme.accent : Colors.white60,
         ),

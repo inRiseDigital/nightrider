@@ -3,9 +3,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:nightride/components/auth_process_scaffold.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/pages/onboard_questionnaire_page.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/services/auth_service.dart';
@@ -107,14 +107,15 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.sizeOf(context).width;
-    final requiredPanelPx = 600.h;
-    final basePanelPx = 0.63.sh;
+    final screenH = MediaQuery.sizeOf(context).height;
+    final requiredPanelPx = 600.0;
+    final basePanelPx = 0.63 * screenH;
     final panelPx = math.min(
-      screenW > 600 ? 0.72.sh : 0.80.sh,
+      screenW > 600 ? 0.72 * screenH : 0.80 * screenH,
       math.max(basePanelPx, requiredPanelPx),
     );
 
-    final reservedGapDesignUnits = panelPx / ScreenUtil().scaleHeight;
+    final reservedGapDesignUnits = panelPx;
     final topGap = screenW > 600 ? 16.0 : 88.0;
 
     return AuthProcessScaffold(
@@ -162,9 +163,10 @@ class _SignUpBottomPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.sizeOf(context).width;
     return SizedBox(
       height: panelHeightPx,
-      width: 1.sw,
+      width: screenW,
       child: Stack(
         children: [
           // Panel body
@@ -172,9 +174,9 @@ class _SignUpBottomPanel extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF0B0816),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(48.r),
-                  topRight: Radius.circular(48.r),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(48),
+                  topRight: Radius.circular(48),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -190,20 +192,20 @@ class _SignUpBottomPanel extends StatelessWidget {
                 ],
               ),
               child: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(48.r),
-                    topRight: Radius.circular(48.r),
+                    topLeft: Radius.circular(48),
+                    topRight: Radius.circular(48),
                   ),
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.primary.withOpacity(0.09),
+                      Color(0x17B45BFF), // AppTheme.primary ~9% opacity
                       Colors.transparent,
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.25, 1.0],
+                    stops: [0.0, 0.25, 1.0],
                   ),
                 ),
               ),
@@ -213,12 +215,12 @@ class _SignUpBottomPanel extends StatelessWidget {
           // Thin glowing top stroke
           Positioned(
             top: 0,
-            left: 22.w,
-            right: 22.w,
+            left: 22,
+            right: 22,
             child: Container(
-              height: 2.h,
+              height: 2,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2.r),
+                borderRadius: BorderRadius.circular(2),
                 gradient: LinearGradient(
                   colors: [
                     Colors.transparent,
@@ -232,10 +234,10 @@ class _SignUpBottomPanel extends StatelessWidget {
 
           // Content — centered with max width for wide screens
           Positioned(
-            top: 20.h,
+            top: 20,
             left: 0,
             right: 0,
-            bottom: 18.h,
+            bottom: 18,
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
@@ -246,7 +248,7 @@ class _SignUpBottomPanel extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 22.w.clamp(0.0, 32.0),
+                    horizontal: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 22.0.clamp(0.0, 32.0),
                   ),
                   child: _PanelContent(
                     emailController: emailController,
@@ -295,10 +297,10 @@ class _PanelContent extends StatelessWidget {
       children: [
         // Role selector
         Container(
-          padding: EdgeInsets.all(4.r),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(14.r),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
           ),
           child: Row(
@@ -308,30 +310,30 @@ class _PanelContent extends StatelessWidget {
             ],
           ),
         ),
-        Gap(14.h),
+        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
         _InputField(
           controller: emailController,
           icon: Icons.mail_outline_rounded,
           hint: AppLocalizations.of(context)!.email,
           isPassword: false,
         ),
-        Gap(14.h),
+        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
         _InputField(
           controller: passwordController,
           icon: Icons.lock_outline_rounded,
           hint: 'Enter New Password',
           isPassword: true,
         ),
-        Gap(14.h),
+        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
         _InputField(
           controller: confirmPasswordController,
           icon: Icons.lock_outline_rounded,
           hint: 'Confirm Password',
           isPassword: true,
         ),
-        Gap(18.h),
+        Gap(AppResponsive.gap(context, 18).clamp(12, 24)),
         _SignUpButton(onPressed: onSignUp, isLoading: isLoading),
-        Gap(14.h),
+        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -339,7 +341,7 @@ class _PanelContent extends StatelessWidget {
             Text(
               "${AppLocalizations.of(context)!.alreadyHaveAccount} ",
               style: TextStyle(
-                fontSize: 13.5.sp,
+                fontSize: AppResponsive.font(context, 13.5),
                 color: Colors.white.withOpacity(0.55),
                 fontWeight: FontWeight.w400,
               ),
@@ -349,7 +351,7 @@ class _PanelContent extends StatelessWidget {
               child: Text(
                 AppLocalizations.of(context)!.signIn,
                 style: TextStyle(
-                  fontSize: 13.5.sp,
+                  fontSize: AppResponsive.font(context, 13.5),
                   color: AppTheme.primaryLight.withOpacity(0.9),
                   fontWeight: FontWeight.w500,
                 ),
@@ -358,22 +360,22 @@ class _PanelContent extends StatelessWidget {
           ],
         ),
 
-        Gap(14.h),
+        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
 
         Row(
           children: [
             Expanded(
               child: Container(
-                height: 1.h,
+                height: 1,
                 color: Colors.white.withOpacity(0.25),
               ),
             ),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12.w),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
                 'Or sign with',
                 style: TextStyle(
-                  fontSize: 12.5.sp,
+                  fontSize: AppResponsive.font(context, 12.5),
                   color: Colors.white.withOpacity(0.45),
                   fontWeight: FontWeight.w400,
                 ),
@@ -381,14 +383,14 @@ class _PanelContent extends StatelessWidget {
             ),
             Expanded(
               child: Container(
-                height: 1.h,
+                height: 1,
                 color: Colors.white.withOpacity(0.25),
               ),
             ),
           ],
         ),
 
-        Gap(14.h),
+        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -401,14 +403,14 @@ class _PanelContent extends StatelessWidget {
           ],
         ),
 
-        Gap(16.h),
+        Gap(AppResponsive.gap(context, 16).clamp(12, 22)),
 
         GestureDetector(
           onTap: () {},
           child: Text(
             AppLocalizations.of(context)!.continueAsGuest,
             style: TextStyle(
-              fontSize: 14.sp,
+              fontSize: AppResponsive.font(context, 14),
               color: AppTheme.primaryLight.withOpacity(0.9),
               fontWeight: FontWeight.w500,
               letterSpacing: 0.2,
@@ -435,10 +437,10 @@ class _RoleTab extends StatelessWidget {
         onTap: () => onTap(value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: EdgeInsets.symmetric(vertical: 10.h),
+          padding: EdgeInsets.symmetric(vertical: AppResponsive.gap(context, 10).clamp(8, 14)),
           decoration: BoxDecoration(
             color: selected ? AppTheme.primary.withValues(alpha: 0.3) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10.r),
+            borderRadius: BorderRadius.circular(10),
             border: selected ? Border.all(color: AppTheme.primary.withValues(alpha: 0.6)) : null,
           ),
           child: Center(
@@ -446,7 +448,7 @@ class _RoleTab extends StatelessWidget {
               label,
               style: TextStyle(
                 color: selected ? Colors.white : Colors.white38,
-                fontSize: 13.sp,
+                fontSize: AppResponsive.font(context, 13),
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
@@ -482,9 +484,9 @@ class _InputFieldState extends State<_InputField> {
     final obscure = widget.isPassword ? _obscure : false;
 
     return Container(
-      height: 64.h,
+      height: AppResponsive.gap(context, 64).clamp(54, 72),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26.r),
+        borderRadius: BorderRadius.circular(26),
         color: Colors.black.withOpacity(0.10),
         boxShadow: [
           BoxShadow(
@@ -503,16 +505,16 @@ class _InputFieldState extends State<_InputField> {
         obscureText: obscure,
         style: TextStyle(
           color: Colors.white.withOpacity(0.92),
-          fontSize: 15.sp,
+          fontSize: AppResponsive.font(context, 15),
         ),
         cursorColor: AppTheme.primaryLight,
         decoration: InputDecoration(
           prefixIcon: Padding(
-            padding: EdgeInsets.only(left: 18.w, right: 10.w),
+            padding: const EdgeInsets.only(left: 18, right: 10),
             child: Icon(
               widget.icon,
               color: AppTheme.primaryLight.withOpacity(0.85),
-              size: 22.sp,
+              size: AppResponsive.icon(context, 22),
             ),
           ),
           prefixIconConstraints: const BoxConstraints(
@@ -522,37 +524,37 @@ class _InputFieldState extends State<_InputField> {
           hintText: widget.hint,
           hintStyle: TextStyle(
             color: AppTheme.primaryLight.withOpacity(0.45),
-            fontSize: 15.sp,
+            fontSize: AppResponsive.font(context, 15),
             fontWeight: FontWeight.w400,
           ),
           filled: true,
           fillColor: Colors.transparent,
           contentPadding: EdgeInsets.symmetric(
-            vertical: 18.h,
-            horizontal: 18.w,
+            vertical: AppResponsive.gap(context, 18).clamp(14, 22),
+            horizontal: 18,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(26.r),
+            borderRadius: BorderRadius.circular(26),
             borderSide: BorderSide(
               color: AppTheme.primary.withOpacity(0.55),
               width: 1.2,
             ),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(26.r),
+            borderRadius: BorderRadius.circular(26),
             borderSide: const BorderSide(color: AppTheme.primary, width: 2),
           ),
           suffixIcon:
               widget.isPassword
                   ? Padding(
-                    padding: EdgeInsets.only(right: 10.w),
+                    padding: const EdgeInsets.only(right: 10),
                     child: IconButton(
                       onPressed: () => setState(() => _obscure = !_obscure),
                       icon: Icon(
                         _obscure
                             ? Icons.visibility_off_rounded
                             : Icons.visibility_rounded,
-                        size: 20.sp,
+                        size: AppResponsive.icon(context, 20),
                         color: AppTheme.primaryLight.withOpacity(0.55),
                       ),
                     ),
@@ -573,7 +575,7 @@ class _SignUpButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 62.h,
+      height: AppResponsive.gap(context, 62).clamp(52, 70),
       width: double.infinity,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
@@ -582,14 +584,14 @@ class _SignUpButton extends StatelessWidget {
           foregroundColor: AppTheme.primaryLight.withOpacity(0.85),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22.r),
+            borderRadius: BorderRadius.circular(22),
           ),
         ),
         child:
             isLoading
                 ? SizedBox(
-                  height: 24.h,
-                  width: 24.h,
+                  height: 24,
+                  width: 24,
                   child: const CircularProgressIndicator(
                     color: AppTheme.primaryLight,
                     strokeWidth: 2,
@@ -598,7 +600,7 @@ class _SignUpButton extends StatelessWidget {
                 : Text(
                   AppLocalizations.of(context)!.signUp,
                   style: TextStyle(
-                    fontSize: 18.sp,
+                    fontSize: AppResponsive.font(context, 18),
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.2,
                   ),
@@ -618,14 +620,14 @@ class _SocialIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = 40.sp;
+    final size = AppResponsive.icon(context, 40);
 
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
         width: size,
         height: size,
-        child: Center(child: _Logo(kind: kind, size: 32.sp)),
+        child: Center(child: _Logo(kind: kind, size: AppResponsive.icon(context, 32))),
       ),
     );
   }

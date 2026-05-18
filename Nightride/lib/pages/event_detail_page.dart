@@ -2,10 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
@@ -135,19 +135,19 @@ class _DetailBody extends ConsumerWidget {
           slivers: [
             // ── Hero image ──────────────────────────────────────────────────
             SliverAppBar(
-              expandedHeight: 360.h,
+              expandedHeight: 360,
               pinned: true,
               stretch: true,
               backgroundColor: AppTheme.scaffold,
-              leadingWidth: 70.w,
+              leadingWidth: 70,
               leading: Padding(
-                padding: EdgeInsets.only(left: 14.w),
+                padding: const EdgeInsets.only(left: 14),
                 child: Center(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      height: 40.h,
-                      width: 40.w,
+                      height: 40,
+                      width: 40,
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.45),
                         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
@@ -195,48 +195,48 @@ class _DetailBody extends ConsumerWidget {
             // ── Content ─────────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 130.h),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 130),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Genre badge
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: AppTheme.primary.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(10.r),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         _genre.toUpperCase(),
                         style: TextStyle(
                           color: AppTheme.primaryLight,
-                          fontSize: 10.sp,
+                          fontSize: AppResponsive.font(context, 10).clamp(8.5, 11.0),
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.4,
                         ),
                       ),
                     ),
-                    Gap(14.h),
+                    const Gap(14),
 
                     // Title
                     Text(
                       _name,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 26.sp,
+                        fontSize: AppResponsive.font(context, 26).clamp(22.0, 28.5),
                         fontWeight: FontWeight.w900,
                         height: 1.1,
                       ),
                     ),
-                    Gap(20.h),
+                    const Gap(20),
 
                     // ── Info card ────────────────────────────────────────────
                     Container(
-                      padding: EdgeInsets.all(16.r),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(20.r),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                       child: Column(
@@ -282,62 +282,62 @@ class _DetailBody extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Gap(26.h),
+                    const Gap(26),
 
                     // ── Artists ──────────────────────────────────────────────
                     if (_artists.isNotEmpty) ...[
                       Text(
                         AppLocalizations.of(context)!.performers,
-                        style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w900),
+                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
                       ),
-                      Gap(12.h),
+                      const Gap(12),
                       Wrap(
-                        spacing: 10.w,
-                        runSpacing: 10.h,
+                        spacing: 10,
+                        runSpacing: 10,
                         children: _artists.map((artist) => Container(
-                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 9.h),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(12.r),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.mic_rounded, color: AppTheme.accent, size: 13.sp),
-                              Gap(7.w),
+                              Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 13).clamp(11.0, 14.5)),
+                              const Gap(7),
                               Text(
                                 artist,
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13.sp, fontWeight: FontWeight.w600),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
                         )).toList(),
                       ),
-                      Gap(26.h),
+                      const Gap(26),
                     ],
 
                     // ── Description ──────────────────────────────────────────
                     if (_description.isNotEmpty) ...[
                       Text(
                         AppLocalizations.of(context)!.aboutThisEvent,
-                        style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w900),
+                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
                       ),
-                      Gap(12.h),
+                      const Gap(12),
                       Text(
                         _description,
-                        style: TextStyle(color: Colors.white70, fontSize: 14.sp, height: 1.65),
+                        style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), height: 1.65),
                       ),
-                      Gap(26.h),
+                      const Gap(26),
                     ],
 
                     // ── Map preview ──────────────────────────────────────────
                     if (_lat != 0 && _lng != 0) ...[
                       Text(
                         AppLocalizations.of(context)!.location,
-                        style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w900),
+                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
                       ),
-                      Gap(12.h),
+                      const Gap(12),
                       GestureDetector(
                         onTap: () {
                           ref.read(mapFocusProvider.notifier).state =
@@ -346,11 +346,11 @@ class _DetailBody extends ConsumerWidget {
                           Navigator.of(context).popUntil((route) => route.isFirst);
                         },
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20.r),
+                          borderRadius: BorderRadius.circular(20),
                           child: Stack(
                             children: [
                               SizedBox(
-                                height: 190.h,
+                                height: 190,
                                 width: double.infinity,
                                 child: staticMapUrl.isNotEmpty
                                     ? Image.network(
@@ -368,21 +368,21 @@ class _DetailBody extends ConsumerWidget {
                               ),
                               // "Open in Maps" overlay pill
                               Positioned(
-                                bottom: 10.h,
-                                right: 10.w,
+                                bottom: 10,
+                                right: 10,
                                 child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withValues(alpha: 0.65),
-                                    borderRadius: BorderRadius.circular(999.r),
+                                    borderRadius: BorderRadius.circular(999),
                                     border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.open_in_new_rounded, color: Colors.white, size: 12.sp),
-                                      Gap(5.w),
-                                      Text(AppLocalizations.of(context)!.openInMaps, style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.w700)),
+                                      Icon(Icons.open_in_new_rounded, color: Colors.white, size: AppResponsive.icon(context, 12).clamp(10.0, 13.5)),
+                                      const Gap(5),
+                                      Text(AppLocalizations.of(context)!.openInMaps, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w700)),
                                     ],
                                   ),
                                 ),
@@ -405,7 +405,7 @@ class _DetailBody extends ConsumerWidget {
           right: 0,
           bottom: 0,
           child: Container(
-            padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 36.h),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
             decoration: BoxDecoration(
               color: AppTheme.surface.withValues(alpha: 0.97),
               border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07))),
@@ -417,13 +417,13 @@ class _DetailBody extends ConsumerWidget {
               children: [
                 if (_priceHint.isNotEmpty)
                   Padding(
-                    padding: EdgeInsets.only(right: 20.w),
+                    padding: const EdgeInsets.only(right: 20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(AppLocalizations.of(context)!.price, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
-                        Text(_priceHint, style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.w900)),
+                        Text(AppLocalizations.of(context)!.price, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0))),
+                        Text(_priceHint, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.5), fontWeight: FontWeight.w900)),
                       ],
                     ),
                   ),
@@ -431,10 +431,10 @@ class _DetailBody extends ConsumerWidget {
                   child: GestureDetector(
                     onTap: _openTickets,
                     child: Container(
-                      height: 54.h,
+                      height: 54,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(colors: [AppTheme.primary, AppTheme.accentPurple]),
-                        borderRadius: BorderRadius.circular(16.r),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6)),
                         ],
@@ -443,11 +443,11 @@ class _DetailBody extends ConsumerWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.open_in_new_rounded, color: Colors.white, size: 16.sp),
-                          Gap(8.w),
+                          Icon(Icons.open_in_new_rounded, color: Colors.white, size: AppResponsive.icon(context, 16).clamp(14.0, 17.5)),
+                          const Gap(8),
                           Text(
                             AppLocalizations.of(context)!.getTickets,
-                            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.2),
+                            style: TextStyle(fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.2),
                           ),
                         ],
                       ),
@@ -473,29 +473,29 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 2.h),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: EdgeInsets.all(8.r),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10.r),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 18.sp),
+            child: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 18).clamp(15.0, 20.0)),
           ),
-          Gap(12.w),
+          const Gap(12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Gap(2.h),
-                Text(text, style: TextStyle(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.bold)),
+                const Gap(2),
+                Text(text, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.bold)),
                 if (subText != null && subText!.isNotEmpty) ...[
-                  Gap(3.h),
-                  Text(subText!, style: TextStyle(color: Colors.white54, fontSize: 12.sp), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const Gap(3),
+                  Text(subText!, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0)), maxLines: 2, overflow: TextOverflow.ellipsis),
                 ],
               ],
             ),
@@ -511,7 +511,7 @@ class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 10.h),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
     );
   }
@@ -523,14 +523,14 @@ class _MapFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 190.h,
+      height: 190,
       color: AppTheme.surface,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.map_rounded, color: AppTheme.primary, size: 36.sp),
-          Gap(8.h),
-          Text(locationLine, style: TextStyle(color: Colors.white60, fontSize: 13.sp)),
+          Icon(Icons.map_rounded, color: AppTheme.primary, size: AppResponsive.icon(context, 36).clamp(28.0, 40.0)),
+          const Gap(8),
+          Text(locationLine, style: TextStyle(color: Colors.white60, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5))),
         ],
       ),
     );

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/domain/profile_models.dart';
 import 'package:nightride/domain/rank_system.dart';
 
@@ -16,9 +16,9 @@ class RankCard extends StatelessWidget {
     final pct = RankSystem.progress(pts);
 
     return Container(
-      padding: EdgeInsets.all(16.r),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20.r),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: tier.color.withValues(alpha: 0.28)),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -34,8 +34,8 @@ class RankCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(tier.emoji, style: TextStyle(fontSize: 28.sp)),
-              SizedBox(width: 10.w),
+              Text(tier.emoji, style: TextStyle(fontSize: AppResponsive.font(context, 28).clamp(22.0, 32.0))),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,7 +44,7 @@ class RankCard extends StatelessWidget {
                       tier.name,
                       style: TextStyle(
                         color: tier.color,
-                        fontSize: 16.sp,
+                        fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.0),
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.4,
                       ),
@@ -53,7 +53,7 @@ class RankCard extends StatelessWidget {
                       '$pts pts total',
                       style: TextStyle(
                         color: Colors.white54,
-                        fontSize: 11.sp,
+                        fontSize: AppResponsive.font(context, 11).clamp(10.0, 12.0),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -63,17 +63,17 @@ class RankCard extends StatelessWidget {
               if (data.streakDays > 0) _StreakPill(days: data.streakDays),
             ],
           ),
-          SizedBox(height: 14.h),
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: LinearProgressIndicator(
               value: pct,
-              minHeight: 6.h,
+              minHeight: 6,
               backgroundColor: Colors.white.withValues(alpha: 0.08),
               valueColor: AlwaysStoppedAnimation<Color>(tier.color),
             ),
           ),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -81,14 +81,17 @@ class RankCard extends StatelessWidget {
                 next != null
                     ? '${pts - tier.minPoints} / ${next.minPoints - tier.minPoints} pts to ${next.name}'
                     : 'Max rank reached!',
-                style: TextStyle(color: Colors.white38, fontSize: 10.sp),
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
+                ),
               ),
               if (next != null)
                 Text(
                   '${next.emoji} ${next.name}',
                   style: TextStyle(
                     color: next.color.withValues(alpha: 0.65),
-                    fontSize: 10.sp,
+                    fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -107,7 +110,7 @@ class _StreakPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: const Color(0xFFF97316).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(99),
@@ -116,14 +119,17 @@ class _StreakPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.local_fire_department_rounded,
-              color: const Color(0xFFF97316), size: 13.sp),
-          SizedBox(width: 3.w),
+          Icon(
+            Icons.local_fire_department_rounded,
+            color: const Color(0xFFF97316),
+            size: AppResponsive.icon(context, 13).clamp(11.0, 15.0),
+          ),
+          const SizedBox(width: 3),
           Text(
             '$days day${days == 1 ? "" : "s"}',
             style: TextStyle(
               color: const Color(0xFFF97316),
-              fontSize: 10.sp,
+              fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
               fontWeight: FontWeight.w900,
             ),
           ),

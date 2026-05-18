@@ -2,8 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/providers/settings_providers.dart';
 
@@ -31,15 +31,15 @@ class OrganizerHomePage extends ConsumerWidget {
         title: const Text('My Events', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
         actions: [
           Padding(
-            padding: EdgeInsets.only(right: 8.w),
+            padding: const EdgeInsets.only(right: 8),
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppTheme.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8.r),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
               ),
-              child: Text('ORGANIZER', style: TextStyle(color: AppTheme.primaryLight, fontSize: 10.sp, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              child: Text('ORGANIZER', style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 10), fontWeight: FontWeight.w900, letterSpacing: 1)),
             ),
           ),
         ],
@@ -68,9 +68,9 @@ class OrganizerHomePage extends ConsumerWidget {
                   return _EmptyState(onTap: () => _showCreateEventSheet(context, uid));
                 }
                 return ListView.separated(
-                  padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
+                  padding: EdgeInsets.fromLTRB(16, AppResponsive.gap(context, 16).clamp(12, 22), 16, AppResponsive.gap(context, 100).clamp(80, 120)),
                   itemCount: docs.length,
-                  separatorBuilder: (_, __) => Gap(12.h),
+                  separatorBuilder: (_, __) => Gap(AppResponsive.gap(context, 12).clamp(8, 16)),
                   itemBuilder: (context, i) {
                     final data = docs[i].data() as Map<String, dynamic>;
                     return _EventCard(
@@ -128,11 +128,11 @@ class _EmptyState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.event_busy_rounded, size: 72, color: AppTheme.primary.withValues(alpha: 0.3)),
-          Gap(16.h),
-          Text('No events yet', style: TextStyle(color: Colors.white70, fontSize: 18.sp, fontWeight: FontWeight.w700)),
-          Gap(8.h),
-          Text('Tap + to create your first event', style: TextStyle(color: Colors.white38, fontSize: 13.sp)),
-          Gap(24.h),
+          Gap(AppResponsive.gap(context, 16).clamp(12, 22)),
+          Text('No events yet', style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 18), fontWeight: FontWeight.w700)),
+          Gap(AppResponsive.gap(context, 8).clamp(6, 12)),
+          Text('Tap + to create your first event', style: TextStyle(color: Colors.white38, fontSize: AppResponsive.font(context, 13))),
+          Gap(AppResponsive.gap(context, 24).clamp(18, 32)),
           ElevatedButton.icon(
             onPressed: onTap,
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary.withValues(alpha: 0.2), foregroundColor: Colors.white),
@@ -161,10 +161,10 @@ class _EventCard extends StatelessWidget {
     final isPublished = status == 'published';
 
     return Container(
-      padding: EdgeInsets.all(16.r),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
@@ -173,41 +173,41 @@ class _EventCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(title, style: TextStyle(color: Colors.white, fontSize: 15.sp, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+                child: Text(title, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 15), fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isPublished ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6.r),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(status.toUpperCase(),
-                    style: TextStyle(color: isPublished ? Colors.greenAccent : Colors.orangeAccent, fontSize: 9.sp, fontWeight: FontWeight.w900)),
+                    style: TextStyle(color: isPublished ? Colors.greenAccent : Colors.orangeAccent, fontSize: AppResponsive.font(context, 9), fontWeight: FontWeight.w900)),
               ),
             ],
           ),
           if (date.isNotEmpty || venue.isNotEmpty) ...[
-            Gap(6.h),
+            Gap(AppResponsive.gap(context, 6).clamp(4, 10)),
             if (date.isNotEmpty)
               Row(children: [
-                Icon(Icons.calendar_today_rounded, size: 12.sp, color: Colors.white38),
-                Gap(4.w),
-                Text(date, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
+                Icon(Icons.calendar_today_rounded, size: AppResponsive.icon(context, 12), color: Colors.white38),
+                Gap(4),
+                Text(date, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12))),
               ]),
             if (venue.isNotEmpty) ...[
-              Gap(3.h),
+              Gap(3),
               Row(children: [
-                Icon(Icons.location_on_rounded, size: 12.sp, color: Colors.white38),
-                Gap(4.w),
-                Text(venue, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
+                Icon(Icons.location_on_rounded, size: AppResponsive.icon(context, 12), color: Colors.white38),
+                Gap(4),
+                Text(venue, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12))),
               ]),
             ],
           ],
-          Gap(12.h),
+          Gap(AppResponsive.gap(context, 12).clamp(8, 16)),
           Row(
             children: [
               _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', onTap: onEdit),
-              Gap(8.w),
+              Gap(8),
               _ActionBtn(
                 icon: isPublished ? Icons.visibility_off_outlined : Icons.publish_rounded,
                 label: isPublished ? 'Unpublish' : 'Publish',
@@ -217,7 +217,7 @@ class _EventCard extends StatelessWidget {
               const Spacer(),
               GestureDetector(
                 onTap: onDelete,
-                child: Icon(Icons.delete_outline_rounded, color: Colors.redAccent.withValues(alpha: 0.7), size: 20.sp),
+                child: Icon(Icons.delete_outline_rounded, color: Colors.redAccent.withValues(alpha: 0.7), size: AppResponsive.icon(context, 20)),
               ),
             ],
           ),
@@ -238,16 +238,16 @@ class _ActionBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: AppTheme.primary.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8.r),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
         ),
         child: Row(children: [
-          Icon(icon, size: 13.sp, color: AppTheme.primaryLight),
-          Gap(4.w),
-          Text(label, style: TextStyle(color: AppTheme.primaryLight, fontSize: 11.sp, fontWeight: FontWeight.w700)),
+          Icon(icon, size: AppResponsive.icon(context, 13), color: AppTheme.primaryLight),
+          const Gap(4),
+          Text(label, style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 11), fontWeight: FontWeight.w700)),
         ]),
       ),
     );
@@ -324,42 +324,42 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
       maxChildSize: 0.95,
       minChildSize: 0.5,
       builder: (_, controller) => Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, MediaQuery.of(context).viewInsets.bottom + 24.h),
+        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 24),
         child: ListView(controller: controller, children: [
-          Center(child: Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2.r)))),
-          Gap(16.h),
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+          Gap(AppResponsive.gap(context, 16).clamp(12, 22)),
           Text(widget.docId != null ? 'Edit Event' : 'Create Event',
-              style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w800)),
-          Gap(20.h),
+              style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18), fontWeight: FontWeight.w800)),
+          Gap(AppResponsive.gap(context, 20).clamp(14, 28)),
           _SheetField(controller: _title, label: 'Event Title *', hint: 'e.g. Neon Night Festival', icon: Icons.title_rounded),
-          Gap(14.h),
+          Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(controller: _venue, label: 'Venue', hint: 'e.g. Skyline Rooftop, Colombo', icon: Icons.location_on_outlined),
-          Gap(14.h),
+          Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(controller: _date, label: 'Date & Time', hint: 'e.g. May 10, 2026 · 9PM', icon: Icons.calendar_today_rounded),
-          Gap(14.h),
+          Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(controller: _price, label: 'Ticket Price', hint: 'e.g. \$15 or Free', icon: Icons.confirmation_number_outlined),
-          Gap(14.h),
+          Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(controller: _description, label: 'Description', hint: 'Tell people about the event...', icon: Icons.notes_rounded, maxLines: 4),
-          Gap(24.h),
+          Gap(AppResponsive.gap(context, 24).clamp(18, 32)),
           SizedBox(
             width: double.infinity,
-            height: 52.h,
+            height: AppResponsive.gap(context, 52).clamp(44, 60),
             child: ElevatedButton(
               onPressed: _saving ? null : _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary.withValues(alpha: 0.3),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.5)),
               ),
               child: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : Text(widget.docId != null ? 'Save Changes' : 'Create Event',
-                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800)),
+                      style: TextStyle(fontSize: AppResponsive.font(context, 15), fontWeight: FontWeight.w800)),
             ),
           ),
         ]),
@@ -379,26 +379,26 @@ class _SheetField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: TextStyle(color: Colors.white70, fontSize: 12.sp, fontWeight: FontWeight.w700)),
-      Gap(6.h),
+      Text(label, style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 12), fontWeight: FontWeight.w700)),
+      Gap(AppResponsive.gap(context, 6).clamp(4, 10)),
       TextField(
         controller: controller,
         maxLines: maxLines,
-        style: TextStyle(color: Colors.white, fontSize: 14.sp),
+        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14)),
         cursorColor: AppTheme.primary,
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: Colors.white24, fontSize: 13.sp),
+          hintStyle: TextStyle(color: Colors.white24, fontSize: AppResponsive.font(context, 13)),
           prefixIcon: maxLines == 1 ? Padding(
-            padding: EdgeInsets.only(left: 12.w, right: 8.w),
-            child: Icon(icon, color: AppTheme.primaryLight.withValues(alpha: 0.6), size: 18.sp),
+            padding: const EdgeInsets.only(left: 12, right: 8),
+            child: Icon(icon, color: AppTheme.primaryLight.withValues(alpha: 0.6), size: AppResponsive.icon(context, 18)),
           ) : null,
           prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
           filled: true,
           fillColor: Colors.white.withValues(alpha: 0.05),
-          contentPadding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 14.w),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppTheme.primary.withValues(alpha: 0.6), width: 1.5)),
+          contentPadding: EdgeInsets.symmetric(vertical: AppResponsive.gap(context, 14).clamp(10, 18), horizontal: 14),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.primary.withValues(alpha: 0.6), width: 1.5)),
         ),
       ),
     ]);

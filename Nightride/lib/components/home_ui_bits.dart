@@ -1,9 +1,9 @@
 // lib/features/home/presentation/widgets/home_ui_bits.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
-import '../../../../core/theme/app_theme.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
+import 'package:nightride/core/theme/app_theme.dart';
 
 class HomeSmoothScrollBehavior extends ScrollBehavior {
   const HomeSmoothScrollBehavior();
@@ -21,7 +21,7 @@ class GapH extends StatelessWidget {
   final double h;
 
   @override
-  Widget build(BuildContext context) => Gap(h.h);
+  Widget build(BuildContext context) => Gap(h);
 }
 
 class MiniIconButton extends StatelessWidget {
@@ -31,15 +31,17 @@ class MiniIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = AppResponsive.gap(context, 38).clamp(34.0, 44.0);
+    final radius = AppResponsive.radius(context, 14).clamp(12.0, 16.0);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14.r),
+      borderRadius: BorderRadius.circular(radius),
       child: Container(
-        width: 38.sp,
-        height: 38.sp,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.30),
-          borderRadius: BorderRadius.circular(14.r),
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.10),
             width: 1,
@@ -48,7 +50,7 @@ class MiniIconButton extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(
           icon,
-          size: 18.sp,
+          size: AppResponsive.icon(context, 18).clamp(15.0, 20.0),
           color: Colors.white.withValues(alpha: 0.92),
         ),
       ),
@@ -64,15 +66,17 @@ class IconPillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = AppResponsive.gap(context, 36).clamp(32.0, 42.0);
+    final radius = AppResponsive.radius(context, 14).clamp(12.0, 16.0);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14.r),
+      borderRadius: BorderRadius.circular(radius),
       child: Container(
-        width: 36.sp,
-        height: 36.sp,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(14.r),
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
         alignment: Alignment.center,
@@ -96,15 +100,19 @@ class TextPillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final h = AppResponsive.gap(context, 36).clamp(32.0, 42.0);
+    final radius = AppResponsive.radius(context, 14).clamp(12.0, 16.0);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14.r),
+      borderRadius: BorderRadius.circular(radius),
       child: Container(
-        height: 36.sp,
-        padding: EdgeInsets.symmetric(horizontal: 10.w),
+        height: h,
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.gap(context, 10).clamp(8.0, 14.0),
+        ),
         decoration: BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(14.r),
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
         child: Row(
@@ -113,12 +121,12 @@ class TextPillButton extends StatelessWidget {
             Text(
               text,
               style: TextStyle(
-                fontSize: 12.5.sp,
+                fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 14.0),
                 fontWeight: FontWeight.w800,
                 color: Colors.white.withValues(alpha: 0.9),
               ),
             ),
-            Gap(2.w),
+            const Gap(2),
             trailing,
           ],
         ),

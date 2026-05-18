@@ -2,7 +2,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
 // ignore: unused_import
@@ -51,7 +50,7 @@ class HomeTrendingList extends ConsumerWidget {
       children: List<Widget>.generate(events.length, (int i) {
         final TrendingEvent e = events[i];
         return Padding(
-          padding: EdgeInsets.only(bottom: i == events.length - 1 ? 0 : 12.h),
+          padding: EdgeInsets.only(bottom: i == events.length - 1 ? 0 : 12.0),
           child: _TrendingCard(event: e),
         );
       }),
@@ -79,9 +78,9 @@ class _TrendingCard extends ConsumerWidget {
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => EventDetailPage(id: event.id)),
       ),
-      borderRadius: BorderRadius.circular(24.r),
+      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 24).clamp(20.0, 28.0)),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24.r),
+        borderRadius: BorderRadius.circular(AppResponsive.radius(context, 24).clamp(20.0, 28.0)),
         child: SizedBox(
           height: cardHeight,
           child: Stack(
@@ -213,7 +212,7 @@ class _TrendingCard extends ConsumerWidget {
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24.r),
+                      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 24).clamp(20.0, 28.0)),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.06),
                         width: 1,
@@ -292,10 +291,13 @@ class _TagPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.gap(context, 10).clamp(8.0, 12.0),
+        vertical: AppResponsive.gap(context, 7).clamp(5.0, 8.0),
+      ),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(999.r),
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.12),
           width: 1,
@@ -306,7 +308,7 @@ class _TagPill extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: 11.sp,
+          fontSize: AppResponsive.font(context, 11).clamp(10.0, 12.0),
           fontWeight: FontWeight.w900,
           letterSpacing: 1.0,
           color: Colors.white.withValues(alpha: 0.92),
@@ -328,26 +330,26 @@ class _InterestedRow extends StatelessWidget {
     return Row(
       children: <Widget>[
         SizedBox(
-          height: 26.sp,
-          width: (show == 0) ? 0 : (26.sp + (show - 1) * 16.w),
+          height: 26,
+          width: (show == 0) ? 0 : (26.0 + (show - 1) * 16.0),
           child: Stack(
             children: List<Widget>.generate(show, (int i) {
               return Positioned(
-                left: i * 16.w,
+                left: i * 16.0,
                 child: Container(
-                  width: 26.sp,
-                  height: 26.sp,
+                  width: 26,
+                  height: 26,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: Colors.black.withValues(alpha: 0.55),
                       width: 1.6,
                     ),
-                    boxShadow: <BoxShadow>[
+                    boxShadow: const <BoxShadow>[
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.20),
-                        blurRadius: 10.r,
-                        offset: Offset(0, 6.h),
+                        color: Color(0x33000000),
+                        blurRadius: 10,
+                        offset: Offset(0, 6),
                       ),
                     ],
                   ),
@@ -370,11 +372,11 @@ class _InterestedRow extends StatelessWidget {
             }),
           ),
         ),
-        if (show > 0) Gap(8.w),
+        if (show > 0) const Gap(8),
         Text(
           countText,
           style: TextStyle(
-            fontSize: 12.sp,
+            fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
             fontWeight: FontWeight.w900,
             color: Colors.white.withValues(alpha: 0.88),
           ),
@@ -431,7 +433,7 @@ class _HeartIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
+      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 16)),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,

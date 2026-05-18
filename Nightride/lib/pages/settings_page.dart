@@ -3,9 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:nightride/components/home_language_sheet.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/services/privacy_service.dart';
 import 'package:nightride/l10n/app_localizations.dart';
@@ -34,7 +34,7 @@ class SettingsPage extends ConsumerWidget {
         ),
       ),
       body: ListView(
-        padding: EdgeInsets.all(20.r),
+        padding: const EdgeInsets.all(20),
         children: [
           _SettingsSection(
             title: l.account,
@@ -62,7 +62,7 @@ class SettingsPage extends ConsumerWidget {
               ),
             ],
           ),
-          Gap(24.h),
+          const Gap(24),
           _SettingsSection(
             title: l.preferences,
             children: [
@@ -80,7 +80,7 @@ class SettingsPage extends ConsumerWidget {
               ),
             ],
           ),
-          Gap(24.h),
+          const Gap(24),
           _SettingsSection(
             title: l.support,
             children: [
@@ -101,7 +101,7 @@ class SettingsPage extends ConsumerWidget {
             ],
           ),
           if (ref.watch(isAdminProvider).asData?.value == true) ...[
-            Gap(24.h),
+            const Gap(24),
             _SettingsSection(
               title: 'Admin',
               children: [
@@ -116,7 +116,7 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ],
-          Gap(40.h),
+          const Gap(40),
           TextButton(
             onPressed: () async {
               await ref.read(authServiceProvider).signOut();
@@ -160,11 +160,11 @@ class _NotificationsPageState extends ConsumerState<_NotificationsPage> {
             _SwitchTile(label: 'Event alerts & reminders', value: _eventAlerts, onChanged: (v) => setState(() => _eventAlerts = v)),
             _SwitchTile(label: 'Events near me', value: _nearbyEvents, onChanged: (v) => setState(() => _nearbyEvents = v)),
           ]),
-          Gap(24.h),
+          const Gap(24),
           _SwitchSection(title: 'Social', children: [
             _SwitchTile(label: 'Friend activity', value: _friendActivity, onChanged: (v) => setState(() => _friendActivity = v)),
           ]),
-          Gap(24.h),
+          const Gap(24),
           _SwitchSection(title: 'Other', children: [
             _SwitchTile(label: 'Promotions & deals', value: _promotions, onChanged: (v) => setState(() => _promotions = v)),
             _SwitchTile(label: 'App updates', value: _appUpdates, onChanged: (v) => setState(() => _appUpdates = v)),
@@ -303,7 +303,7 @@ class _PrivacyPage extends ConsumerWidget {
                 onChanged: (v) => toggle((s) => s.copyWith(showActivity: v)),
               ),
             ]),
-            Gap(24.h),
+            const Gap(24),
             _SwitchSection(title: 'Security', children: [
               _SwitchTile(
                 label: 'Two-factor authentication',
@@ -311,7 +311,7 @@ class _PrivacyPage extends ConsumerWidget {
                 onChanged: (v) => toggle((s) => s.copyWith(twoFactor: v)),
               ),
             ]),
-            Gap(24.h),
+            const Gap(24),
             _InfoTile(
               icon: Icons.delete_outline_rounded,
               label: 'Delete Account',
@@ -345,12 +345,12 @@ class _AppearancePage extends ConsumerWidget {
               onChanged: (v) => ref.read(homeDarkToggleProvider.notifier).state = v,
             ),
           ]),
-          Gap(24.h),
+          const Gap(24),
           _SettingsSection(
             title: 'Accent color',
             children: [
               Padding(
-                padding: EdgeInsets.all(16.r),
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: List.generate(kAccentColors.length, (i) => GestureDetector(
@@ -395,7 +395,7 @@ class _HelpCenterPage extends StatelessWidget {
               answer: 'Go to Settings → Language and select from 12 available languages.',
             ),
           ]),
-          Gap(24.h),
+          const Gap(24),
           _SettingsSection(title: 'Contact', children: [
             _InfoTile(
               icon: Icons.email_outlined,
@@ -437,22 +437,22 @@ class _AboutPageState extends State<_AboutPage> {
           Center(
             child: Column(
               children: [
-                Gap(12.h),
+                const Gap(12),
                 Container(
-                  width: 80.sp,
-                  height: 80.sp,
+                  width: AppResponsive.font(context, 80).clamp(68.0, 88.0),
+                  height: AppResponsive.font(context, 80).clamp(68.0, 88.0),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20.r),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                   ),
-                  child: Icon(Icons.nightlife_rounded, color: AppTheme.primary, size: 40.sp),
+                  child: Icon(Icons.nightlife_rounded, color: AppTheme.primary, size: AppResponsive.icon(context, 40).clamp(32.0, 44.0)),
                 ),
-                Gap(14.h),
-                Text('Nightride', style: TextStyle(color: Colors.white, fontSize: 22.sp, fontWeight: FontWeight.w900)),
-                Gap(4.h),
-                Text(_version, style: TextStyle(color: Colors.white54, fontSize: 13.sp)),
-                Gap(24.h),
+                const Gap(14),
+                Text('Nightride', style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 22).clamp(18.5, 24.0), fontWeight: FontWeight.w900)),
+                const Gap(4),
+                Text(_version, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5))),
+                const Gap(24),
               ],
             ),
           ),
@@ -487,7 +487,7 @@ class _SubPage extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(20.r),
+        padding: const EdgeInsets.all(20),
         child: child,
       ),
     );
@@ -508,13 +508,13 @@ class _SettingsSection extends StatelessWidget {
       children: [
         Text(
           title.toUpperCase(),
-          style: TextStyle(color: Colors.white54, fontSize: 11.sp, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+          style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w900, letterSpacing: 1.2),
         ),
-        Gap(12.h),
+        const Gap(12),
         Container(
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(16.r),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Column(children: children),
         ),
@@ -542,7 +542,7 @@ class _NavigableTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: iconColor, size: 20.sp),
+      leading: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
       title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)),
       trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 14),
       onTap: onTap,
@@ -579,7 +579,7 @@ class _InfoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: color, size: 20.sp),
+      leading: Icon(icon, color: color, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
       title: Text(label, style: TextStyle(color: color, fontSize: 14)),
       onTap: onTap,
     );
@@ -603,14 +603,14 @@ class _ExpandableTileState extends State<_ExpandableTile> {
     return Column(
       children: [
         ListTile(
-          title: Text(widget.question, style: TextStyle(color: Colors.white, fontSize: 13.5.sp, fontWeight: FontWeight.w600)),
-          trailing: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: Colors.white38, size: 20.sp),
+          title: Text(widget.question, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 13.5).clamp(11.5, 14.5), fontWeight: FontWeight.w600)),
+          trailing: Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: Colors.white38, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
           onTap: () => setState(() => _open = !_open),
         ),
         if (_open)
           Padding(
-            padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 14.h),
-            child: Text(widget.answer, style: TextStyle(color: Colors.white60, fontSize: 13.sp, height: 1.5)),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Text(widget.answer, style: TextStyle(color: Colors.white60, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), height: 1.5)),
           ),
       ],
     );
@@ -625,8 +625,8 @@ class _ColorDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34.sp,
-      height: 34.sp,
+      width: AppResponsive.font(context, 34).clamp(28.0, 37.5),
+      height: AppResponsive.font(context, 34).clamp(28.0, 37.5),
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,

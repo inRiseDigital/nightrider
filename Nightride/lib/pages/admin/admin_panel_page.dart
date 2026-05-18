@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/services/firestore_service.dart';
 import 'admin_add_event_page.dart';
@@ -90,7 +90,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
             tooltip: 'Add Event',
             onPressed: _openAdd,
           ),
-          Gap(8.w),
+          const Gap(8),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -131,9 +131,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                   return _EmptyState(onAdd: _openAdd);
                 }
                 return ListView.separated(
-                  padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 100.h),
+                  padding: EdgeInsets.fromLTRB(16, AppResponsive.gap(context, 12).clamp(8, 18), 16, AppResponsive.gap(context, 100).clamp(80, 120)),
                   itemCount: docs.length,
-                  separatorBuilder: (_, __) => Gap(10.h),
+                  separatorBuilder: (_, __) => Gap(AppResponsive.gap(context, 10).clamp(6, 14)),
                   itemBuilder: (context, i) {
                     final doc = docs[i];
                     return _EventTile(
@@ -168,13 +168,13 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppTheme.background,
-      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 12.h),
+      padding: EdgeInsets.fromLTRB(16, AppResponsive.gap(context, 8).clamp(6, 12), 16, AppResponsive.gap(context, 12).clamp(8, 16)),
       child: SizedBox(
-        height: 36.h,
+        height: AppResponsive.gap(context, 36).clamp(30, 44),
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: filters.length,
-          separatorBuilder: (_, __) => Gap(8.w),
+          separatorBuilder: (_, __) => const Gap(8),
           itemBuilder: (_, i) {
             final f = filters[i];
             final active = f == selected;
@@ -182,12 +182,12 @@ class _FilterBar extends StatelessWidget {
               onTap: () => onSelect(f),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: active
                       ? AppTheme.accent
                       : Colors.white.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(999.r),
+                  borderRadius: BorderRadius.circular(999),
                   border: Border.all(
                     color: active
                         ? AppTheme.accent
@@ -197,7 +197,7 @@ class _FilterBar extends StatelessWidget {
                 child: Text(
                   f,
                   style: TextStyle(
-                    fontSize: 12.sp,
+                    fontSize: AppResponsive.font(context, 12),
                     fontWeight: FontWeight.w700,
                     color: active
                         ? Colors.white
@@ -249,7 +249,7 @@ class _EventTile extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
       ),
       child: IntrinsicHeight(
@@ -258,34 +258,34 @@ class _EventTile extends StatelessWidget {
           children: [
             if (cover.isNotEmpty)
               ClipRRect(
-                borderRadius: BorderRadius.horizontal(left: Radius.circular(16.r)),
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
                 child: Image.network(
                   cover,
-                  width: 90.w,
+                  width: 90,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    width: 90.w,
+                    width: 90,
                     color: Colors.white.withValues(alpha: 0.05),
                     child: Icon(
                       Icons.image_not_supported_outlined,
                       color: Colors.white24,
-                      size: 28.sp,
+                      size: AppResponsive.icon(context, 28),
                     ),
                   ),
                 ),
               )
             else
               Container(
-                width: 90.w,
+                width: 90,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.horizontal(left: Radius.circular(16.r)),
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
                 ),
-                child: Icon(Icons.music_note_rounded, color: Colors.white24, size: 28.sp),
+                child: Icon(Icons.music_note_rounded, color: Colors.white24, size: AppResponsive.icon(context, 28)),
               ),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(12.r),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -297,19 +297,19 @@ class _EventTile extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 14.sp,
+                              fontSize: AppResponsive.font(context, 14),
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                             ),
                           ),
                         ),
                         Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.w, vertical: 3.h,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3,
                           ),
                           decoration: BoxDecoration(
                             color: _statusColor(status).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(999.r),
+                            borderRadius: BorderRadius.circular(999),
                             border: Border.all(
                               color: _statusColor(status).withValues(alpha: 0.4),
                             ),
@@ -317,7 +317,7 @@ class _EventTile extends StatelessWidget {
                           child: Text(
                             status,
                             style: TextStyle(
-                              fontSize: 10.sp,
+                              fontSize: AppResponsive.font(context, 10),
                               fontWeight: FontWeight.w700,
                               color: _statusColor(status),
                             ),
@@ -325,28 +325,28 @@ class _EventTile extends StatelessWidget {
                         ),
                       ],
                     ),
-                    Gap(5.h),
+                    Gap(AppResponsive.gap(context, 5).clamp(3, 8)),
                     if (genre.isNotEmpty)
                       Text(
                         genre.toUpperCase(),
                         style: TextStyle(
-                          fontSize: 10.sp,
+                          fontSize: AppResponsive.font(context, 10),
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.0,
                           color: AppTheme.accent.withValues(alpha: 0.8),
                         ),
                       ),
-                    Gap(4.h),
+                    Gap(4),
                     if (city.isNotEmpty || country.isNotEmpty)
                       _MetaRow(
                         icon: Icons.location_on_rounded,
                         text: [city, country].where((s) => s.isNotEmpty).join(', '),
                       ),
                     if (date.isNotEmpty) ...[
-                      Gap(3.h),
+                      Gap(3),
                       _MetaRow(icon: Icons.calendar_today_rounded, text: date),
                     ],
-                    Gap(8.h),
+                    Gap(AppResponsive.gap(context, 8).clamp(6, 12)),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -356,7 +356,7 @@ class _EventTile extends StatelessWidget {
                           color: Colors.white70,
                           onTap: onEdit,
                         ),
-                        Gap(8.w),
+                        Gap(8),
                         _ActionButton(
                           icon: Icons.delete_rounded,
                           label: 'Delete',
@@ -385,15 +385,15 @@ class _MetaRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 12.sp, color: Colors.white38),
-        Gap(4.w),
+        Icon(icon, size: AppResponsive.icon(context, 12), color: Colors.white38),
+        const Gap(4),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 11.5.sp,
+              fontSize: AppResponsive.font(context, 11.5),
               color: Colors.white.withValues(alpha: 0.55),
             ),
           ),
@@ -421,21 +421,21 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8.r),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13.sp, color: color),
-            Gap(4.w),
+            Icon(icon, size: AppResponsive.icon(context, 13), color: color),
+            const Gap(4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11.5.sp,
+                fontSize: AppResponsive.font(context, 11.5),
                 fontWeight: FontWeight.w700,
                 color: color,
               ),
@@ -459,34 +459,34 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(
             Icons.event_busy_rounded,
-            size: 64.sp,
+            size: AppResponsive.icon(context, 64),
             color: Colors.white.withValues(alpha: 0.15),
           ),
-          Gap(16.h),
+          Gap(AppResponsive.gap(context, 16).clamp(12, 22)),
           Text(
             'No events yet',
             style: TextStyle(
-              fontSize: 18.sp,
+              fontSize: AppResponsive.font(context, 18),
               fontWeight: FontWeight.w700,
               color: Colors.white.withValues(alpha: 0.4),
             ),
           ),
-          Gap(8.h),
+          Gap(AppResponsive.gap(context, 8).clamp(6, 12)),
           Text(
             'Tap the button below to add your first event',
             style: TextStyle(
-              fontSize: 13.sp,
+              fontSize: AppResponsive.font(context, 13),
               color: Colors.white.withValues(alpha: 0.3),
             ),
           ),
-          Gap(24.h),
+          Gap(AppResponsive.gap(context, 24).clamp(18, 32)),
           ElevatedButton.icon(
             onPressed: onAdd,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accent,
-              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 14.h),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14.r),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             icon: const Icon(Icons.add_rounded, color: Colors.white),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 
 class BadgeClaimPage extends StatelessWidget {
@@ -18,7 +18,7 @@ class BadgeClaimPage extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(20.r),
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             // Hero Title
@@ -26,17 +26,17 @@ class BadgeClaimPage extends StatelessWidget {
               'CONGRATULATIONS!',
               style: TextStyle(
                 color: AppTheme.primaryLight,
-                fontSize: 24.sp,
+                fontSize: AppResponsive.font(context, 24).clamp(20.5, 26.5),
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2,
               ),
             ),
-            Gap(8.h),
+            const Gap(8),
             Text(
               'You have unlocked new milestones.',
-              style: TextStyle(color: Colors.white70, fontSize: 14.sp),
+              style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0)),
             ),
-            Gap(40.h),
+            const Gap(40),
 
             // Progress List
             _TaskItem(
@@ -45,62 +45,62 @@ class BadgeClaimPage extends StatelessWidget {
               isClaimed: false,
               description: 'Attend 3 parties in one weekend',
             ),
-            Gap(16.h),
+            const Gap(16),
             _TaskItem(
               title: 'Early Bird',
               progress: 1.0,
               isClaimed: true,
               description: 'Check in before 10 PM',
             ),
-            Gap(16.h),
+            const Gap(16),
             _TaskItem(
               title: 'Social Butterfly',
               progress: 0.7,
               isClaimed: false,
               description: 'Connect with 20 new people',
             ),
-            
-            Gap(50.h),
-            
+
+            const Gap(50),
+
             // New Badge Preview
             Container(
-              padding: EdgeInsets.all(24.r),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(32.r),
+                borderRadius: BorderRadius.circular(32),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
               ),
               child: Column(
                 children: [
                    _BadgePreview(),
-                   Gap(20.h),
+                   const Gap(20),
                    Text(
                      'PART STARTER BADGE',
                      style: TextStyle(
                        color: Colors.white,
-                       fontSize: 16.sp,
+                       fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.5),
                        fontWeight: FontWeight.w900,
                      ),
                    ),
-                   Gap(8.h),
+                   const Gap(8),
                    Row(
                      mainAxisAlignment: MainAxisAlignment.center,
                      children: [
                        _MiniChip(label: '+500 XP', color: Colors.blueAccent),
-                       Gap(8.w),
+                       const Gap(8),
                        _MiniChip(label: 'Exclusive Access', color: Colors.pinkAccent),
                      ],
                    ),
                 ],
               ),
             ),
-            
-            Gap(60.h),
+
+            const Gap(60),
           ],
         ),
       ),
       bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 30.h),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
         child: ElevatedButton(
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -110,8 +110,8 @@ class BadgeClaimPage extends StatelessWidget {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primary,
-            minimumSize: Size(double.infinity, 56.h),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+            minimumSize: Size(double.infinity, 56),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           child: const Text('CLAIM ALL REWARDS'),
         ),
@@ -136,12 +136,12 @@ class _TaskItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(16.r),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(20.r),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isClaimed 
+          color: isClaimed
               ? Colors.greenAccent.withValues(alpha: 0.2)
               : Colors.white.withValues(alpha: 0.08),
         ),
@@ -153,27 +153,27 @@ class _TaskItem extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: TextStyle(color: Colors.white, fontSize: 15.sp, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 15).clamp(12.5, 16.5), fontWeight: FontWeight.bold),
               ),
               const Spacer(),
               if (isClaimed)
                 const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 20)
               else if (progress >= 1.0)
-                Text('READY', style: TextStyle(color: AppTheme.primaryLight, fontSize: 11.sp, fontWeight: FontWeight.w900))
+                Text('READY', style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w900))
               else
-                Text('${(progress * 100).toInt()}%', style: TextStyle(color: Colors.white54, fontSize: 11.sp)),
+                Text('${(progress * 100).toInt()}%', style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0))),
             ],
           ),
-          Gap(4.h),
-          Text(description, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
-          Gap(12.h),
+          const Gap(4),
+          Text(description, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0))),
+          const Gap(12),
           ClipRRect(
-            borderRadius: BorderRadius.circular(10.r),
+            borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
               value: progress,
               backgroundColor: Colors.white.withValues(alpha: 0.05),
               valueColor: AlwaysStoppedAnimation(progress >= 1.0 ? Colors.greenAccent : AppTheme.primary),
-              minHeight: 6.h,
+              minHeight: 6,
             ),
           ),
         ],
@@ -186,8 +186,8 @@ class _BadgePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 120.sp,
-      height: 120.sp,
+      width: AppResponsive.font(context, 120).clamp(100.0, 132.0),
+      height: AppResponsive.font(context, 120).clamp(100.0, 132.0),
       decoration: BoxDecoration(
         color: AppTheme.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
@@ -202,7 +202,7 @@ class _BadgePreview extends StatelessWidget {
       child: Center(
         child: Image.network(
           'https://cdn-icons-png.flaticon.com/512/8644/8644445.png',
-          width: 60.w,
+          width: 60,
           color: Colors.white,
         ),
       ),
@@ -218,14 +218,14 @@ class _MiniChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 10.sp, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: AppResponsive.font(context, 10).clamp(8.5, 11.0), fontWeight: FontWeight.bold),
       ),
     );
   }

@@ -2,8 +2,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/pages/app_shell_page.dart';
 import 'package:nightride/pages/auth/sign_in_page.dart';
 import 'package:nightride/pages/onboard_questionnaire_page.dart';
@@ -83,14 +83,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             /// Center Logo
             Center(
               child: Container(
-                width: 96.sp,
-                height: 96.sp,
+                width: AppResponsive.icon(context, 96).clamp(72.0, 96.0),
+                height: AppResponsive.icon(context, 96).clamp(72.0, 96.0),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(22.r),
+                  borderRadius: BorderRadius.circular(22),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22.r),
+                  borderRadius: BorderRadius.circular(22),
                   child: Image.asset(
                     'assets/images/logo.png',
                     fit: BoxFit.cover,
@@ -101,7 +101,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
             /// Bottom Text
             Positioned(
-              bottom: 48.h,
+              bottom: AppResponsive.gap(context, 48).clamp(32.0, 56.0),
               left: 0,
               right: 0,
               child: Column(
@@ -109,17 +109,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   Text(
                     'NightRide',
                     style: GoogleFonts.inter(
-                      fontSize: 14.sp,
+                      fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
                       fontWeight: FontWeight.w500,
                       color: const Color(0xFF8B5CF6),
                       letterSpacing: 0.6,
                     ),
                   ),
-                  6.verticalSpace,
+                  const SizedBox(height: 6),
                   Text(
                     'v2.0',
                     style: GoogleFonts.inter(
-                      fontSize: 11.sp,
+                      fontSize: AppResponsive.font(context, 11).clamp(9.0, 12.0),
                       fontWeight: FontWeight.w400,
                       color: const Color(0xFF6D28D9),
                     ),

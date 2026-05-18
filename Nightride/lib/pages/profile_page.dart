@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:nightride/components/profile_bio_card.dart';
 import 'package:nightride/components/profile_header.dart';
 import 'package:nightride/components/profile_interests.dart';
@@ -156,23 +155,23 @@ class _StatFeatureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(12.r),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8.r),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10.r),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppTheme.primaryLight, size: 18.sp),
+            child: Icon(icon, color: AppTheme.primaryLight, size: AppResponsive.icon(context, 18).clamp(15.0, 18.0)),
           ),
-          SizedBox(width: 10.w),
+          SizedBox(width: AppResponsive.gap(context, 10).clamp(8.0, 12.0)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,11 +179,11 @@ class _StatFeatureCard extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w900),
+                  style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.0), fontWeight: FontWeight.w900),
                 ),
                 Text(
                   label,
-                  style: TextStyle(color: Colors.white54, fontSize: 9.sp, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 9).clamp(8.0, 10.0), fontWeight: FontWeight.bold),
                 ),
               ],
             ),

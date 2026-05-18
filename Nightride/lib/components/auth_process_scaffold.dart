@@ -2,9 +2,9 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
+import '../../core/responsive/app_responsive.dart';
 import '../../core/theme/app_theme.dart';
 
 class AuthProcessScaffold extends StatelessWidget {
@@ -33,8 +33,14 @@ class AuthProcessScaffold extends StatelessWidget {
     final screenW = MediaQuery.sizeOf(context).width;
     final hPad = screenW > 600
         ? ((screenW - (screenW * 0.88).clamp(460.0, 640.0)) / 2).clamp(16.0, 80.0)
-        : 22.w;
+        : AppResponsive.gap(context, 22).clamp(18.0, 28.0);
     final horizontalPadding = EdgeInsets.symmetric(horizontal: hPad);
+
+    final brandIconSize = AppResponsive.gap(context, 38).clamp(34.0, 44.0);
+    final brandRadius = AppResponsive.radius(context, 10).clamp(8.0, 12.0);
+    final brandFont = AppResponsive.font(context, 18).clamp(15.0, 20.0);
+    final titleFont = AppResponsive.font(context, 34).clamp(26.0, 38.0);
+    final subtitleFont = AppResponsive.font(context, 14.5).clamp(12.0, 16.0);
 
     return Scaffold(
       backgroundColor: AppTheme.scaffold,
@@ -57,52 +63,48 @@ class AuthProcessScaffold extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Gap(18.h),
+                          Gap(AppResponsive.gap(context, 18).clamp(14.0, 22.0)),
 
-                          // Brand row (fixed start)
+                          // Brand row
                           Row(
                             children: [
                               Container(
-                                width: 38.sp,
-                                height: 38.sp,
+                                width: brandIconSize,
+                                height: brandIconSize,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFEDE9FE),
-                                  borderRadius: BorderRadius.circular(10.r),
+                                  borderRadius: BorderRadius.circular(brandRadius),
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   'N',
                                   style: TextStyle(
-                                    fontSize: 18.sp,
+                                    fontSize: brandFont,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.primary,
                                   ),
                                 ),
                               ),
-                              Gap(12.w),
+                              Gap(AppResponsive.gap(context, 12).clamp(10.0, 14.0)),
                               Text(
                                 'Nightride',
                                 style: TextStyle(
-                                  fontSize: 18.sp,
+                                  fontSize: brandFont,
                                   fontWeight: FontWeight.w500,
-                                  color: AppTheme.primaryLight.withOpacity(
-                                    0.95,
-                                  ),
+                                  color: AppTheme.primaryLight.withOpacity(0.95),
                                   letterSpacing: 0.2,
                                 ),
                               ),
                             ],
                           ),
 
-                          Gap(titleTopGap.h),
+                          Gap(titleTopGap),
 
-                          // ✅ Title and subtitle ALWAYS start from EXACT same X.
-                          // Title: unlimited width (wraps naturally, start stays same)
                           Text(
                             title,
                             textAlign: TextAlign.left,
                             style: TextStyle(
-                              fontSize: 34.sp,
+                              fontSize: titleFont,
                               fontWeight: FontWeight.w500,
                               color: AppTheme.primaryLight,
                               height: 1.05,
@@ -110,14 +112,14 @@ class AuthProcessScaffold extends StatelessWidget {
                             ),
                           ),
 
-                          Gap(12.h),
+                          Gap(AppResponsive.gap(context, 12).clamp(10.0, 14.0)),
 
                           Text(
                             subtitle,
                             textAlign: TextAlign.left,
                             softWrap: true,
                             style: TextStyle(
-                              fontSize: 14.5.sp,
+                              fontSize: subtitleFont,
                               height: 1.35,
                               color: AppTheme.primaryLight.withOpacity(0.55),
                               letterSpacing: 0.1,
@@ -126,7 +128,7 @@ class AuthProcessScaffold extends StatelessWidget {
 
                           const Spacer(),
 
-                          Gap(reservedBottomGap.h),
+                          Gap(reservedBottomGap),
                         ],
                       ),
                     ),
@@ -153,6 +155,8 @@ class _AuthProcessBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.sizeOf(context).width;
+    final sh = MediaQuery.sizeOf(context).height;
     return Stack(
       children: [
         Container(
@@ -176,26 +180,26 @@ class _AuthProcessBackground extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: -90.h,
-          left: -70.w,
+          top: sh * -0.10,
+          left: sw * -0.18,
           child: _GlowBlob(
-            size: 240.w,
+            size: sw * 0.62,
             color: AppTheme.primary.withOpacity(0.26),
           ),
         ),
         Positioned(
-          top: 120.h,
-          right: -90.w,
+          top: sh * 0.14,
+          right: sw * -0.23,
           child: _GlowBlob(
-            size: 260.w,
+            size: sw * 0.66,
             color: AppTheme.accent.withOpacity(0.12),
           ),
         ),
         Positioned(
-          bottom: 220.h,
-          left: 40.w,
+          bottom: sh * 0.26,
+          left: sw * 0.10,
           child: _GlowBlob(
-            size: 210.w,
+            size: sw * 0.54,
             color: AppTheme.primaryLight.withOpacity(0.14),
           ),
         ),

@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/domain/profile_models.dart';
 import 'package:nightride/providers/profile_providers.dart';
@@ -146,26 +146,26 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 12.h),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: SizedBox(
-            height: 52.h,
+            height: 52,
             child: ElevatedButton(
               onPressed: _saving ? null : _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               child: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text('Save Changes', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800)),
+                  : Text('Save Changes', style: TextStyle(fontSize: AppResponsive.font(context, 15).clamp(12.5, 16.5), fontWeight: FontWeight.w800)),
             ),
           ),
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 16.h),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -176,8 +176,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 child: Stack(
                   children: [
                     Container(
-                      width: 90.sp,
-                      height: 90.sp,
+                      width: AppResponsive.font(context, 90).clamp(76.0, 99.0),
+                      height: AppResponsive.font(context, 90).clamp(76.0, 99.0),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppTheme.surface,
@@ -188,58 +188,58 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                             ? Image.file(_pickedImage!, fit: BoxFit.cover)
                             : avatarBase64 != null
                                 ? Image.memory(base64Decode(avatarBase64), fit: BoxFit.cover)
-                                : Icon(Icons.person_rounded, color: Colors.white38, size: 44.sp),
+                                : Icon(Icons.person_rounded, color: Colors.white38, size: AppResponsive.icon(context, 44).clamp(36.0, 48.0)),
                       ),
                     ),
                     Positioned(
                       bottom: 0,
                       right: 0,
                       child: Container(
-                        width: 28.sp,
-                        height: 28.sp,
+                        width: AppResponsive.font(context, 28).clamp(24.0, 31.0),
+                        height: AppResponsive.font(context, 28).clamp(24.0, 31.0),
                         decoration: BoxDecoration(
                           color: AppTheme.primary,
                           shape: BoxShape.circle,
                           border: Border.all(color: AppTheme.scaffold, width: 2),
                         ),
-                        child: Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14.sp),
+                        child: Icon(Icons.camera_alt_rounded, color: Colors.white, size: AppResponsive.icon(context, 14).clamp(12.0, 15.5)),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            Gap(8.h),
+            const Gap(8),
             Center(
               child: Text('Tap to change photo',
-                  style: TextStyle(color: Colors.white38, fontSize: 11.sp)),
+                  style: TextStyle(color: Colors.white38, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0))),
             ),
-            Gap(24.h),
+            const Gap(24),
 
             if (_error != null) ...[
               Container(
-                padding: EdgeInsets.all(12.r),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.redAccent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
                 ),
-                child: Text(_error!, style: TextStyle(color: Colors.redAccent, fontSize: 13.sp)),
+                child: Text(_error!, style: TextStyle(color: Colors.redAccent, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5))),
               ),
-              Gap(16.h),
+              const Gap(16),
             ],
 
             _SectionLabel('Basic Info'),
-            Gap(12.h),
+            const Gap(12),
             _Field(controller: _displayName, label: 'Display Name', icon: Icons.badge_outlined, hint: 'Your full name'),
-            Gap(14.h),
+            const Gap(14),
             _Field(controller: _username, label: 'Username', icon: Icons.alternate_email_rounded, hint: 'e.g. nightrider99'),
-            Gap(14.h),
+            const Gap(14),
             _Field(controller: _city, label: 'City', icon: Icons.location_city_rounded, hint: 'e.g. Tokyo, Colombo'),
-            Gap(28.h),
+            const Gap(28),
 
             _SectionLabel('Contact'),
-            Gap(12.h),
+            const Gap(12),
             _Field(
               controller: _email,
               label: 'Email',
@@ -248,7 +248,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               keyboardType: TextInputType.emailAddress,
               helperText: 'A verification email will be sent if you change this.',
             ),
-            Gap(14.h),
+            const Gap(14),
             _Field(
               controller: _phone,
               label: 'Phone Number',
@@ -256,7 +256,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
               hint: '+1 234 567 8900',
               keyboardType: TextInputType.phone,
             ),
-            Gap(16.h),
+            const Gap(16),
           ],
         ),
       ),
@@ -271,7 +271,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: TextStyle(color: Colors.white38, fontSize: 11.sp, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+      style: TextStyle(color: Colors.white38, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w900, letterSpacing: 1.2),
     );
   }
 }
@@ -298,34 +298,34 @@ class _Field extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Colors.white70, fontSize: 12.5.sp, fontWeight: FontWeight.w700)),
-        Gap(6.h),
+        Text(label, style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 12.5).clamp(10.5, 13.5), fontWeight: FontWeight.w700)),
+        const Gap(6),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
-          style: TextStyle(color: Colors.white, fontSize: 14.5.sp),
+          style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14.5).clamp(12.5, 16.0)),
           cursorColor: AppTheme.primary,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.white24, fontSize: 14.sp),
+            hintStyle: TextStyle(color: Colors.white24, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0)),
             prefixIcon: Padding(
-              padding: EdgeInsets.only(left: 14.w, right: 10.w),
-              child: Icon(icon, color: AppTheme.primaryLight.withValues(alpha: 0.7), size: 20.sp),
+              padding: const EdgeInsets.only(left: 14, right: 10),
+              child: Icon(icon, color: AppTheme.primaryLight.withValues(alpha: 0.7), size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
             ),
             prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
             filled: true,
             fillColor: Colors.white.withValues(alpha: 0.05),
-            contentPadding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 16.w),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14.r),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14.r),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppTheme.primary.withValues(alpha: 0.6), width: 1.5),
             ),
             helperText: helperText,
-            helperStyle: TextStyle(color: Colors.white38, fontSize: 11.sp),
+            helperStyle: TextStyle(color: Colors.white38, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0)),
             helperMaxLines: 2,
           ),
         ),

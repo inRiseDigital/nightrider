@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/services/firestore_service.dart';
 
@@ -179,87 +179,87 @@ class _AdminAddEventPageState extends State<AdminAddEventPage> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: EdgeInsets.all(20.r),
+          padding: const EdgeInsets.all(20),
           children: [
             _SectionLabel('Event Info'),
-            Gap(12.h),
+            Gap(AppResponsive.gap(context, 12).clamp(8, 18)),
             _Field(controller: _name, label: 'Event Name *', required: true),
-            Gap(14.h),
+            Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
             _Field(
               controller: _description, label: 'Description',
               maxLines: 3,
             ),
-            Gap(20.h),
+            Gap(AppResponsive.gap(context, 20).clamp(14, 28)),
             _SectionLabel('Location'),
-            Gap(12.h),
+            Gap(AppResponsive.gap(context, 12).clamp(8, 18)),
             _Field(controller: _venueName, label: 'Venue Name'),
-            Gap(14.h),
+            Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
             Row(children: [
               Expanded(child: _Field(controller: _city, label: 'City *', required: true)),
-              Gap(12.w),
+              const Gap(12),
               Expanded(child: _Field(controller: _country, label: 'Country *', required: true)),
             ]),
-            Gap(20.h),
+            Gap(AppResponsive.gap(context, 20).clamp(14, 28)),
             _SectionLabel('Date & Time'),
-            Gap(12.h),
+            Gap(AppResponsive.gap(context, 12).clamp(8, 18)),
             GestureDetector(
               onTap: _pickDate,
               child: AbsorbPointer(
                 child: _Field(controller: _date, label: 'Date (YYYY-MM-DD) *', required: true),
               ),
             ),
-            Gap(14.h),
+            Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
             Row(children: [
               Expanded(child: _Field(controller: _startTime, label: 'Start Time (e.g. 09:00 PM)')),
-              Gap(12.w),
+              const Gap(12),
               Expanded(child: _Field(controller: _endTime, label: 'End Time')),
             ]),
-            Gap(20.h),
+            Gap(AppResponsive.gap(context, 20).clamp(14, 28)),
             _SectionLabel('Classification'),
-            Gap(12.h),
+            Gap(AppResponsive.gap(context, 12).clamp(8, 18)),
             _Dropdown(
               label: 'Category',
               value: _category,
               items: _categories,
               onChanged: (v) => setState(() => _category = v!),
             ),
-            Gap(14.h),
+            Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
             _Dropdown(
               label: 'Genre',
               value: _genre,
               items: _genres,
               onChanged: (v) => setState(() => _genre = v!),
             ),
-            Gap(14.h),
+            Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
             _Dropdown(
               label: 'Vibe',
               value: _vibe,
               items: _vibes,
               onChanged: (v) => setState(() => _vibe = v!),
             ),
-            Gap(14.h),
+            Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
             _Dropdown(
               label: 'Status',
               value: _status,
               items: _statuses,
               onChanged: (v) => setState(() => _status = v!),
             ),
-            Gap(20.h),
+            Gap(AppResponsive.gap(context, 20).clamp(14, 28)),
             _SectionLabel('Media & Pricing'),
-            Gap(12.h),
+            Gap(AppResponsive.gap(context, 12).clamp(8, 18)),
             _Field(controller: _coverImage, label: 'Cover Image URL'),
-            Gap(14.h),
+            Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
             _Field(controller: _priceHint, label: 'Price Hint (e.g. Free / \$20 / Tickets)'),
-            Gap(40.h),
+            Gap(AppResponsive.gap(context, 40).clamp(30, 52)),
             SizedBox(
               width: double.infinity,
-              height: 54.h,
+              height: AppResponsive.gap(context, 54).clamp(46, 62),
               child: ElevatedButton(
                 onPressed: _saving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: Text(
@@ -270,7 +270,7 @@ class _AdminAddEventPageState extends State<AdminAddEventPage> {
                 ),
               ),
             ),
-            Gap(30.h),
+            Gap(AppResponsive.gap(context, 30).clamp(22, 40)),
           ],
         ),
       ),
@@ -287,7 +287,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text.toUpperCase(),
       style: TextStyle(
-        fontSize: 11.sp,
+        fontSize: AppResponsive.font(context, 11),
         fontWeight: FontWeight.w900,
         letterSpacing: 1.4,
         color: AppTheme.accent,
@@ -324,19 +324,19 @@ class _Field extends StatelessWidget {
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.06),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppTheme.accent),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.redAccent),
         ),
       ),
@@ -370,15 +370,15 @@ class _Dropdown extends StatelessWidget {
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.06),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppTheme.accent),
         ),
       ),

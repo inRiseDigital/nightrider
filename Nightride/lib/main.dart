@@ -78,7 +78,11 @@ class MyApp extends ConsumerWidget {
     // own MediaQuery, so all adaptive layout helpers remain correct.
     final view = WidgetsBinding.instance.platformDispatcher.views.first;
     final physW = view.physicalSize.width / view.devicePixelRatio;
-    final suDesignWidth = physW.clamp(390.0, 480.0);
+    // Phones/small tablets (≤600dp): cap at 480 → max 25% growth.
+    // Large tablets/foldables (>600dp): cap at 720 → max ~14% growth on V3 unfolded.
+    final suDesignWidth = physW > 600
+        ? physW.clamp(600.0, 720.0)
+        : physW.clamp(390.0, 480.0);
 
     return ScreenUtilInit(
       designSize: Size(suDesignWidth, 844),

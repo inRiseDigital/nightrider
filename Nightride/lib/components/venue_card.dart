@@ -1,6 +1,5 @@
 // lib/features/map/presentation/widgets/venue_card.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:nightride/components/marquee_text.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
@@ -63,23 +62,22 @@ class VenueCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.06),
               width: 1,
             ),
-            boxShadow: <BoxShadow>[
+            boxShadow: const <BoxShadow>[
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.55),
-                blurRadius: 26.r,
-                offset: Offset(0, 18.h),
+                color: Color(0x8C000000),
+                blurRadius: 26,
+                offset: Offset(0, 18),
               ),
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.10),
-                blurRadius: 24.r,
-                offset: Offset(0, 14.h),
+                color: Color(0x1A7B2FFF),
+                blurRadius: 24,
+                offset: Offset(0, 14),
               ),
             ],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              /// IMAGE
               ClipRRect(
                 borderRadius: BorderRadius.circular(imageRadius),
                 child: SizedBox(
@@ -105,18 +103,17 @@ class VenueCard extends StatelessWidget {
                         ),
                       ),
 
-                      /// PRICE HINT
                       Positioned(
-                        left: 8.w,
-                        bottom: 8.h,
+                        left: 8,
+                        bottom: 8,
                         child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10.w,
-                            vertical: 5.h,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.48),
-                            borderRadius: BorderRadius.circular(999.r),
+                            borderRadius: BorderRadius.circular(999),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.10),
                               width: 1,
@@ -126,7 +123,7 @@ class VenueCard extends StatelessWidget {
                             data.priceHint,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.95),
-                              fontSize: 11.sp,
+                              fontSize: AppResponsive.font(context, 11).clamp(10.0, 12.0),
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -139,7 +136,6 @@ class VenueCard extends StatelessWidget {
 
               SizedBox(width: AppResponsive.gap(context, 10)),
 
-              /// TEXT + BUTTON
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -168,7 +164,6 @@ class VenueCard extends StatelessWidget {
                     ),
                     SizedBox(height: AppResponsive.gap(context, 10)),
 
-                    /// MORE DETAILS BUTTON
                     SizedBox(
                       height: buttonHeight,
                       width: double.infinity,
@@ -179,7 +174,7 @@ class VenueCard extends StatelessWidget {
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14.r),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           padding: EdgeInsets.zero,
                           minimumSize: Size.zero,
@@ -188,7 +183,7 @@ class VenueCard extends StatelessWidget {
                         child: Text(
                           'More details',
                           style: TextStyle(
-                            fontSize: 12.5.sp,
+                            fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.5),
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.2,
                           ),

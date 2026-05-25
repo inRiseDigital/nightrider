@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/domain/rank_system.dart';
 import 'package:nightride/pages/badges_collection_page.dart';
@@ -120,9 +119,13 @@ class _StatText extends StatelessWidget {
           '$label ',
           style: TextStyle(color: Colors.white60, fontSize: size),
         ),
-        Text(
-          value,
-          style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.bold),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );
@@ -174,11 +177,11 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58.h,
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14.r),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
@@ -189,18 +192,18 @@ class _StatCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 15.sp,
+              fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
               fontWeight: FontWeight.w900,
               color: Colors.white.withValues(alpha: 0.92),
             ),
           ),
-          SizedBox(height: 2.h),
+          const SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 11.5.sp,
+              fontSize: AppResponsive.font(context, 11.5).clamp(10.0, 12.5),
               fontWeight: FontWeight.w600,
               color: Colors.white.withValues(alpha: 0.45),
             ),
@@ -220,19 +223,19 @@ class _PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14.r),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        height: 40.h,
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppTheme.primary.withValues(alpha: 0.20),
-          borderRadius: BorderRadius.circular(14.r),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppTheme.primary.withValues(alpha: 0.22)),
         ),
         child: Text(
           text,
           style: TextStyle(
-            fontSize: 12.8.sp,
+            fontSize: AppResponsive.font(context, 12.8).clamp(11.0, 14.0),
             fontWeight: FontWeight.w900,
             color: Colors.white.withValues(alpha: 0.92),
           ),
@@ -250,7 +253,7 @@ class _RankBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tier = RankSystem.tierFor(points);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: tier.color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(99),
@@ -259,13 +262,13 @@ class _RankBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(tier.emoji, style: TextStyle(fontSize: 10.sp)),
-          SizedBox(width: 4.w),
+          Text(tier.emoji, style: TextStyle(fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0))),
+          const SizedBox(width: 4),
           Text(
             tier.name,
             style: TextStyle(
               color: tier.color,
-              fontSize: 10.sp,
+              fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
               fontWeight: FontWeight.w800,
               letterSpacing: 0.3,
             ),
@@ -285,19 +288,19 @@ class _GhostButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14.r),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        height: 40.h,
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(14.r),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
         ),
         child: Text(
           text,
           style: TextStyle(
-            fontSize: 12.8.sp,
+            fontSize: AppResponsive.font(context, 12.8).clamp(11.0, 14.0),
             fontWeight: FontWeight.w900,
             color: Colors.white.withValues(alpha: 0.78),
           ),

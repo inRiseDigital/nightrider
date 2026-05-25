@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:http/http.dart' as http;
@@ -149,7 +148,7 @@ class _MapPageState extends ConsumerState<MapPage>
 
           SafeArea(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 0),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
               child: Material(
                 type: MaterialType.transparency,
                 child: Column(
@@ -175,7 +174,7 @@ class _MapPageState extends ConsumerState<MapPage>
                         MaterialPageRoute(builder: (_) => const EventsGridPage()),
                       ),
                     ),
-                    Gap(10.h),
+                    const Gap(10),
                     CategoryChipsRow(
                       items: kMapCategories,
                       selectedIndex: _selectedCategoryIndex,
@@ -228,15 +227,15 @@ class _MapPageState extends ConsumerState<MapPage>
                 MapAnimationOptions(duration: 900),
               ),
               child: Container(
-                width: 44.sp,
-                height: 44.sp,
+                width: AppResponsive.icon(context, 44).clamp(36.0, 48.0),
+                height: AppResponsive.icon(context, 44).clamp(36.0, 48.0),
                 decoration: BoxDecoration(
                   color: AppTheme.surface.withValues(alpha: 0.95),
-                  borderRadius: BorderRadius.circular(14.r),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.40), blurRadius: 14, offset: const Offset(0, 4))],
                 ),
-                child: Icon(Icons.public_rounded, color: Colors.white.withValues(alpha: 0.85), size: 22.sp),
+                child: Icon(Icons.public_rounded, color: Colors.white.withValues(alpha: 0.85), size: AppResponsive.icon(context, 22).clamp(18.0, 22.0)),
               ),
             ),
           ),
@@ -287,8 +286,8 @@ class _MapPageState extends ConsumerState<MapPage>
                     final item = displayEvents[index];
                     return Padding(
                       padding: EdgeInsets.only(
-                        left: index == 0 ? 12.w : 6.w,
-                        right: 6.w,
+                        left: index == 0 ? 12 : 6,
+                        right: 6,
                       ),
                       child: VenueCard(
                         data: item,
@@ -680,7 +679,7 @@ class _MapPageState extends ConsumerState<MapPage>
           ),
           SafeArea(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 0),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
               child: CategoryChipsRow(
                 items: kMapCategories,
                 selectedIndex: _selectedCategoryIndex,
@@ -690,9 +689,9 @@ class _MapPageState extends ConsumerState<MapPage>
           ),
           if (_selectedVenue != null)
             Positioned(
-              left: 14.w,
-              right: 14.w,
-              bottom: 50.h,
+              left: 14,
+              right: 14,
+              bottom: 50,
               child: VenueCard(
                 data: _selectedVenue!,
                 onTap: () => _showVenueModal(context, _selectedVenue!),

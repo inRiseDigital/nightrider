@@ -1,8 +1,8 @@
 // lib/features/home/presentation/widgets/home_location_row.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
+import '../../../../core/responsive/app_responsive.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class HomeLocationRow extends StatelessWidget {
@@ -16,16 +16,16 @@ class HomeLocationRow extends StatelessWidget {
         Icon(
           Icons.location_on_rounded,
           color: Colors.white.withValues(alpha: 0.55),
-          size: 16.sp,
+          size: AppResponsive.icon(context, 16).clamp(14.0, 18.0),
         ),
-        Gap(6.w),
+        Gap(AppResponsive.gap(context, 6).clamp(4.0, 8.0)),
         Expanded(
           child: Text(
             country,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 13.sp,
+              fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0),
               color: AppTheme.textSecondary,
               fontWeight: FontWeight.w500,
             ),

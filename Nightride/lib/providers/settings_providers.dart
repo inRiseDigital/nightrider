@@ -41,3 +41,17 @@ StreamProvider<bool> _userRoleProvider(String field) => StreamProvider<bool>((re
 
 final isAdminProvider = _userRoleProvider('isAdmin');
 final isOrganizerProvider = _userRoleProvider('isOrganizer');
+
+// ── Organizer request ─────────────────────────────────────────────────────────
+// Streams the status of the current user's organizer application:
+// null = no request, 'pending' | 'approved' | 'rejected'
+
+final organizerRequestStatusProvider = StreamProvider<String?>((ref) {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return Stream.value(null);
+  return FirebaseFirestore.instance
+      .collection('organizer_requests')
+      .doc(uid)
+      .snapshots()
+      .map((snap) => snap.exists ? (snap.data()?['status'] as String?) : null);
+});

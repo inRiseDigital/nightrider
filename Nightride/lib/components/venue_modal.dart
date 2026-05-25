@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
 import 'package:nightride/providers/home_providers.dart';
@@ -20,16 +20,22 @@ class VenueModal extends ConsumerWidget {
         : 0;
     final String distLabel = formatDistance(km);
     final String travelLabel = formatTravel(km);
+
     return Container(
-      padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 14.h),
+      padding: EdgeInsets.fromLTRB(
+        AppResponsive.gap(context, 14),
+        AppResponsive.gap(context, 10),
+        AppResponsive.gap(context, 14),
+        AppResponsive.gap(context, 14),
+      ),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-        boxShadow: <BoxShadow>[
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: const <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.55),
-            blurRadius: 40.r,
-            offset: Offset(0, -18.h),
+            color: Color(0x8C000000),
+            blurRadius: 40,
+            offset: Offset(0, -18),
           ),
         ],
       ),
@@ -37,16 +43,16 @@ class VenueModal extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Container(
-            width: 44.w,
-            height: 4.h,
+            width: 44,
+            height: 4,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(999.r),
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
-          Gap(12.h),
+          const Gap(12),
           ClipRRect(
-            borderRadius: BorderRadius.circular(18.r),
+            borderRadius: BorderRadius.circular(18),
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: Stack(
@@ -69,16 +75,13 @@ class VenueModal extends ConsumerWidget {
                     ),
                   ),
                   Positioned(
-                    left: 12.w,
-                    bottom: 12.h,
+                    left: 12,
+                    bottom: 12,
                     child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12.w,
-                        vertical: 7.h,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.40),
-                        borderRadius: BorderRadius.circular(999.r),
+                        borderRadius: BorderRadius.circular(999),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.10),
                           width: 1,
@@ -88,7 +91,7 @@ class VenueModal extends ConsumerWidget {
                         data.openText,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.92),
-                          fontSize: 12.sp,
+                          fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -98,7 +101,7 @@ class VenueModal extends ConsumerWidget {
               ),
             ),
           ),
-          Gap(12.h),
+          const Gap(12),
           Row(
             children: <Widget>[
               Expanded(
@@ -107,38 +110,38 @@ class VenueModal extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 17.sp,
+                    fontSize: AppResponsive.font(context, 17).clamp(15.0, 18.0),
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
                 ),
               ),
-              Gap(10.w),
+              const Gap(10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(999.r),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       distLabel,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.92),
-                        fontSize: 12.sp,
+                        fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                   if (travelLabel.isNotEmpty) ...[
-                    Gap(3.h),
+                    const Gap(3),
                     Text(
                       travelLabel,
                       style: TextStyle(
                         color: AppTheme.primaryLight,
-                        fontSize: 10.sp,
+                        fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -147,18 +150,18 @@ class VenueModal extends ConsumerWidget {
               ),
             ],
           ),
-          Gap(6.h),
+          const Gap(6),
           Text(
             data.locationLine,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.62),
-              fontSize: 12.5.sp,
+              fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.5),
               fontWeight: FontWeight.w600,
             ),
           ),
-          Gap(14.h),
+          const Gap(14),
           Row(
             children: <Widget>[
               Expanded(
@@ -170,30 +173,30 @@ class VenueModal extends ConsumerWidget {
                       color: Colors.white.withValues(alpha: 0.14),
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16.r),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: const Text('Close'),
                 ),
               ),
-              Gap(10.w),
+              const Gap(10),
               Expanded(
                 child: ElevatedButton(
                   onPressed: onNavigate,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16.r),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: const Text('See full details'),
                 ),
               ),
             ],
           ),
-          Gap(10.h),
+          const Gap(10),
         ],
       ),
     );

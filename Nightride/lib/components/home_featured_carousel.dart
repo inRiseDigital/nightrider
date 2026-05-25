@@ -3,8 +3,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-
 import 'package:nightride/core/responsive/app_dimensions.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
@@ -42,7 +40,7 @@ class HomeFeaturedCarousel extends ConsumerWidget {
         child: Center(
           child: Text(
             'No events match this filter',
-            style: TextStyle(color: Colors.white38, fontSize: 14.sp),
+            style: TextStyle(color: Colors.white38, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0)),
           ),
         ),
       );
@@ -116,24 +114,25 @@ class _FeaturedHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cardRadius = AppResponsive.radius(context, 22).clamp(18.0, 26.0);
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 2.w),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22.r),
+        borderRadius: BorderRadius.circular(cardRadius),
         child: Container(
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(22.r),
-            boxShadow: <BoxShadow>[
+            borderRadius: BorderRadius.circular(cardRadius),
+            boxShadow: const <BoxShadow>[
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.45),
-                blurRadius: 26.r,
-                offset: Offset(0, 16.h),
+                color: Color(0x73000000),
+                blurRadius: 26,
+                offset: Offset(0, 16),
               ),
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.10),
-                blurRadius: 30.r,
-                offset: Offset(0, 18.h),
+                color: Color(0x1A7B2FFF),
+                blurRadius: 30,
+                offset: Offset(0, 18),
               ),
             ],
           ),
@@ -161,7 +160,7 @@ class _FeaturedHeroCard extends StatelessWidget {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: _BottomFadeStrip(height: 96.h),
+                child: _BottomFadeStrip(height: AppResponsive.gap(context, 96).clamp(80.0, 110.0)),
               ),
               Positioned(
                 right: AppResponsive.gap(context, 12),
@@ -173,9 +172,9 @@ class _FeaturedHeroCard extends StatelessWidget {
                 ),
               ),
               Positioned(
-                left: 16.w,
-                right: 16.w,
-                bottom: 14.h,
+                left: AppResponsive.gap(context, 16),
+                right: AppResponsive.gap(context, 16),
+                bottom: AppResponsive.gap(context, 14),
                 child: _FeaturedBottomRow(event: event),
               ),
             ],

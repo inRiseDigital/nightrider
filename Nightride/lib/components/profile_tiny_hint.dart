@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 
 class ProfileTinyHint extends StatelessWidget {
   const ProfileTinyHint({super.key, required this.text});
@@ -12,7 +12,7 @@ class ProfileTinyHint extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        fontSize: 10.5.sp,
+        fontSize: AppResponsive.font(context, 10.5).clamp(9.5, 11.5),
         fontWeight: FontWeight.w600,
         color: Colors.white.withValues(alpha: 0.35),
       ),

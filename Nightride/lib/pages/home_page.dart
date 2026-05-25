@@ -67,33 +67,48 @@ class HomePage extends ConsumerWidget {
                   ),
                   const ResponsiveGap.subSection(),
                   ResponsiveContentContainer(
-                    child: ResponsivePagePadding(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (locationLabel.isNotEmpty) ...[
-                            HomeLocationRow(country: locationLabel),
-                            const ResponsiveGap.section(),
-                          ] else
-                            const ResponsiveGap.s(),
-                          const HomeFeaturedCarousel(),
-                          const ResponsiveGap.section(),
-                          HomeSectionTitle(title: l.exploreCategories),
-                          const ResponsiveGap.subSection(),
-                          const HomeCategoryRail(),
-                          const ResponsiveGap.subSection(),
-                          const HomeCountryFilter(),
-                          const ResponsiveGap.section(),
-                          // ── Clubs Right Now (live) ─────────────────────
-                          const _LiveNowHeader(),
-                          const SizedBox(height: 12),
-                          const _LiveClubsRow(),
-                          const ResponsiveGap.section(),
-                          HomeSectionTitle(title: l.trendingEvents),
-                          const ResponsiveGap.subSection(),
-                          const HomeTrendingList(),
-                        ],
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Pre-carousel content (inside page padding) ──
+                        ResponsivePagePadding(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (locationLabel.isNotEmpty) ...[
+                                HomeLocationRow(country: locationLabel),
+                                const ResponsiveGap.section(),
+                              ] else
+                                const ResponsiveGap.s(),
+                            ],
+                          ),
+                        ),
+                        // ── Featured carousel — full-bleed (no h-padding) ──
+                        const HomeFeaturedCarousel(),
+                        // ── Everything below — back inside page padding ──
+                        ResponsivePagePadding(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const ResponsiveGap.section(),
+                              HomeSectionTitle(title: l.exploreCategories),
+                              const ResponsiveGap.subSection(),
+                              const HomeCategoryRail(),
+                              const ResponsiveGap.subSection(),
+                              const HomeCountryFilter(),
+                              const ResponsiveGap.section(),
+                              // ── Clubs Right Now (live) ─────────────────
+                              const _LiveNowHeader(),
+                              const SizedBox(height: 12),
+                              const _LiveClubsRow(),
+                              const ResponsiveGap.section(),
+                              HomeSectionTitle(title: l.trendingEvents),
+                              const ResponsiveGap.subSection(),
+                              const HomeTrendingList(),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -578,6 +593,8 @@ class _ClubDetailSheet extends StatelessWidget {
                           // Club name
                           Text(
                             club.clubName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
@@ -588,6 +605,8 @@ class _ClubDetailSheet extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             '${club.city} · ${club.country}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.6),
                               fontSize: 13,

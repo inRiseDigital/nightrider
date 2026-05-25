@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -211,8 +212,41 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleSend({String? text}) async {
-    final messageText = text ?? _controller.text.trim();
+    String messageText = text ?? _controller.text.trim();
     if (messageText.isEmpty || _isLoading) return;
+
+    // Always try to get GPS before sending, with longer wait if user explicitly asked.
+    final isLocationRequest = messageText.toLowerCase().contains('location') ||
+        messageText.toLowerCase().contains('near me') ||
+        messageText.toLowerCase().contains('share my');
+    final gpsTimeout = isLocationRequest ? 8 : 3;
+
+    if (_userLatitude == null || isLocationRequest) {
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+        ).timeout(Duration(seconds: gpsTimeout));
+        if (mounted) {
+          setState(() {
+            _userLatitude = pos.latitude;
+            _userLongitude = pos.longitude;
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Replace the "Share my location" chip text with a real message that
+    // embeds coordinates so the agent can't miss them even if the request
+    // field is somehow dropped.
+    if (isLocationRequest && _userLatitude != null) {
+      messageText =
+          'My GPS location: lat=${_userLatitude!.toStringAsFixed(5)}, '
+          'lon=${_userLongitude!.toStringAsFixed(5)}. '
+          'Find parties near me tonight.';
+    } else if (isLocationRequest && _userLatitude == null) {
+      messageText = 'I want to share my location but GPS is unavailable right now. '
+          'What city should I tell you?';
+    }
 
     final historySnapshot = List<ChatMessage>.from(_messages);
     setState(() {
@@ -223,11 +257,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
     _scrollToBottom();
 
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     final handle = _chatService.streamMessage(
       messageText,
       historySnapshot,
       latitude: _userLatitude,
       longitude: _userLongitude,
+      userId: uid,
+      threadId: _currentSessionId ?? uid,
     );
     _streamHandle = handle;
 
@@ -240,16 +277,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
         if (type == 'status') {
           setState(() => _statusText = event['text'] as String?);
-        } else if (type == 'token') {
+        } else if (type == 'token' || type == 'text') {
           final token = event['text'] as String? ?? '';
           if (assistantMsg == null) {
             assistantMsg = ChatMessage(content: token, role: 'assistant');
             setState(() {
               _messages.add(assistantMsg!);
-              _statusText = null; // hide thinking indicator
+              _statusText = null;
             });
           } else {
             setState(() => assistantMsg!.content += token);
+          }
+          // Handle suggestions bundled in the 'text' event
+          if (type == 'text') {
+            final suggestions =
+                ((event['suggestions'] as List<dynamic>?) ?? []).cast<String>();
+            if (suggestions.isNotEmpty) setState(() => _suggestions = suggestions);
           }
           _scrollToBottom();
         } else if (type == 'done') {

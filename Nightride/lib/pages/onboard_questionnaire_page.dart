@@ -5,9 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/pages/app_shell_page.dart';
 import 'package:nightride/services/user_profile_service.dart';
@@ -340,7 +340,7 @@ class _OnboardQuestionnaireTemplatePageState
                     intensity: glow,
                   ),
                   Padding(
-                    padding: EdgeInsets.fromLTRB(18.w, 16.h, 18.w, 18.h),
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
@@ -348,7 +348,7 @@ class _OnboardQuestionnaireTemplatePageState
                           activeIndex: s.stepIndex + 1,
                           total: kTotalSteps,
                         ),
-                        Gap(44.h),
+                        const Gap(44),
 
                         /// ✅ Elegant step transition (fade + slide)
                         AnimatedSwitcher(
@@ -400,7 +400,7 @@ class _OnboardQuestionnaireTemplatePageState
                                     .read(onboardQuestionnaireFlowProvider.notifier)
                                     .previousStep(),
                               ),
-                              SizedBox(width: 12.w),
+                              const SizedBox(width: 12),
                             ],
                             Expanded(
                               child: _PrimaryButtonBreathing(
@@ -424,7 +424,7 @@ class _OnboardQuestionnaireTemplatePageState
                             ),
                           ],
                         ),
-                        Gap(18.h),
+                        const Gap(18),
 
                         // Skip — hidden on last step
                         if (s.stepIndex != kTotalSteps - 1)
@@ -436,12 +436,12 @@ class _OnboardQuestionnaireTemplatePageState
                                   .skipStep(),
                               behavior: HitTestBehavior.translucent,
                               child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 6.h),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                                 child: Text(
                                   'skip',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.75),
-                                    fontSize: 14.sp,
+                                    fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: 0.2,
                                   ),
@@ -449,7 +449,7 @@ class _OnboardQuestionnaireTemplatePageState
                               ),
                             ),
                           ),
-                        Gap(6.h),
+                        const Gap(6),
                       ],
                     ),
                   ),
@@ -492,22 +492,22 @@ class _StepBody extends StatelessWidget {
           title,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.92),
-            fontSize: 22.sp,
+            fontSize: AppResponsive.font(context, 22).clamp(18.5, 24.0),
             fontWeight: FontWeight.w700,
             height: 1.2,
           ),
         ),
-        Gap(14.h),
+        const Gap(14),
         Text(
           subtitle,
           style: TextStyle(
             color: AppTheme.textSecondary,
-            fontSize: 13.2.sp,
+            fontSize: AppResponsive.font(context, 13.2).clamp(11.0, 14.5),
             fontWeight: FontWeight.w500,
             height: 1.35,
           ),
         ),
-        Gap(34.h),
+        const Gap(34),
         _OptionsWrap(options: options, selected: selected, onTap: onTap),
       ],
     );
@@ -565,11 +565,11 @@ class _HeaderRow extends StatelessWidget {
     return Row(
       children: <Widget>[
         const _BrandMark(),
-        Gap(10.w),
+        const Gap(10),
         Text(
           kBrandName,
           style: GoogleFonts.orbitron(
-            fontSize: 18.sp,
+            fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0),
             fontWeight: FontWeight.w800,
             color: AppTheme.primary,
             letterSpacing: 0.6,
@@ -588,21 +588,21 @@ class _BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34.sp,
-      height: 34.sp,
+      width: AppResponsive.font(context, 34).clamp(28.0, 37.5),
+      height: AppResponsive.font(context, 34).clamp(28.0, 37.5),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(10.r),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 16.r,
-            offset: Offset(0, 10.h),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10.r),
+        borderRadius: BorderRadius.circular(10),
         child: Image.asset(
           'assets/images/logo.png',
           fit: BoxFit.cover,
@@ -626,15 +626,15 @@ class _ProgressSegments extends StatelessWidget {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOut,
-          margin: EdgeInsets.only(left: i == 0 ? 0 : 6.w),
-          width: active ? 34.w : 28.w,
-          height: 5.h,
+          margin: EdgeInsets.only(left: i == 0 ? 0 : 6),
+          width: active ? 34 : 28,
+          height: 5,
           decoration: BoxDecoration(
             color:
                 active
                     ? AppTheme.accent
                     : AppTheme.primary.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(999.r),
+            borderRadius: BorderRadius.circular(999),
           ),
         );
       }),
@@ -662,8 +662,8 @@ class _OptionsWrap extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Wrap(
-        spacing: 10.w,
-        runSpacing: 12.h,
+        spacing: 10,
+        runSpacing: 12,
         children:
             options.map((String label) {
               final bool isSelected = selected.contains(label);
@@ -695,7 +695,7 @@ class _OptionChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(12),
         child: AnimatedScale(
           duration: const Duration(milliseconds: 170),
           curve: Curves.easeOut,
@@ -703,13 +703,13 @@ class _OptionChip extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color:
                   selected
                       ? AppTheme.primary.withValues(alpha: 0.35)
                       : AppTheme.surface.withValues(alpha: 0.70),
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color:
                     selected
@@ -722,8 +722,8 @@ class _OptionChip extends StatelessWidget {
                       ? <BoxShadow>[
                         BoxShadow(
                           color: AppTheme.primary.withValues(alpha: 0.22),
-                          blurRadius: 18.r,
-                          offset: Offset(0, 10.h),
+                          blurRadius: 18,
+                          offset: const Offset(0, 10),
                         ),
                       ]
                       : const <BoxShadow>[],
@@ -735,7 +735,7 @@ class _OptionChip extends StatelessWidget {
                     selected
                         ? Colors.white.withValues(alpha: 0.95)
                         : AppTheme.primaryLight.withValues(alpha: 0.92),
-                fontSize: 14.sp,
+                fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
               ),
@@ -761,10 +761,10 @@ class _GhostButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 58.h,
-        padding: EdgeInsets.symmetric(horizontal: 20.w),
+        height: 58,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22.r),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
           color: Colors.white.withValues(alpha: 0.05),
         ),
@@ -772,7 +772,7 @@ class _GhostButton extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 16.sp,
+            fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.5),
             fontWeight: FontWeight.w700,
             color: Colors.white.withValues(alpha: 0.70),
             letterSpacing: 0.2,
@@ -837,7 +837,7 @@ class _PrimaryButtonBreathingState extends State<_PrimaryButtonBreathing>
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 58.h,
+      height: 58,
       width: double.infinity,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 180),
@@ -849,14 +849,14 @@ class _PrimaryButtonBreathingState extends State<_PrimaryButtonBreathing>
             final double glow = 0.12 + (0.10 * t);
             return DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22.r),
+                borderRadius: BorderRadius.circular(22),
                 boxShadow:
                     widget.enabled
                         ? <BoxShadow>[
                           BoxShadow(
                             color: AppTheme.primary.withValues(alpha: glow),
-                            blurRadius: 26.r,
-                            offset: Offset(0, 14.h),
+                            blurRadius: 26,
+                            offset: const Offset(0, 14),
                           ),
                         ]
                         : const <BoxShadow>[],
@@ -868,13 +868,13 @@ class _PrimaryButtonBreathingState extends State<_PrimaryButtonBreathing>
                   foregroundColor: Colors.white.withValues(alpha: 0.92),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22.r),
+                    borderRadius: BorderRadius.circular(22),
                   ),
                 ),
                 child: Text(
                   widget.label,
                   style: TextStyle(
-                    fontSize: 18.sp,
+                    fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0),
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.2,
                   ),

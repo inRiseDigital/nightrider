@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
 import 'package:nightride/providers/home_providers.dart';
@@ -44,19 +44,19 @@ class VenueDetailsPage extends ConsumerWidget {
             physics: const BouncingScrollPhysics(),
             slivers: [
               SliverAppBar(
-                expandedHeight: 380.h,
+                expandedHeight: 380,
                 pinned: true,
                 stretch: true,
                 backgroundColor: AppTheme.scaffold,
-                leadingWidth: 70.w,
+                leadingWidth: 70,
                 leading: Padding(
-                  padding: EdgeInsets.only(left: 14.w),
+                  padding: const EdgeInsets.only(left: 14),
                   child: Center(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12.r),
+                      borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        height: 40.h,
-                        width: 40.w,
+                        height: 40,
+                        width: 40,
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.4),
                           border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
@@ -72,13 +72,13 @@ class VenueDetailsPage extends ConsumerWidget {
                 ),
                 actions: [
                   Padding(
-                    padding: EdgeInsets.only(right: 14.w),
+                    padding: const EdgeInsets.only(right: 14),
                     child: Center(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12.r),
+                        borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          height: 40.h,
-                          width: 40.w,
+                          height: 40,
+                          width: 40,
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.4),
                             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
@@ -148,48 +148,48 @@ class VenueDetailsPage extends ConsumerWidget {
 
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 120.h),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Genre badge
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10.r),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           data.subtitle.toUpperCase(),
                           style: TextStyle(
                             color: AppTheme.primaryLight,
-                            fontSize: 10.sp,
+                            fontSize: AppResponsive.font(context, 10).clamp(8.5, 11.0),
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.2,
                           ),
                         ),
                       ),
-                      Gap(16.h),
+                      const Gap(16),
 
                       // Title
                       Text(
                         data.title,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 26.sp,
+                          fontSize: AppResponsive.font(context, 26).clamp(22.0, 28.5),
                           fontWeight: FontWeight.w900,
                           height: 1.1,
                         ),
                       ),
-                      Gap(16.h),
+                      const Gap(16),
 
                       // Location & Distance card
                       Container(
-                        padding: EdgeInsets.all(16.r),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(20.r),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                         ),
                         child: Column(
@@ -197,26 +197,26 @@ class VenueDetailsPage extends ConsumerWidget {
                             Row(
                               children: [
                                 Container(
-                                  padding: EdgeInsets.all(8.r),
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: AppTheme.primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10.r),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: Icon(Icons.location_on_rounded, color: AppTheme.primary, size: 20.sp),
+                                  child: Icon(Icons.location_on_rounded, color: AppTheme.primary, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
                                 ),
-                                Gap(12.w),
+                                const Gap(12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         data.locationLine,
-                                        style: TextStyle(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.bold),
+                                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.bold),
                                       ),
                                       if (data.subtitle.isNotEmpty)
                                         Text(
                                           data.subtitle,
-                                          style: TextStyle(color: Colors.white54, fontSize: 12.sp),
+                                          style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0)),
                                         ),
                                     ],
                                   ),
@@ -226,58 +226,58 @@ class VenueDetailsPage extends ConsumerWidget {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withValues(alpha: 0.08),
-                                        borderRadius: BorderRadius.circular(10.r),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Text(
                                         distLabel,
-                                        style: TextStyle(color: Colors.white, fontSize: 12.sp, fontWeight: FontWeight.w800),
+                                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0), fontWeight: FontWeight.w800),
                                       ),
                                     ),
                                     if (travelLabel.isNotEmpty) ...[
-                                      Gap(4.h),
+                                      const Gap(4),
                                       Text(
                                         travelLabel,
-                                        style: TextStyle(color: AppTheme.primaryLight, fontSize: 11.sp, fontWeight: FontWeight.w600),
+                                        style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ],
                                 ),
                               ],
                             ),
-                            Gap(12.h),
+                            const Gap(12),
                             Divider(color: Colors.white.withValues(alpha: 0.05)),
-                            Gap(12.h),
+                            const Gap(12),
                             Row(
                               children: [
                                 Container(
-                                  padding: EdgeInsets.all(8.r),
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: Colors.amber.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10.r),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: Icon(Icons.access_time_filled_rounded, color: Colors.amber, size: 20.sp),
+                                  child: Icon(Icons.access_time_filled_rounded, color: Colors.amber, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
                                 ),
-                                Gap(12.w),
+                                const Gap(12),
                                 Expanded(
                                   child: Text(
                                     data.openText,
-                                    style: TextStyle(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.bold),
+                                    style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.bold),
                                   ),
                                 ),
                                 if (data.priceHint.isNotEmpty)
                                   Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: AppTheme.primary.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(10.r),
+                                      borderRadius: BorderRadius.circular(10),
                                       border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
                                     ),
                                     child: Text(
                                       data.priceHint,
-                                      style: TextStyle(color: AppTheme.primaryLight, fontSize: 12.sp, fontWeight: FontWeight.w800),
+                                      style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0), fontWeight: FontWeight.w800),
                                     ),
                                   ),
                               ],
@@ -285,18 +285,18 @@ class VenueDetailsPage extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      Gap(24.h),
+                      const Gap(24),
 
                       // ── Map preview ───────────────────────────────────────
                       Text(
                         'Location on Map',
-                        style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w900),
+                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
                       ),
-                      Gap(12.h),
+                      const Gap(12),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(20.r),
+                        borderRadius: BorderRadius.circular(20),
                         child: SizedBox(
-                          height: 200.h,
+                          height: 200,
                           width: double.infinity,
                           child: staticMapUrl.isNotEmpty
                               ? Image.network(
@@ -318,32 +318,32 @@ class VenueDetailsPage extends ConsumerWidget {
                               : _MapPlaceholder(data: data),
                         ),
                       ),
-                      Gap(28.h),
+                      const Gap(28),
 
                       // Tags
                       Text(
                         'Features & Vibes',
-                        style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w900),
+                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
                       ),
-                      Gap(16.h),
+                      const Gap(16),
                       Wrap(
-                        spacing: 10.w,
-                        runSpacing: 10.h,
+                        spacing: 10,
+                        runSpacing: 10,
                         children: data.tags.map((tag) => Container(
-                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(14.r),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.music_note_rounded, color: AppTheme.primary, size: 14.sp),
-                              Gap(8.w),
+                              Icon(Icons.music_note_rounded, color: AppTheme.primary, size: AppResponsive.icon(context, 14).clamp(12.0, 15.5)),
+                              const Gap(8),
                               Text(
                                 tag,
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13.sp, fontWeight: FontWeight.w600),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
@@ -362,7 +362,7 @@ class VenueDetailsPage extends ConsumerWidget {
             right: 0,
             bottom: 0,
             child: Container(
-              padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 36.h),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
               decoration: BoxDecoration(
                 color: AppTheme.surface.withOpacity(0.95),
                 border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
@@ -376,20 +376,20 @@ class VenueDetailsPage extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Admission', style: TextStyle(color: Colors.white54, fontSize: 12.sp, fontWeight: FontWeight.w600)),
+                      Text('Admission', style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0), fontWeight: FontWeight.w600)),
                       Text(
                         data.priceHint.isNotEmpty ? data.priceHint : 'Free',
-                        style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.w900),
+                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 20).clamp(17.0, 22.0), fontWeight: FontWeight.w900),
                       ),
                     ],
                   ),
-                  Gap(24.w),
+                  const Gap(24),
                   Expanded(
                     child: Container(
-                      height: 54.h,
+                      height: 54,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(colors: [AppTheme.primary, AppTheme.accentPurple]),
-                        borderRadius: BorderRadius.circular(16.r),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(color: AppTheme.primary.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 5)),
                         ],
@@ -399,11 +399,11 @@ class VenueDetailsPage extends ConsumerWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         child: Text(
                           'GET TICKETS',
-                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                          style: TextStyle(fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.w900, letterSpacing: 1.2),
                         ),
                       ),
                     ),
@@ -429,11 +429,11 @@ class _MapPlaceholder extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.map_rounded, color: AppTheme.primary, size: 40.sp),
-          Gap(8.h),
+          Icon(Icons.map_rounded, color: AppTheme.primary, size: AppResponsive.icon(context, 40).clamp(32.0, 44.0)),
+          const Gap(8),
           Text(
             data.locationLine,
-            style: TextStyle(color: Colors.white70, fontSize: 13.sp, fontWeight: FontWeight.w600),
+            style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
           ),
         ],

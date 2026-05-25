@@ -1,9 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:gap/gap.dart';
 
+import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/event_detail_page.dart';
@@ -24,33 +24,57 @@ class EventsGridPage extends ConsumerWidget {
           children: [
             // Top bar
             Padding(
-              padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 0),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
               child: Row(
                 children: [
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20.sp),
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white,
+                      size: AppResponsive.icon(context, 20).clamp(16.0, 20.0),
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
-                  Gap(12.w),
+                  const Gap(12),
                   Text(
                     AppLocalizations.of(context)!.exploreCategories,
-                    style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0),
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ],
               ),
             ),
-            Gap(16.h),
+            const Gap(16),
 
             // Content
             Expanded(
               child: async.when(
                 loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2)),
-                error: (_, __) => Center(child: Text(AppLocalizations.of(context)!.couldNotLoadEvents, style: TextStyle(color: Colors.white54, fontSize: 14.sp))),
+                error: (_, __) => Center(
+                  child: Text(
+                    AppLocalizations.of(context)!.couldNotLoadEvents,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
+                    ),
+                  ),
+                ),
                 data: (events) {
                   if (events.isEmpty) {
-                    return Center(child: Text(AppLocalizations.of(context)!.noEventsFound, style: TextStyle(color: Colors.white38, fontSize: 14.sp)));
+                    return Center(
+                      child: Text(
+                        AppLocalizations.of(context)!.noEventsFound,
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
+                        ),
+                      ),
+                    );
                   }
 
                   // Group by category
@@ -61,7 +85,7 @@ class EventsGridPage extends ConsumerWidget {
                   final categories = grouped.keys.toList();
 
                   return ListView.builder(
-                    padding: EdgeInsets.fromLTRB(14.w, 0, 14.w, 24.h),
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
                     physics: const BouncingScrollPhysics(),
                     itemCount: categories.length,
                     itemBuilder: (context, i) {
@@ -75,30 +99,37 @@ class EventsGridPage extends ConsumerWidget {
                           Row(
                             children: [
                               Container(
-                                width: 4.w,
-                                height: 16.h,
+                                width: 4,
+                                height: 16,
                                 decoration: BoxDecoration(
                                   color: AppTheme.primary,
-                                  borderRadius: BorderRadius.circular(2.r),
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
-                              Gap(10.w),
+                              const Gap(10),
                               Text(
                                 cat,
-                                style: TextStyle(color: Colors.white, fontSize: 15.sp, fontWeight: FontWeight.w900),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
-                              Gap(8.w),
+                              const Gap(8),
                               Text(
                                 '${catEvents.length}',
-                                style: TextStyle(color: Colors.white38, fontSize: 12.sp),
+                                style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: AppResponsive.font(context, 12).clamp(10.0, 13.0),
+                                ),
                               ),
                             ],
                           ),
-                          Gap(12.h),
+                          const Gap(12),
 
                           // Horizontal scroll cards
                           SizedBox(
-                            height: 210.h,
+                            height: AppResponsive.gap(context, 210).clamp(180.0, 230.0),
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
                               physics: const BouncingScrollPhysics(),
@@ -106,7 +137,7 @@ class EventsGridPage extends ConsumerWidget {
                               itemBuilder: (context, j) {
                                 final event = catEvents[j];
                                 return Padding(
-                                  padding: EdgeInsets.only(right: 12.w),
+                                  padding: const EdgeInsets.only(right: 12),
                                   child: _EventCard(
                                     id: event.id,
                                     title: event.title,
@@ -118,7 +149,7 @@ class EventsGridPage extends ConsumerWidget {
                               },
                             ),
                           ),
-                          Gap(28.h),
+                          const Gap(28),
                         ],
                       );
                     },
@@ -155,13 +186,13 @@ class _EventCard extends StatelessWidget {
         MaterialPageRoute(builder: (_) => EventDetailPage(id: id)),
       ),
       child: SizedBox(
-        width: 160.w,
+        width: AppResponsive.gap(context, 160).clamp(130.0, 180.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16.r),
+                borderRadius: BorderRadius.circular(16),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -172,7 +203,11 @@ class _EventCard extends StatelessWidget {
                       errorWidget: (_, __, ___) => Container(
                         color: AppTheme.surface,
                         alignment: Alignment.center,
-                        child: Icon(Icons.music_note_rounded, color: AppTheme.primary, size: 30.sp),
+                        child: Icon(
+                          Icons.music_note_rounded,
+                          color: AppTheme.primary,
+                          size: AppResponsive.icon(context, 30).clamp(24.0, 30.0),
+                        ),
                       ),
                     ),
                     DecoratedBox(
@@ -186,12 +221,16 @@ class _EventCard extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      left: 10.w,
-                      bottom: 10.h,
-                      right: 10.w,
+                      left: 10,
+                      bottom: 10,
+                      right: 10,
                       child: Text(
                         dateText,
-                        style: TextStyle(color: AppTheme.accent, fontSize: 11.sp, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          color: AppTheme.accent,
+                          fontSize: AppResponsive.font(context, 11).clamp(9.0, 12.0),
+                          fontWeight: FontWeight.w800,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -200,19 +239,27 @@ class _EventCard extends StatelessWidget {
                 ),
               ),
             ),
-            Gap(8.h),
+            const Gap(8),
             Text(
               title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w800, height: 1.2),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.0),
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+              ),
             ),
-            Gap(3.h),
+            const Gap(3),
             Text(
               locationText,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white54, fontSize: 11.sp),
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: AppResponsive.font(context, 11).clamp(9.0, 12.0),
+              ),
             ),
           ],
         ),

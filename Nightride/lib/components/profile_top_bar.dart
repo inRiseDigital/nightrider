@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'package:nightride/core/responsive/app_responsive.dart';
 import '../../domain/profile_models.dart';
@@ -43,13 +42,13 @@ class ProfileTopBar extends StatelessWidget {
         if (isEditing)
           InkWell(
             onTap: onCancel,
-            borderRadius: BorderRadius.circular(12.r),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Text(
                 'Cancel',
                 style: TextStyle(
-                  fontSize: 12.5.sp,
+                  fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.5),
                   fontWeight: FontWeight.w800,
                   color: Colors.white.withValues(alpha: 0.75),
                 ),
@@ -59,12 +58,12 @@ class ProfileTopBar extends StatelessWidget {
         else
           InkWell(
             onTap: onMenu,
-            borderRadius: BorderRadius.circular(12.r),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: EdgeInsets.all(8.w),
+              padding: const EdgeInsets.all(8),
               child: Icon(
                 Icons.more_vert_rounded,
-                size: 18.sp,
+                size: AppResponsive.icon(context, 18).clamp(15.0, 20.0),
                 color: Colors.white.withValues(alpha: 0.8),
               ),
             ),

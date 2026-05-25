@@ -7,7 +7,6 @@ import 'package:gap/gap.dart';
 import 'package:nightride/components/auth_process_scaffold.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/pages/onboard_questionnaire_page.dart';
-import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/services/auth_service.dart';
 
 import 'package:nightride/l10n/app_localizations.dart';
@@ -25,7 +24,6 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
-  String _selectedRole = 'user';
 
   @override
   void dispose() {
@@ -60,13 +58,10 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       await ref.read(authServiceProvider).signUpWithEmailPassword(
         email: email,
         password: password,
-        role: _selectedRole,
       );
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => _selectedRole == 'organizer'
-              ? const OrganizerShellPage()
-              : const OnboardQuestionnaireTemplatePage()),
+          MaterialPageRoute(builder: (_) => const OnboardQuestionnaireTemplatePage()),
         );
       }
     } catch (e) {
@@ -129,8 +124,6 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         passwordController: _passwordController,
         confirmPasswordController: _confirmPasswordController,
         isLoading: _isLoading,
-        selectedRole: _selectedRole,
-        onRoleChanged: (role) => setState(() => _selectedRole = role),
         onSignUp: _handleSignUp,
         onGoogleSignUp: _handleGoogleSignUp,
       ),
@@ -144,8 +137,6 @@ class _SignUpBottomPanel extends StatelessWidget {
   final TextEditingController passwordController;
   final TextEditingController confirmPasswordController;
   final bool isLoading;
-  final String selectedRole;
-  final ValueChanged<String> onRoleChanged;
   final VoidCallback onSignUp;
   final VoidCallback onGoogleSignUp;
 
@@ -155,8 +146,6 @@ class _SignUpBottomPanel extends StatelessWidget {
     required this.passwordController,
     required this.confirmPasswordController,
     required this.isLoading,
-    required this.selectedRole,
-    required this.onRoleChanged,
     required this.onSignUp,
     required this.onGoogleSignUp,
   });
@@ -255,8 +244,6 @@ class _SignUpBottomPanel extends StatelessWidget {
                     passwordController: passwordController,
                     confirmPasswordController: confirmPasswordController,
                     isLoading: isLoading,
-                    selectedRole: selectedRole,
-                    onRoleChanged: onRoleChanged,
                     onSignUp: onSignUp,
                     onGoogleSignUp: onGoogleSignUp,
                   ),
@@ -275,8 +262,6 @@ class _PanelContent extends StatelessWidget {
   final TextEditingController passwordController;
   final TextEditingController confirmPasswordController;
   final bool isLoading;
-  final String selectedRole;
-  final ValueChanged<String> onRoleChanged;
   final VoidCallback onSignUp;
   final VoidCallback onGoogleSignUp;
 
@@ -285,8 +270,6 @@ class _PanelContent extends StatelessWidget {
     required this.passwordController,
     required this.confirmPasswordController,
     required this.isLoading,
-    required this.selectedRole,
-    required this.onRoleChanged,
     required this.onSignUp,
     required this.onGoogleSignUp,
   });
@@ -295,22 +278,6 @@ class _PanelContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Role selector
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-          ),
-          child: Row(
-            children: [
-              _RoleTab(label: 'Party Goer', value: 'user', selectedRole: selectedRole, onTap: onRoleChanged),
-              _RoleTab(label: 'Organizer', value: 'organizer', selectedRole: selectedRole, onTap: onRoleChanged),
-            ],
-          ),
-        ),
-        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
         _InputField(
           controller: emailController,
           icon: Icons.mail_outline_rounded,
@@ -418,43 +385,6 @@ class _PanelContent extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RoleTab extends StatelessWidget {
-  const _RoleTab({required this.label, required this.value, required this.selectedRole, required this.onTap});
-  final String label;
-  final String value;
-  final String selectedRole;
-  final ValueChanged<String> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = selectedRole == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onTap(value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: EdgeInsets.symmetric(vertical: AppResponsive.gap(context, 10).clamp(8, 14)),
-          decoration: BoxDecoration(
-            color: selected ? AppTheme.primary.withValues(alpha: 0.3) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: selected ? Border.all(color: AppTheme.primary.withValues(alpha: 0.6)) : null,
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : Colors.white38,
-                fontSize: AppResponsive.font(context, 13),
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -818,6 +818,8 @@ class _ClubDetailSheet extends StatelessWidget {
                           const SizedBox(height: 8),
                           Text(
                             club.clubName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
@@ -828,6 +830,8 @@ class _ClubDetailSheet extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             '${club.city} · ${club.country}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.6),
                               fontSize: 13,

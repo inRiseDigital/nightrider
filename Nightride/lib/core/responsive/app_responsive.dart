@@ -308,9 +308,9 @@ class AppResponsive {
   // ── Featured carousel (top of home) ────────────────────────────────────
   static double featuredViewportFraction(BuildContext c) {
     final w = width(c);
-    if (w >= 840) return 0.82;
-    if (w >= 600) return 0.86;
-    return 0.92;
+    if (w >= 840) return 0.80;
+    if (w >= 600) return 0.83;
+    return 0.88;
   }
 
   static double featuredGenreMaxWidth(BuildContext c) {

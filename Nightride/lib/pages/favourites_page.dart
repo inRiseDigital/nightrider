@@ -119,108 +119,133 @@ class _FavCard extends ConsumerWidget {
 
     final daysLeft = _daysUntil(date);
 
+    final double imgSize = AppResponsive.gap(context, 96).clamp(84.0, 108.0);
+    final String daysLabel = daysLeft == null
+        ? ''
+        : daysLeft == 0
+            ? 'Today!'
+            : daysLeft == 1
+                ? 'Tomorrow!'
+                : '$daysLeft days away';
+
+    const double deleteWidth = 48;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Thumbnail — stretches to match the column height
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-              ),
-              child: CachedNetworkImage(
-                imageUrl: image,
-                width: AppResponsive.gap(context, 100).clamp(80.0, 110.0),
-                fit: BoxFit.cover,
-                placeholder: (_, __) => SizedBox(
-                  width: AppResponsive.gap(context, 100).clamp(80.0, 110.0),
-                  child: Container(color: Colors.white10),
-                ),
-                errorWidget: (_, __, ___) => SizedBox(
-                  width: AppResponsive.gap(context, 100).clamp(80.0, 110.0),
-                  child: Container(
-                    color: Colors.white10,
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.music_note_rounded,
-                      color: Colors.white24,
-                      size: AppResponsive.icon(context, 28).clamp(22.0, 28.0),
+      // LayoutBuilder lets us compute the exact content column width so that
+      // IntrinsicHeight can measure multi-line text at the real width (not ∞).
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final contentWidth =
+              (constraints.maxWidth - imgSize - 12 - deleteWidth).clamp(60.0, double.infinity);
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Thumbnail — stretches to match content height
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    bottomLeft: Radius.circular(16),
+                  ),
+                  child: CachedNetworkImage(
+                    imageUrl: image,
+                    width: imgSize,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) =>
+                        SizedBox(width: imgSize, height: imgSize, child: Container(color: Colors.white10)),
+                    errorWidget: (_, __, ___) => SizedBox(
+                      width: imgSize,
+                      height: imgSize,
+                      child: Container(
+                        color: Colors.white10,
+                        alignment: Alignment.center,
+                        child: Icon(Icons.music_note_rounded,
+                            color: Colors.white24,
+                            size: AppResponsive.icon(context, 28).clamp(22.0, 28.0)),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const Gap(12),
-            // Info
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    if (city.isNotEmpty) ...[
-                      const Gap(4),
-                      Text(
-                        city,
-                        style: GoogleFonts.inter(
-                          fontSize: AppResponsive.font(context, 12).clamp(10.0, 13.0),
-                          color: Colors.white54,
+                const Gap(12),
+                // Info — fixed width so IntrinsicHeight measures text correctly
+                SizedBox(
+                  width: contentWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    ],
-                    if (genre.isNotEmpty || daysLeft != null) ...[
-                      const Gap(6),
-                      Row(
-                        children: [
-                          if (genre.isNotEmpty) _Chip(genre),
-                          if (daysLeft != null) ...[
-                            const Gap(6),
-                            _Chip(
-                              daysLeft == 0
-                                  ? 'Today!'
-                                  : daysLeft == 1
-                                      ? 'Tomorrow!'
-                                      : '$daysLeft days away',
-                              color: daysLeft <= 3 ? AppTheme.accent : Colors.white24,
+                        if (city.isNotEmpty) ...[
+                          const Gap(3),
+                          Text(
+                            city,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: AppResponsive.font(context, 12).clamp(10.0, 13.0),
+                              color: Colors.white54,
                             ),
-                          ],
+                          ),
                         ],
-                      ),
-                    ],
-                  ],
+                        if (genre.isNotEmpty || daysLeft != null) ...[
+                          const Gap(6),
+                          // Row instead of Wrap — genre chip shrinks via Flexible
+                          // so chips always stay on one line (avoids IntrinsicHeight measurement bug with Wrap)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (genre.isNotEmpty)
+                                Flexible(child: _Chip(genre)),
+                              if (genre.isNotEmpty && daysLeft != null)
+                                const Gap(6),
+                              if (daysLeft != null)
+                                _Chip(
+                                  daysLabel,
+                                  color: daysLeft <= 3
+                                      ? AppTheme.accent
+                                      : Colors.white24,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                // Remove button centered in the card height
+                SizedBox(
+                  width: deleteWidth,
+                  child: Center(
+                    child: IconButton(
+                      icon: const Icon(Icons.favorite_rounded,
+                          color: AppTheme.accent, size: 22),
+                      onPressed: () async {
+                        final user = ref.read(authStateProvider).asData?.value;
+                        if (user == null) return;
+                        await ref.read(favouritesServiceProvider).remove(user.uid, id);
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
-            // Remove button
-            IconButton(
-              icon: const Icon(Icons.favorite_rounded, color: AppTheme.accent, size: 22),
-              onPressed: () async {
-                final user = ref.read(authStateProvider).asData?.value;
-                if (user == null) return;
-                await ref.read(favouritesServiceProvider).remove(user.uid, id);
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -252,6 +277,8 @@ class _Chip extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: GoogleFonts.inter(
           fontSize: AppResponsive.font(context, 10).clamp(8.0, 11.0),
           fontWeight: FontWeight.w600,

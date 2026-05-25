@@ -88,6 +88,15 @@ class _DetailBody extends ConsumerWidget {
   String get _language => data['language'] as String? ?? '';
   List<String> get _artists =>
       (data['artists'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+
+  List<Map<String, dynamic>> get _performers {
+    final raw = data['performers'] as List<dynamic>?;
+    if (raw == null || raw.isEmpty) return [];
+    return raw.whereType<Map>().map((p) => Map<String, dynamic>.from(p)).toList();
+  }
+
+  Map<String, dynamic> get _policies =>
+      (data['policies'] as Map<String, dynamic>?) ?? {};
   double get _lat => (data['lat'] as num? ?? 0).toDouble();
   double get _lng => (data['lng'] as num? ?? 0).toDouble();
 
@@ -284,35 +293,142 @@ class _DetailBody extends ConsumerWidget {
                     ),
                     const Gap(26),
 
-                    // ── Artists ──────────────────────────────────────────────
-                    if (_artists.isNotEmpty) ...[
+                    // ── Performers ───────────────────────────────────────────
+                    if (_performers.isNotEmpty || _artists.isNotEmpty) ...[
                       Text(
                         AppLocalizations.of(context)!.performers,
                         style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
                       ),
                       const Gap(12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: _artists.map((artist) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 13).clamp(11.0, 14.5)),
-                              const Gap(7),
-                              Text(
-                                artist,
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), fontWeight: FontWeight.w600),
+                      // Rich performer cards (from new performers field)
+                      if (_performers.isNotEmpty)
+                        Column(
+                          children: _performers.map((p) {
+                            final name = p['name'] as String? ?? '';
+                            final type = p['type'] as String? ?? 'DJ';
+                            final bio = p['bio'] as String? ?? '';
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
                               ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.accent.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
+                                  ),
+                                  const Gap(12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(name, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.5), fontWeight: FontWeight.w800)),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primary.withValues(alpha: 0.2),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(type, style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0), fontWeight: FontWeight.w700)),
+                                            ),
+                                          ],
+                                        ),
+                                        if (bio.isNotEmpty) ...[
+                                          const Gap(4),
+                                          Text(bio, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0)), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        )
+                      // Fallback: legacy plain artist name chips
+                      else
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: _artists.map((artist) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 13).clamp(11.0, 14.5)),
+                                const Gap(7),
+                                Text(artist, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          )).toList(),
+                        ),
+                      const Gap(26),
+                    ],
+
+                    // ── Event Policies ───────────────────────────────────────
+                    if (_policies.isNotEmpty) ...[
+                      Text(
+                        'Event Policies',
+                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
+                      ),
+                      const Gap(12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        ),
+                        child: Column(
+                          children: [
+                            if ((_policies['age_restriction'] as int? ?? 0) > 0) ...[
+                              _PolicyRow(icon: Icons.person_outline_rounded, iconColor: Colors.orangeAccent, label: 'Age Restriction', value: '${_policies['age_restriction']}+ only'),
+                              _DividerThin(),
                             ],
-                          ),
-                        )).toList(),
+                            if ((_policies['refund_policy'] as String? ?? '').isNotEmpty) ...[
+                              _PolicyRow(icon: Icons.receipt_long_rounded, iconColor: Colors.blueAccent, label: 'Refund Policy', value: _policies['refund_policy'] as String),
+                              _DividerThin(),
+                            ],
+                            _PolicyRow(
+                              icon: Icons.loop_rounded,
+                              iconColor: _policies['re_entry_allowed'] == true ? Colors.greenAccent : Colors.redAccent,
+                              label: 'Re-entry',
+                              value: _policies['re_entry_allowed'] == true ? 'Allowed' : 'Not allowed',
+                            ),
+                            _DividerThin(),
+                            _PolicyRow(
+                              icon: Icons.accessible_rounded,
+                              iconColor: _policies['wheelchair_accessible'] == true ? Colors.greenAccent : Colors.white38,
+                              label: 'Wheelchair Access',
+                              value: _policies['wheelchair_accessible'] == true ? 'Accessible' : 'Not specified',
+                            ),
+                            _DividerThin(),
+                            _PolicyRow(
+                              icon: Icons.pets_rounded,
+                              iconColor: _policies['allow_pets'] == true ? Colors.greenAccent : Colors.white38,
+                              label: 'Pets',
+                              value: _policies['allow_pets'] == true ? 'Allowed' : 'Not allowed',
+                            ),
+                          ],
+                        ),
                       ),
                       const Gap(26),
                     ],
@@ -515,6 +631,40 @@ class _Divider extends StatelessWidget {
       child: Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
     );
   }
+}
+
+class _PolicyRow extends StatelessWidget {
+  const _PolicyRow({required this.icon, required this.iconColor, required this.label, required this.value});
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
+            child: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 16).clamp(13.0, 18.0)),
+          ),
+          const Gap(12),
+          Expanded(child: Text(label, style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0)))),
+          Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0), fontWeight: FontWeight.w700))),
+        ],
+      ),
+    );
+  }
+}
+
+class _DividerThin extends StatelessWidget {
+  const _DividerThin();
+  @override
+  Widget build(BuildContext context) =>
+      Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Divider(color: Colors.white.withValues(alpha: 0.05), height: 1));
 }
 
 class _MapFallback extends StatelessWidget {

@@ -11,6 +11,7 @@ import 'package:nightride/data/services/privacy_service.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/admin/admin_panel_page.dart';
 import 'package:nightride/pages/auth/sign_in_page.dart';
+import 'package:nightride/pages/organizer_apply_page.dart';
 import 'package:nightride/pages/edit_profile_page.dart';
 import 'package:nightride/providers/home_providers.dart';
 import 'package:nightride/providers/settings_providers.dart';
@@ -100,6 +101,11 @@ class SettingsPage extends ConsumerWidget {
               ),
             ],
           ),
+          if (ref.watch(isAdminProvider).asData?.value != true &&
+              ref.watch(isOrganizerProvider).asData?.value != true) ...[
+            const Gap(24),
+            _OrganizerApplySection(ref: ref),
+          ],
           if (ref.watch(isAdminProvider).asData?.value == true) ...[
             const Gap(24),
             _SettingsSection(
@@ -490,6 +496,51 @@ class _SubPage extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: child,
       ),
+    );
+  }
+}
+
+// ── Organizer apply section ───────────────────────────────────────────────────
+
+class _OrganizerApplySection extends ConsumerWidget {
+  const _OrganizerApplySection({required this.ref});
+  final WidgetRef ref;
+
+  void _openApplyPage(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const OrganizerApplyPage()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(organizerRequestStatusProvider).asData?.value;
+    return _SettingsSection(
+      title: 'Organizer',
+      children: [
+        if (status == 'pending')
+          ListTile(
+            leading: const Icon(Icons.hourglass_top_rounded, color: Colors.orangeAccent, size: 20),
+            title: const Text('Application Pending', style: TextStyle(color: Colors.orangeAccent, fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: const Text('An admin will review your request', style: TextStyle(color: Colors.white38, fontSize: 12)),
+          )
+        else if (status == 'rejected')
+          ListTile(
+            leading: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 20),
+            title: const Text('Application Rejected', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: const Text('Tap to reapply', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 14),
+            onTap: () => _openApplyPage(context),
+          )
+        else
+          ListTile(
+            leading: Icon(Icons.badge_outlined, color: AppTheme.accent, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
+            title: const Text('Apply as Organizer', style: TextStyle(color: Colors.white, fontSize: 14)),
+            subtitle: const Text('Host and manage your own events', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 14),
+            onTap: () => _openApplyPage(context),
+          ),
+      ],
     );
   }
 }

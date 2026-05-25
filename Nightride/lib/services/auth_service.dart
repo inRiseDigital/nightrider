@@ -59,7 +59,6 @@ class AuthService {
   Future<UserCredential> signUpWithEmailPassword({
     required String email,
     required String password,
-    String role = 'user',
   }) async {
     try {
       final cred = await _auth.createUserWithEmailAndPassword(
@@ -67,7 +66,7 @@ class AuthService {
         password: password,
       );
       if (cred.user != null) {
-        await _profileService.createIfAbsent(cred.user!, role: role);
+        await _profileService.createIfAbsent(cred.user!, role: 'user');
         await _flushOnboardingAnswers(cred.user!.uid);
       }
       return cred;

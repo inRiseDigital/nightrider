@@ -17,7 +17,7 @@ class ChatStreamHandle {
 class ChatService {
   static const String _baseUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'https://your-nightride-agent.onrender.com',
+    defaultValue: 'http://192.168.24.149:8000',
   );
 
   static const String _apiKey = String.fromEnvironment('APP_API_KEY');
@@ -27,6 +27,8 @@ class ChatService {
     List<ChatMessage> history, {
     double? latitude,
     double? longitude,
+    String? userId,
+    String? threadId,
   }) {
     final client = http.Client();
     final stream = _streamImpl(
@@ -34,6 +36,8 @@ class ChatService {
       message,
       latitude: latitude,
       longitude: longitude,
+      userId: userId,
+      threadId: threadId,
     );
     return ChatStreamHandle(stream, client);
   }
@@ -43,10 +47,14 @@ class ChatService {
     String message, {
     double? latitude,
     double? longitude,
+    String? userId,
+    String? threadId,
   }) async* {
     try {
       final body = <String, dynamic>{
         'message': message,
+        'user_id': userId ?? 'anonymous',
+        if (threadId != null) 'thread_id': threadId,
         'history': [],
         if (latitude != null && longitude != null) 'latitude': latitude,
         if (latitude != null && longitude != null) 'longitude': longitude,

@@ -51,86 +51,88 @@ class AuthProcessScaffold extends StatelessWidget {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                // Compute effective topGap so content never overflows the safe area.
+                // Fixed overhead: top gap ~20, brand row ~44, title ~42, subtitle gap ~12, subtitle ~22.
+                const fixedOverhead = 140.0;
+                final effectiveTopGap = titleTopGap.clamp(
+                  0.0,
+                  (constraints.maxHeight - reservedBottomGap - fixedOverhead).clamp(0.0, titleTopGap),
+                );
+
                 return SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
                   padding: horizontalPadding,
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: SizedBox(
-                      height: constraints.maxHeight,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Gap(AppResponsive.gap(context, 18).clamp(14.0, 22.0)),
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Gap(AppResponsive.gap(context, 18).clamp(14.0, 22.0)),
 
-                          // Brand row
-                          Row(
-                            children: [
-                              Container(
-                                width: brandIconSize,
-                                height: brandIconSize,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEDE9FE),
-                                  borderRadius: BorderRadius.circular(brandRadius),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'N',
-                                  style: TextStyle(
-                                    fontSize: brandFont,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.primary,
-                                  ),
-                                ),
+                        // Brand row
+                        Row(
+                          children: [
+                            Container(
+                              width: brandIconSize,
+                              height: brandIconSize,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEDE9FE),
+                                borderRadius: BorderRadius.circular(brandRadius),
                               ),
-                              Gap(AppResponsive.gap(context, 12).clamp(10.0, 14.0)),
-                              Text(
-                                'Nightride',
+                              alignment: Alignment.center,
+                              child: Text(
+                                'N',
                                 style: TextStyle(
                                   fontSize: brandFont,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.primaryLight.withOpacity(0.95),
-                                  letterSpacing: 0.2,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primary,
                                 ),
                               ),
-                            ],
-                          ),
-
-                          Gap(titleTopGap),
-
-                          Text(
-                            title,
-                            textAlign: TextAlign.left,
-                            style: TextStyle(
-                              fontSize: titleFont,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.primaryLight,
-                              height: 1.05,
-                              letterSpacing: 0.2,
                             ),
-                          ),
-
-                          Gap(AppResponsive.gap(context, 12).clamp(10.0, 14.0)),
-
-                          Text(
-                            subtitle,
-                            textAlign: TextAlign.left,
-                            softWrap: true,
-                            style: TextStyle(
-                              fontSize: subtitleFont,
-                              height: 1.35,
-                              color: AppTheme.primaryLight.withOpacity(0.55),
-                              letterSpacing: 0.1,
+                            Gap(AppResponsive.gap(context, 12).clamp(10.0, 14.0)),
+                            Text(
+                              'Nightride',
+                              style: TextStyle(
+                                fontSize: brandFont,
+                                fontWeight: FontWeight.w500,
+                                color: AppTheme.primaryLight.withValues(alpha:0.95),
+                                letterSpacing: 0.2,
+                              ),
                             ),
+                          ],
+                        ),
+
+                        Gap(effectiveTopGap),
+
+                        Text(
+                          title,
+                          textAlign: TextAlign.left,
+                          style: TextStyle(
+                            fontSize: titleFont,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.primaryLight,
+                            height: 1.05,
+                            letterSpacing: 0.2,
                           ),
+                        ),
 
-                          const Spacer(),
+                        Gap(AppResponsive.gap(context, 12).clamp(10.0, 14.0)),
 
-                          Gap(reservedBottomGap),
-                        ],
-                      ),
+                        Text(
+                          subtitle,
+                          textAlign: TextAlign.left,
+                          softWrap: true,
+                          style: TextStyle(
+                            fontSize: subtitleFont,
+                            height: 1.35,
+                            color: AppTheme.primaryLight.withValues(alpha:0.55),
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+
+                        SizedBox(height: reservedBottomGap),
+                      ],
                     ),
                   ),
                 );
@@ -174,7 +176,7 @@ class _AuthProcessBackground extends StatelessWidget {
             gradient: RadialGradient(
               center: const Alignment(0.15, -0.35),
               radius: 1.15,
-              colors: [AppTheme.primary.withOpacity(0.12), Colors.transparent],
+              colors: [AppTheme.primary.withValues(alpha:0.12), Colors.transparent],
               stops: const [0.0, 0.7],
             ),
           ),
@@ -184,7 +186,7 @@ class _AuthProcessBackground extends StatelessWidget {
           left: sw * -0.18,
           child: _GlowBlob(
             size: sw * 0.62,
-            color: AppTheme.primary.withOpacity(0.26),
+            color: AppTheme.primary.withValues(alpha:0.26),
           ),
         ),
         Positioned(
@@ -192,7 +194,7 @@ class _AuthProcessBackground extends StatelessWidget {
           right: sw * -0.23,
           child: _GlowBlob(
             size: sw * 0.66,
-            color: AppTheme.accent.withOpacity(0.12),
+            color: AppTheme.accent.withValues(alpha:0.12),
           ),
         ),
         Positioned(
@@ -200,10 +202,10 @@ class _AuthProcessBackground extends StatelessWidget {
           left: sw * 0.10,
           child: _GlowBlob(
             size: sw * 0.54,
-            color: AppTheme.primaryLight.withOpacity(0.14),
+            color: AppTheme.primaryLight.withValues(alpha:0.14),
           ),
         ),
-        Container(color: Colors.black.withOpacity(0.10)),
+        Container(color: Colors.black.withValues(alpha:0.10)),
       ],
     );
   }

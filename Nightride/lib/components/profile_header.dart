@@ -119,9 +119,13 @@ class _StatText extends StatelessWidget {
           '$label ',
           style: TextStyle(color: Colors.white60, fontSize: size),
         ),
-        Text(
-          value,
-          style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.bold),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );

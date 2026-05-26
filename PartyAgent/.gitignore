@@ -1,0 +1,16 @@
+.env
+firebase_service_account.json
+*_service_account.json
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+*.log
+.langgraph_api/
+.idea/
+.vscode/

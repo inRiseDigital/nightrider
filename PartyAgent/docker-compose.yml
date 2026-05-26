@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: party
+      POSTGRES_PASSWORD: party
+      POSTGRES_DB: party_agent
+    # Host 5432 and 5433 are taken by other local projects (koli-postgres,
+    # pos-postgres) — this one binds 5434 to avoid the collision.
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U party -d party_agent"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    # Host 6379 and 6380 are also taken — this one binds 6381.
+    ports:
+      - "6381:6379"
+
+volumes:
+  pgdata:

@@ -1,0 +1,6 @@
+{"input": "What's on in Dubai tonight?", "expected_routing": "event_discovery"}
+{"input": "Who's going out?", "expected_routing": "social_companion"}
+{"input": "Open the map", "expected_routing": "map_navigator"}
+{"input": "Make me a recap", "expected_routing": "night_recap"}
+{"input": "Is the club crowded?", "expected_routing": "safety_support"}
+{"input": "Any new badges?", "expected_routing": "gamification"}

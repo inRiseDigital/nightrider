@@ -360,6 +360,8 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                     children: [
                       Text(
                         name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14), fontWeight: FontWeight.w700),
                       ),
                       if (orgName.isNotEmpty)

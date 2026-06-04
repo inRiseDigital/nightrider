@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:nightride/services/user_profile_service.dart';
@@ -13,7 +14,12 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
 /// Provider for GoogleSignIn instance
 final googleSignInProvider = Provider<GoogleSignIn>((ref) {
   return GoogleSignIn(
-    clientId: '218660887469-uqtutg9a7qd7dqu6jva7qpbk8ujm358n.apps.googleusercontent.com',
+    // serverClientId only needed on iOS/web to get an ID token for a backend.
+    // On Android it triggers web-client OAuth validation, causing DEVELOPER_ERROR
+    // (code 10) on real devices. Firebase Auth works with accessToken alone.
+    serverClientId: defaultTargetPlatform == TargetPlatform.android
+        ? null
+        : '218660887469-uqtutg9a7qd7dqu6jva7qpbk8ujm358n.apps.googleusercontent.com',
   );
 });
 

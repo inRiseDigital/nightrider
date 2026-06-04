@@ -262,8 +262,19 @@ String formatTravel(double km) {
     final mins = (km / 5 * 60).round();
     if (mins <= 45) return '~$mins min walk';
   }
-  final mins = (km / 60 * 60).round();
-  return '~$mins min drive';
+  if (km > 1500) {
+    // Too far to drive — show flight estimate (~900 km/h cruise speed)
+    final flightHours = (km / 900).ceil();
+    return '~${flightHours}h flight';
+  }
+  // Drive time: 40 km/h city, 70 km/h mixed, 100 km/h highway
+  final speedKmh = km < 50 ? 40.0 : (km < 200 ? 70.0 : 100.0);
+  final totalMins = (km / speedKmh * 60).round();
+  if (totalMins >= 120) {
+    final hours = (totalMins / 60).round();
+    return '~${hours}h drive';
+  }
+  return '~$totalMins min drive';
 }
 
 // ── Category & country filters ───────────────────────────────────────────────

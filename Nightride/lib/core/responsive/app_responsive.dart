@@ -108,8 +108,8 @@ class AppResponsive {
     final w = width(c);
     if (h < 700) return 130;
     if (w >= 840) return 184;
-    if (w >= 600) return 188; // bumped from 174 — Tab overflowed by 11 dp
-    return 150;
+    if (w >= 600) return 188;
+    return 165; // bumped from 150 — S23 Ultra overflowed by 11 dp
   }
 
   // ── Map: top filter chips + search row ────────────────────────────────

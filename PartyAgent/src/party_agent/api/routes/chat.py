@@ -8,6 +8,7 @@ import logging
 import traceback
 from typing import AsyncGenerator
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
@@ -24,20 +25,42 @@ def _is_placeholder_gps(lat: float, lng: float) -> bool:
     return (lat == 0.0 and lng == 0.0) or (lat == -90.0 and lng == -180.0)
 
 
+async def _reverse_geocode(lat: float, lon: float) -> str:
+    """Convert GPS coords to a human-readable address using OpenStreetMap Nominatim."""
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            r = await client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={"lat": lat, "lon": lon, "format": "json"},
+                headers={"User-Agent": "NightrideApp/1.0"},
+            )
+            data = r.json()
+            addr = data.get("address", {})
+            # Build a readable label: place name + suburb/district + city + country
+            parts = [
+                addr.get("amenity") or addr.get("building") or addr.get("tourism")
+                or addr.get("leisure") or addr.get("shop") or addr.get("office"),
+                addr.get("road"),
+                addr.get("suburb") or addr.get("neighbourhood") or addr.get("village"),
+                addr.get("city") or addr.get("town") or addr.get("county"),
+                addr.get("state"),
+                addr.get("country"),
+            ]
+            return ", ".join(p for p in parts if p)
+    except Exception:
+        return f"{lat:.5f}, {lon:.5f}"  # fallback to raw coords on network error
+
+
 @router.post("", response_model=ChatResponse)
 async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     # Graph is built once during the app's lifespan and stashed on app.state
     # so the async Postgres checkpointer pool stays alive across requests.
     graph = request.app.state.graph
-    # Build message with GPS context injected so agents can use it
+    # Build message with location context injected so agents can use it
     message_content = req.message
     if req.gps and not _is_placeholder_gps(req.gps.latitude, req.gps.longitude):
-        gps_context = (
-            f"[GPS: lat={req.gps.latitude}, lon={req.gps.longitude}"
-            + (f", accuracy={req.gps.accuracy_meters}m" if req.gps.accuracy_meters else "")
-            + (f", speed={req.gps.speed_kmh}km/h" if req.gps.speed_kmh else "")
-            + f"] {req.message}"
-        )
+        address = await _reverse_geocode(req.gps.latitude, req.gps.longitude)
+        gps_context = f"[User location: {address}] {req.message}"
         message_content = gps_context
 
     # Only pass keys that exist on AgentState — passing unknown keys (e.g. `gps`)
@@ -89,7 +112,8 @@ async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResp
         message_content = req.message
         if (req.latitude is not None and req.longitude is not None
                 and not _is_placeholder_gps(req.latitude, req.longitude)):
-            message_content = f"[GPS: lat={req.latitude}, lon={req.longitude}] {req.message}"
+            address = await _reverse_geocode(req.latitude, req.longitude)
+            message_content = f"[User location: {address}] {req.message}"
 
         thread_id = req.thread_id or req.user_id
         state_input: dict = {

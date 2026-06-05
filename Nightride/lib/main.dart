@@ -19,23 +19,29 @@ import 'package:nightride/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
   try {
     await NotificationService.init();
     await NotificationService.requestPermission();
   } catch (_) {}
 
+  // Load .env for all platforms — provides BACKEND_URL, MAPBOX_ACCESS_TOKEN, etc.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // .env missing — values fall back to --dart-define / built-in defaults.
+  }
+
   if (!kIsWeb) {
     // Primary source: --dart-define=MAPBOX_ACCESS_TOKEN=pk.xxx at build time.
-    // Fallback for local dev: .env file (NOT bundled in production builds).
+    // Fallback for local dev: .env file.
     const String dartDefineToken = String.fromEnvironment('MAPBOX_ACCESS_TOKEN');
     String token = dartDefineToken;
     try {
-      await dotenv.load(fileName: '.env');
       token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dartDefineToken;
-    } catch (_) {
-      // .env is not bundled in production — dart-define token is used.
-    }
+    } catch (_) {}
     if (token.isNotEmpty) {
       MapboxOptions.setAccessToken(token);
     }

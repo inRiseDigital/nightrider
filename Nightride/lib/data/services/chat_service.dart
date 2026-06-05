@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import '../models/chat_message.dart';
 
@@ -15,12 +16,32 @@ class ChatStreamHandle {
 }
 
 class ChatService {
-  static const String _baseUrl = String.fromEnvironment(
-    'BACKEND_URL',
-    defaultValue: 'http://192.168.24.149:8000',
-  );
+  /// Backend agent API base URL. Resolved from (in priority order):
+  /// 1. `BACKEND_URL` in the bundled `.env` file
+  /// 2. `--dart-define=BACKEND_URL=...` at build time
+  /// 3. the devtunnel default below
+  static String get _baseUrl {
+    String url = const String.fromEnvironment(
+      'BACKEND_URL',
+      defaultValue: 'https://5r5cqck5-8000.asse.devtunnels.ms',
+    );
+    try {
+      final fromEnv = dotenv.env['BACKEND_URL'];
+      if (fromEnv != null && fromEnv.isNotEmpty) url = fromEnv;
+    } catch (_) {
+      // dotenv not initialized (e.g. web) — fall back to dart-define/default.
+    }
+    return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+  }
 
-  static const String _apiKey = String.fromEnvironment('APP_API_KEY');
+  static String get _apiKey {
+    const fromDefine = String.fromEnvironment('APP_API_KEY');
+    try {
+      return dotenv.env['APP_API_KEY'] ?? fromDefine;
+    } catch (_) {
+      return fromDefine;
+    }
+  }
 
   ChatStreamHandle streamMessage(
     String message,

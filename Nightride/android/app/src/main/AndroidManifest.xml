@@ -30,6 +30,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Google Maps API key — required for Maps SDK on Android.
+             Enable these APIs in Google Cloud Console:
+             Maps SDK for Android, Directions API, Static Maps API, Places API -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBvmLE6LC8DJCNmQgNnpfijE3WM0ssbnQU"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

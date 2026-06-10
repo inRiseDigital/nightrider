@@ -29,11 +29,11 @@ class HomeTopBar extends ConsumerWidget {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.orbitron(
+            style: GoogleFonts.anton(
               fontSize: AppResponsive.font(context, 20).clamp(16.0, 22.0),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w400,
               color: AppTheme.primary,
-              letterSpacing: 0.6,
+              letterSpacing: 1.5,
             ),
           ),
         ),

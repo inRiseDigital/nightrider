@@ -12,6 +12,7 @@ import '../providers/profile_providers.dart';
 import 'package:nightride/services/favourites_service.dart';
 import 'package:nightride/services/user_profile_service.dart';
 import 'package:nightride/pages/settings_page.dart';
+import 'package:nightride/components/nightrite_refresh.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -50,8 +51,16 @@ class ProfilePage extends ConsumerWidget {
               constraints: BoxConstraints(
                 maxWidth: AppResponsive.maxContentWidth(context),
               ),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
+              child: NightRiteRefresh(
+                onRefresh: () async {
+                  ref.invalidate(profileProvider);
+                  ref.invalidate(userProfileDocProvider);
+                  await Future<void>.delayed(const Duration(milliseconds: 600));
+                },
+                child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
                 padding: EdgeInsets.fromLTRB(
                   hPad,
                   AppResponsive.gap(context, 14),
@@ -137,6 +146,7 @@ class ProfilePage extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),

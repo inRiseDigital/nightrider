@@ -7,6 +7,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../core/theme/app_theme.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/chat_session.dart';
 import '../data/services/chat_service.dart' show ChatService, ChatStreamHandle;
@@ -31,18 +33,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isLoading = false;
   String? _statusText;
   ChatStreamHandle? _streamHandle;
+
+  // Typing animation
+  Timer? _typingTimer;
+  String _typingTarget = '';
+  int _typedLength = 0;
+  String? _typingMessageId;
   double? _userLatitude;
   double? _userLongitude;
   List<ChatSession> _sessions = [];
   String? _currentSessionId;
   StreamSubscription<List<ChatSession>>? _sessionsSub;
 
-  static const kPrimary = Color(0xFF9F7AEA);
-  static const kBackground = Color(0xFFF8F7FF);
-  static const kSurface = Colors.white;
-  static const kAccent = Color(0xFFED64A6);
-  static const kTextMuted = Color(0xFF6B7280);
-  static const kTextDark = Color(0xFF2D3748);
+  static const kPrimary = Color(0xFFf15991);     // hot pink
+  static const kBackground = Color(0xFF000000);  // pure black
+  static const kSurface = Color(0xFF111111);      // near-black surface
+  static const kAccent = Color(0xFF2ec4b6);       // teal
+  static const kTextMuted = Color(0xFF9EAFA0);    // muted gray
+  static const kTextDark = Color(0xFFfafafa);     // off-white
 
   List<String> _suggestions = [
     "What's happening tonight?",
@@ -114,6 +122,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _historyService.upsertSession(_currentSessionId, List.from(_messages));
     }
     _sessionsSub?.cancel();
+    _typingTimer?.cancel();
     _focusNode.dispose();
     _controller.dispose();
     _scrollController.dispose();
@@ -180,18 +189,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Clear chat?',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
         content: Text('This will save the current chat to history and start fresh.',
-            style: GoogleFonts.outfit(color: kTextMuted)),
+            style: GoogleFonts.poppins(color: kTextMuted)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: GoogleFonts.outfit(color: kTextMuted)),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: kTextMuted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Clear',
-                style: GoogleFonts.outfit(color: kAccent, fontWeight: FontWeight.w700)),
+                style: GoogleFonts.poppins(color: kAccent, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -280,13 +289,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         } else if (type == 'token' || type == 'text') {
           final token = event['text'] as String? ?? '';
           if (assistantMsg == null) {
-            assistantMsg = ChatMessage(content: token, role: 'assistant');
+            final msg = ChatMessage(content: token, role: 'assistant');
+            assistantMsg = msg;
             setState(() {
-              _messages.add(assistantMsg!);
+              _messages.add(msg);
               _statusText = null;
             });
+            _typingTarget = token;
+            _startTypingAnimation(msg.id);
           } else {
-            setState(() => assistantMsg!.content += token);
+            assistantMsg.content += token;
+            _typingTarget = assistantMsg.content;
           }
           // Handle suggestions bundled in the 'text' event
           if (type == 'text') {
@@ -329,6 +342,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _streamHandle = null;
     _scrollToBottom();
     _autoSave();
+  }
+
+  void _startTypingAnimation(String messageId) {
+    _typingTimer?.cancel();
+    _typingMessageId = messageId;
+    _typedLength = 0;
+    _typingTarget = '';
+    _typingTimer = Timer.periodic(const Duration(milliseconds: 18), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      if (_typedLength < _typingTarget.length) {
+        setState(() => _typedLength++);
+        _scrollToBottom();
+      } else if (!_isLoading) {
+        timer.cancel();
+        _typingTimer = null;
+        setState(() => _typingMessageId = null);
+      }
+    });
   }
 
   String _stripHtml(String html) {
@@ -450,9 +481,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         tooltip: 'Chat history',
       ),
       title: Text(
-        'Nightride AI',
-        style: GoogleFonts.outfit(
-            fontWeight: FontWeight.w800, fontSize: 20, color: kTextDark, letterSpacing: -0.5),
+        'NIGHT RITE AI',
+        style: GoogleFonts.anton(
+            fontWeight: FontWeight.w400, fontSize: 20, color: kPrimary, letterSpacing: 1.5),
       ),
       actions: [
         IconButton(
@@ -478,7 +509,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   const Icon(Icons.history_rounded, color: kPrimary, size: 22),
                   const SizedBox(width: 10),
                   Text('Chat History',
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.poppins(
                           fontSize: 18, fontWeight: FontWeight.w800, color: kTextDark)),
                   const Spacer(),
                   IconButton(
@@ -496,7 +527,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   onPressed: _startNewChat,
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: Text('New Chat',
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimary,
                     foregroundColor: Colors.white,
@@ -520,7 +551,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               size: 40, color: kTextMuted.withValues(alpha: 0.4)),
                           const SizedBox(height: 12),
                           Text('No past chats yet',
-                              style: GoogleFonts.outfit(color: kTextMuted, fontSize: 14)),
+                              style: GoogleFonts.poppins(color: kTextMuted, fontSize: 14)),
                         ],
                       ),
                     )
@@ -541,19 +572,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16)),
                       title: Text('Clear all history?',
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
                       content: Text('All past chats will be permanently deleted.',
-                          style: GoogleFonts.outfit(color: kTextMuted)),
+                          style: GoogleFonts.poppins(color: kTextMuted)),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
                           child: Text('Cancel',
-                              style: GoogleFonts.outfit(color: kTextMuted)),
+                              style: GoogleFonts.poppins(color: kTextMuted)),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, true),
                           child: Text('Delete all',
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.poppins(
                                   color: Colors.red, fontWeight: FontWeight.w700)),
                         ),
                       ],
@@ -566,7 +597,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 },
                 icon: const Icon(Icons.delete_sweep_rounded, color: Colors.red, size: 18),
                 label: Text('Clear all history',
-                    style: GoogleFonts.outfit(color: Colors.red, fontSize: 13)),
+                    style: GoogleFonts.poppins(color: Colors.red, fontSize: 13)),
               ),
               const SizedBox(height: 8),
             ],
@@ -608,12 +639,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           session.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.poppins(
               fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark),
         ),
         subtitle: Text(
           '${session.messages.length} messages · ${_formatSessionDate(session.updatedAt)}',
-          style: GoogleFonts.outfit(fontSize: 12, color: kTextMuted),
+          style: GoogleFonts.poppins(fontSize: 12, color: kTextMuted),
         ),
         trailing: IconButton(
           icon: Icon(Icons.delete_outline_rounded,
@@ -641,7 +672,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
           const SizedBox(width: 12),
           Text(_statusText!,
-              style: GoogleFonts.outfit(color: kTextMuted, fontSize: 13)),
+              style: GoogleFonts.poppins(color: kTextMuted, fontSize: 13)),
         ],
       ),
     );
@@ -657,13 +688,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           const Icon(Icons.auto_awesome_rounded, size: 48, color: kPrimary),
           const SizedBox(height: 24),
           Text(
-            "How can I help you tonight?",
+            "HOW CAN I HELP YOU TONIGHT?",
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: kTextDark,
-                letterSpacing: -0.5),
+            style: GoogleFonts.anton(
+                fontSize: 26,
+                fontWeight: FontWeight.w400,
+                color: kPrimary,
+                letterSpacing: 1.0),
           ),
           const SizedBox(height: 32),
           Wrap(
@@ -685,11 +716,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         decoration: BoxDecoration(
           color: kSurface,
           borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.30)),
         ),
         child: Text(text,
-            style: GoogleFonts.outfit(
-                color: kTextDark.withValues(alpha: 0.8),
+            style: GoogleFonts.poppins(
+                color: kTextDark,
                 fontSize: 14,
                 fontWeight: FontWeight.w600)),
       ),
@@ -731,25 +762,41 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       decoration:
           BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(28)),
       child: Text(content,
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.poppins(
               color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
     );
   }
 
   Widget _buildAssistantText(ChatMessage message) {
-    final cleaned = _stripHtml(message.content);
+    final isTyping = message.id == _typingMessageId;
+    final visibleContent = isTyping
+        ? message.content.substring(0, _typedLength.clamp(0, message.content.length))
+        : message.content;
+    final cleaned = _stripHtml(visibleContent);
     final allImages = _extractImages(cleaned);
     return Padding(
       padding: const EdgeInsets.only(left: 4, right: 20),
       child: MarkdownBody(
         data: cleaned,
         styleSheet: MarkdownStyleSheet(
-          p: GoogleFonts.outfit(
+          p: GoogleFonts.poppins(
               color: kTextDark.withValues(alpha: 0.85), fontSize: 16, height: 1.6),
           strong:
-              GoogleFonts.outfit(color: kTextDark, fontWeight: FontWeight.w800),
-          listBullet: GoogleFonts.outfit(color: kPrimary),
+              GoogleFonts.poppins(color: kTextDark, fontWeight: FontWeight.w800),
+          listBullet: GoogleFonts.poppins(color: kPrimary),
+          a: GoogleFonts.poppins(
+              color: kPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              decoration: TextDecoration.underline),
         ),
+        onTapLink: (text, href, title) async {
+          if (href == null) return;
+          final uri = Uri.tryParse(href);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
         // ignore: deprecated_member_use
         imageBuilder: (uri, title, alt) {
           final imageUrl = uri.toString();
@@ -845,7 +892,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget _buildInputArea() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      decoration: const BoxDecoration(color: kBackground),
+      decoration: BoxDecoration(
+        color: kBackground,
+        border: Border(top: BorderSide(color: kPrimary.withValues(alpha: 0.14))),
+      ),
       child: SafeArea(
         child: Column(
           children: [
@@ -878,18 +928,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 20,
+                        color: kPrimary.withValues(alpha: 0.12),
+                        blurRadius: 16,
                         offset: const Offset(0, 4))
                   ],
-                  border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+                  border: Border.all(color: kPrimary.withValues(alpha: 0.22)),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _controller,
-                        style: GoogleFonts.outfit(color: kTextDark, fontSize: 16),
+                        style: GoogleFonts.poppins(color: kTextDark, fontSize: 15),
                         maxLines: 5,
                         minLines: 1,
                         textInputAction: TextInputAction.send,
@@ -897,8 +947,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         onChanged: (text) => setState(() {}),
                         decoration: InputDecoration(
                           hintText: 'Message Nightride...',
-                          hintStyle: GoogleFonts.outfit(
-                              color: kTextMuted.withValues(alpha: 0.5)),
+                          hintStyle: GoogleFonts.poppins(
+                              color: kTextMuted.withValues(alpha: 0.6)),
                           border: InputBorder.none,
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 14),
@@ -1032,7 +1082,7 @@ class _ImageGalleryPageState extends State<ImageGalleryPage> {
             icon: const Icon(Icons.close, color: Colors.white),
             onPressed: () => Navigator.pop(context)),
         title: Text("${_currentIndex + 1} / ${widget.images.length}",
-            style: GoogleFonts.outfit(color: Colors.white)),
+            style: GoogleFonts.poppins(color: Colors.white)),
         centerTitle: true,
       ),
       body: PhotoViewGallery.builder(

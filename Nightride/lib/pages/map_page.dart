@@ -1,17 +1,14 @@
 import 'dart:convert';
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map/flutter_map.dart' as fmap;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:geolocator/geolocator.dart' as geo;
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' as ll;
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide MapOptions;
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:nightride/components/category_chips_row.dart';
@@ -20,6 +17,7 @@ import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/components/venue_card.dart';
 import 'package:nightride/components/venue_modal.dart';
 import 'package:nightride/components/venue_search_sheet.dart';
+import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
@@ -29,6 +27,27 @@ import 'package:nightride/pages/venue_details_page.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
 import 'package:nightride/providers/home_providers.dart';
 
+const String _kDarkMapStyle = '''[
+  {"elementType":"geometry","stylers":[{"color":"#242f3e"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},
+  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},
+  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},
+  {"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},
+  {"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},
+  {"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263c"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},
+  {"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263c"}]}
+]''';
+
 class MapPage extends ConsumerStatefulWidget {
   const MapPage({super.key});
 
@@ -36,64 +55,57 @@ class MapPage extends ConsumerStatefulWidget {
   ConsumerState<MapPage> createState() => _MapPageState();
 }
 
-class _MapPageState extends ConsumerState<MapPage>
-    implements OnPointAnnotationClickListener {
-  MapboxMap? _mapboxMap;
-  PointAnnotationManager? _pointAnnotationManager;
-  PolylineAnnotationManager? _polylineAnnotationManager;
+class _MapPageState extends ConsumerState<MapPage> {
+  GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
+  MarkerId? _searchedVenueMarkerId;
+  bool _locationPermissionGranted = false;
+
   int _topTabIndex = 0;
   final PageController _bottomCardsController = PageController(viewportFraction: 0.94);
 
   MapBottomCardData? _selectedVenue;
-  PointAnnotation? _searchedVenueMarker;
-
   List<MapBottomCardData> _currentEvents = [];
   bool _eventMarkersAdded = false;
   int? _selectedCategoryIndex;
 
   @override
   void dispose() {
+    _mapController?.dispose();
     _bottomCardsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return _buildWebMap(context);
-    }
-    // Fly to event location when tapped from detail page
+    if (kIsWeb) return _buildWebMap(context);
+
     ref.listen<MapFocus?>(mapFocusProvider, (_, focus) {
       if (focus == null) return;
-      _mapboxMap?.flyTo(
-        CameraOptions(
-          center: Point(coordinates: Position(focus.lng, focus.lat)),
-          zoom: 14.0,
-          pitch: 0.0,
-        ),
-        MapAnimationOptions(duration: 900),
-      );
+      _mapController?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+        target: LatLng(focus.lat, focus.lng),
+        zoom: 14.0,
+      )));
       _dropRedPin(focus.lat, focus.lng);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(mapFocusProvider.notifier).state = null;
       });
     });
 
-    // Keep _currentEvents in sync for use in non-build callbacks
     ref.listen<AsyncValue<List<MapBottomCardData>>>(mapEventsProvider, (_, next) {
       next.whenData((events) {
         _currentEvents = events;
-        if (_pointAnnotationManager != null && !_eventMarkersAdded) {
+        if (_mapController != null && !_eventMarkersAdded) {
           _addEventMarkers(events);
           _eventMarkersAdded = true;
         }
       });
     });
 
-    // Drive UI directly from the provider so it always reflects current state
     final liveEvents = ref.watch(mapEventsProvider).asData?.value ?? [];
     if (liveEvents.isNotEmpty) _currentEvents = liveEvents;
-    if (liveEvents.isNotEmpty && _pointAnnotationManager != null && !_eventMarkersAdded) {
+    if (liveEvents.isNotEmpty && _mapController != null && !_eventMarkersAdded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_eventMarkersAdded) {
           _addEventMarkers(liveEvents);
@@ -104,7 +116,6 @@ class _MapPageState extends ConsumerState<MapPage>
 
     final l = AppLocalizations.of(context)!;
 
-    // Only use dummy cards when Firestore has returned nothing at all
     final List<MapBottomCardData> allEvents =
         liveEvents.isNotEmpty ? liveEvents : kBottomCards;
 
@@ -125,24 +136,30 @@ class _MapPageState extends ConsumerState<MapPage>
       body: Stack(
         children: <Widget>[
           Positioned.fill(
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _selectedVenue = null);
-                _polylineAnnotationManager?.deleteAll();
-                if (_searchedVenueMarker != null) {
-                  _pointAnnotationManager?.delete(_searchedVenueMarker!);
-                  _searchedVenueMarker = null;
-                }
-              },
-              child: MapWidget(
-                onMapCreated: _onMapCreated,
-                styleUri: MapboxStyles.MAPBOX_STREETS,
-                cameraOptions: CameraOptions(
-                  center: Point(coordinates: Position(79.8500, 7.2200)),
-                  zoom: 14.0,
-                  pitch: 0.0,
-                ),
+            child: GoogleMap(
+              onMapCreated: _onMapCreated,
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(7.2200, 79.8500),
+                zoom: 14.0,
               ),
+              markers: Set<Marker>.from(_markers),
+              polylines: Set<Polyline>.from(_polylines),
+              style: _kDarkMapStyle,
+              myLocationEnabled: _locationPermissionGranted,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: false,
+              onTap: (_) {
+                setState(() {
+                  _selectedVenue = null;
+                  _polylines.clear();
+                  if (_searchedVenueMarkerId != null) {
+                    _markers.removeWhere((m) => m.markerId == _searchedVenueMarkerId);
+                    _searchedVenueMarkerId = null;
+                  }
+                });
+              },
             ),
           ),
 
@@ -161,12 +178,12 @@ class _MapPageState extends ConsumerState<MapPage>
                         setState(() {
                           _topTabIndex = i;
                           _selectedVenue = null;
+                          _polylines.clear();
+                          if (_searchedVenueMarkerId != null) {
+                            _markers.removeWhere((m) => m.markerId == _searchedVenueMarkerId);
+                            _searchedVenueMarkerId = null;
+                          }
                         });
-                        _polylineAnnotationManager?.deleteAll();
-                        if (_searchedVenueMarker != null) {
-                          _pointAnnotationManager?.delete(_searchedVenueMarker!);
-                          _searchedVenueMarker = null;
-                        }
                         if (i == 0) _goToMyLocation();
                       },
                       onSearchTap: () => _showSearchSheet(context),
@@ -184,10 +201,8 @@ class _MapPageState extends ConsumerState<MapPage>
                           _eventMarkersAdded = false;
                         });
                         WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (_pointAnnotationManager != null) {
-                            _addEventMarkers(displayEvents);
-                            _eventMarkersAdded = true;
-                          }
+                          _addEventMarkers(displayEvents);
+                          _eventMarkersAdded = true;
                         });
                       },
                     ),
@@ -197,18 +212,6 @@ class _MapPageState extends ConsumerState<MapPage>
             ),
           ),
 
-          // ── World view button ──────────────────────────────────────────
-          // Derive the bottom offset from the same inputs the bottom event
-          // card uses, so the globe always sits a fixed gap *above* the card
-          // instead of getting buried behind it on wide/foldable layouts.
-          //
-          //   bottom = nav height + safe-area + gap(12) below card     ── matches card.bottom
-          //          + mapBottomCardHeight + 6 (PageView buffer)       ── card slot height
-          //          + gap(12) above card                              ── visible clearance
-          //
-          // The +6 PageView buffer is included unconditionally so the offset
-          // is identical whether the card is the selected-venue single card
-          // or the multi-event PageView.
           Positioned(
             right: AppResponsive.gap(context, 14).clamp(12.0, 18.0),
             bottom: AppResponsive.bottomNavHeight(context) +
@@ -218,13 +221,11 @@ class _MapPageState extends ConsumerState<MapPage>
                 6 +
                 AppResponsive.gap(context, 12),
             child: GestureDetector(
-              onTap: () => _mapboxMap?.flyTo(
-                CameraOptions(
-                  center: Point(coordinates: Position(0, 20)),
+              onTap: () => _mapController?.animateCamera(
+                CameraUpdate.newCameraPosition(const CameraPosition(
+                  target: LatLng(20, 0),
                   zoom: 1.5,
-                  pitch: 0.0,
-                ),
-                MapAnimationOptions(duration: 900),
+                )),
               ),
               child: Container(
                 width: AppResponsive.icon(context, 44).clamp(36.0, 48.0),
@@ -273,9 +274,6 @@ class _MapPageState extends ConsumerState<MapPage>
                   MediaQuery.viewPaddingOf(context).bottom +
                   AppResponsive.gap(context, 12),
               child: SizedBox(
-                // Match the responsive card height + a little breathing room
-                // so the PageView never clips the card and never overflows
-                // its parent stack on shorter screens.
                 height: AppResponsive.mapBottomCardHeight(context) + 6,
                 child: PageView.builder(
                   controller: _bottomCardsController,
@@ -308,143 +306,86 @@ class _MapPageState extends ConsumerState<MapPage>
     );
   }
 
-  Future<void> _dropRedPin(double lat, double lng) async {
-    // Remove previous highlight pin if any
-    if (_searchedVenueMarker != null) {
-      await _pointAnnotationManager?.delete(_searchedVenueMarker!);
-      _searchedVenueMarker = null;
-    }
-    final bytes = await _buildRedPinImage();
-    _searchedVenueMarker = await _pointAnnotationManager?.create(
-      PointAnnotationOptions(
-        geometry: Point(coordinates: Position(lng, lat)),
-        image: bytes,
-        iconSize: 1.0,
-        iconAnchor: IconAnchor.BOTTOM,
-      ),
-    );
+  void _dropRedPin(double lat, double lng) {
+    const markerId = MarkerId('focused_pin');
+    setState(() {
+      if (_searchedVenueMarkerId != null) {
+        _markers.removeWhere((m) => m.markerId == _searchedVenueMarkerId);
+      }
+      _searchedVenueMarkerId = markerId;
+      _markers.add(Marker(
+        markerId: markerId,
+        position: LatLng(lat, lng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      ));
+    });
   }
 
-  Future<Uint8List> _buildRedPinImage() async {
-    const double w = 48, h = 60;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, w, h));
-
-    // Shadow
-    canvas.drawCircle(
-      const Offset(w / 2, w / 2 + 2),
-      16,
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.25)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-    );
-    // Red circle
-    canvas.drawCircle(const Offset(w / 2, w / 2), 16, Paint()..color = const Color(0xFFE53935));
-    // White ring
-    canvas.drawCircle(
-      const Offset(w / 2, w / 2),
-      16,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
-    );
-    // White centre dot
-    canvas.drawCircle(const Offset(w / 2, w / 2), 5, Paint()..color = Colors.white);
-    // Tail
-    final path = Path()
-      ..moveTo(w / 2 - 6, w / 2 + 12)
-      ..lineTo(w / 2, h - 2)
-      ..lineTo(w / 2 + 6, w / 2 + 12)
-      ..close();
-    canvas.drawPath(path, Paint()..color = const Color(0xFFE53935));
-
-    final img = await recorder.endRecording().toImage(w.toInt(), h.toInt());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return data!.buffer.asUint8List();
-  }
-
-  Future<void> _addEventMarkers(List<MapBottomCardData> events) async {
-    await _pointAnnotationManager?.deleteAll();
-    _searchedVenueMarker = null;
-    if (events.isEmpty) return;
-
-    final annotations = events
-        .where((v) => v.lat != 0 && v.lng != 0)
-        .map((v) => PointAnnotationOptions(
-              geometry: Point(coordinates: Position(v.lng, v.lat)),
-              iconImage: 'marker-15',
-              iconSize: 2.5,
-            ))
-        .toList();
-    if (annotations.isNotEmpty) {
-      await _pointAnnotationManager?.createMulti(annotations);
-    }
+  void _addEventMarkers(List<MapBottomCardData> events) {
+    final icon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
+    setState(() {
+      _markers.removeWhere((m) => m.markerId.value.startsWith('event_'));
+      for (final v in events.where((e) => e.lat != 0 && e.lng != 0)) {
+        _markers.add(Marker(
+          markerId: MarkerId('event_${v.lat},${v.lng}'),
+          position: LatLng(v.lat, v.lng),
+          icon: icon,
+          onTap: () => _onVenueSelected(v),
+        ));
+      }
+    });
   }
 
   Future<void> _goToMyLocation() async {
-    final PermissionStatus permission = await Permission.locationWhenInUse.status;
-    if (!permission.isGranted) {
-      await Permission.locationWhenInUse.request();
-    }
+    final status = await Permission.locationWhenInUse.status;
+    if (!status.isGranted) await Permission.locationWhenInUse.request();
     try {
-      final geo.Position position = await geo.Geolocator.getCurrentPosition(
+      final position = await geo.Geolocator.getCurrentPosition(
         locationSettings: const geo.LocationSettings(accuracy: geo.LocationAccuracy.high),
       );
-      _zoomToLocation(position.latitude, position.longitude);
+      _mapController?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+        target: LatLng(position.latitude, position.longitude),
+        zoom: 16.5,
+      )));
     } catch (e) {
-      debugPrint("Error getting location: $e");
+      debugPrint("Location error: $e");
     }
-  }
-
-  Future<void> _zoomToLocation(double lat, double lng, {double zoom = 16.5}) async {
-    await _mapboxMap?.setCamera(
-      CameraOptions(
-        center: Point(coordinates: Position(lng, lat)),
-        zoom: zoom,
-        pitch: 0.0,
-      ),
-    );
   }
 
   Future<void> _onVenueSelected(MapBottomCardData venue) async {
     setState(() => _selectedVenue = venue);
 
-    // If it's a Mapbox geocode search result (not a Firestore event), pin it
     if (venue.tags.contains('Search Result')) {
-      if (_searchedVenueMarker != null) {
-        await _pointAnnotationManager?.delete(_searchedVenueMarker!);
-        _searchedVenueMarker = null;
-      }
-      _searchedVenueMarker = await _pointAnnotationManager?.create(
-        PointAnnotationOptions(
-          geometry: Point(coordinates: Position(venue.lng, venue.lat)),
-          iconImage: 'custom-pin',
-          iconSize: 1.0,
-        ),
-      );
+      const markerId = MarkerId('search_result');
+      setState(() {
+        if (_searchedVenueMarkerId != null) {
+          _markers.removeWhere((m) => m.markerId == _searchedVenueMarkerId);
+        }
+        _searchedVenueMarkerId = markerId;
+        _markers.add(Marker(
+          markerId: markerId,
+          position: LatLng(venue.lat, venue.lng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        ));
+      });
     }
 
     _drawRouteToVenue(venue);
   }
 
   Future<void> _drawRouteToVenue(MapBottomCardData venue) async {
-    final PermissionStatus permission = await Permission.locationWhenInUse.status;
-    if (!permission.isGranted) return;
+    final status = await Permission.locationWhenInUse.status;
+    if (!status.isGranted) return;
     if (venue.lat == 0 || venue.lng == 0) return;
 
     try {
-      final geo.Position position = await geo.Geolocator.getCurrentPosition();
+      final position = await geo.Geolocator.getCurrentPosition();
       if (position.latitude == 0 || position.longitude == 0) return;
 
-      await _mapboxMap?.flyTo(
-        CameraOptions(
-          center: Point(coordinates: Position(venue.lng, venue.lat)),
-          zoom: 17.5,
-          pitch: 0,
-        ),
-        MapAnimationOptions(duration: 800),
-      );
+      _mapController?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+        target: LatLng(venue.lat, venue.lng),
+        zoom: 17.5,
+      )));
 
       await _fetchAndDrawRoute(
         position.latitude, position.longitude,
@@ -457,23 +398,27 @@ class _MapPageState extends ConsumerState<MapPage>
 
   Future<void> _fetchAndDrawRoute(
       double startLat, double startLng, double endLat, double endLng) async {
-    final String token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
-    if (token.isEmpty) return;
+    const String mapsKey = String.fromEnvironment(
+        'GOOGLE_MAPS_API_KEY', defaultValue: kGoogleMapsApiKey);
+    if (mapsKey.isEmpty || mapsKey == 'YOUR_GOOGLE_MAPS_API_KEY_HERE') return;
 
     final Uri uri = Uri.parse(
-      'https://api.mapbox.com/directions/v5/mapbox/driving/$startLng,$startLat;$endLng,$endLat'
-      '?geometries=geojson&access_token=$token',
+      'https://maps.googleapis.com/maps/api/directions/json'
+      '?origin=$startLat,$startLng'
+      '&destination=$endLat,$endLng'
+      '&key=$mapsKey',
     );
 
     try {
-      final http.Response response = await http.get(uri);
+      final response = await http.get(uri);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if ((data['routes'] as List).isEmpty) return;
+        final routes = data['routes'] as List?;
+        if (routes == null || routes.isEmpty) return;
 
-        final route = data['routes'][0];
-        final coordinates = route['geometry']['coordinates'] as List;
-        final double distanceMeters = (route['distance'] as num).toDouble();
+        final route = routes[0];
+        final legs = route['legs'] as List;
+        final int distanceMeters = (legs[0]['distance']['value'] as num).toInt();
 
         if (_selectedVenue != null) {
           setState(() {
@@ -483,121 +428,84 @@ class _MapPageState extends ConsumerState<MapPage>
           });
         }
 
-        final List<Position> points =
-            coordinates.map((c) => Position(c[0], c[1])).toList();
+        final String encodedPoly = route['overview_polyline']['points'];
+        final List<LatLng> points = _decodePolyline(encodedPoly);
 
-        await _polylineAnnotationManager?.deleteAll();
-        await _polylineAnnotationManager?.create(
-          PolylineAnnotationOptions(
-            geometry: LineString(coordinates: points),
-            lineColor: Colors.redAccent.value,
-            lineWidth: 6.0,
-            lineBlur: 0.8,
-            lineOpacity: 1.0,
-            lineJoin: LineJoin.ROUND,
-          ),
-        );
+        setState(() {
+          _polylines.clear();
+          _polylines.add(Polyline(
+            polylineId: const PolylineId('route'),
+            points: points,
+            color: Colors.redAccent,
+            width: 5,
+          ));
+        });
       }
     } catch (e) {
-      debugPrint("Error fetching directions: $e");
+      debugPrint("Directions error: $e");
     }
   }
 
-  Future<void> _onMapCreated(MapboxMap controller) async {
-    _mapboxMap = controller;
-    _pointAnnotationManager =
-        await controller.annotations.createPointAnnotationManager();
-    _polylineAnnotationManager =
-        await controller.annotations.createPolylineAnnotationManager();
-
-    // Load custom logo pin
-    try {
-      final ByteData bytes = await rootBundle.load('assets/images/logo.png');
-      final Uint8List list = bytes.buffer.asUint8List();
-      final codec = await ui.instantiateImageCodec(list);
-      final frame = await codec.getNextFrame();
-      final image = MbxImage(
-        width: frame.image.width,
-        height: frame.image.height,
-        data: list,
-      );
-      await controller.style.addStyleImage('custom-pin', 4.0, image, false, [], [], null);
-      await controller.location.updateSettings(
-        LocationComponentSettings(
-          enabled: true,
-          puckBearingEnabled: true,
-          locationPuck: LocationPuck(
-            locationPuck2D: LocationPuck2D(topImage: list, scaleExpression: "0.15"),
-          ),
-        ),
-      );
-    } catch (e) {
-      debugPrint("Error loading custom pin: $e");
-      await controller.location.updateSettings(
-        LocationComponentSettings(enabled: true, puckBearingEnabled: true),
-      );
+  List<LatLng> _decodePolyline(String encoded) {
+    final List<LatLng> poly = [];
+    int index = 0;
+    final int len = encoded.length;
+    int lat = 0, lng = 0;
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      final int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      final int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+      poly.add(LatLng(lat / 1e5, lng / 1e5));
     }
+    return poly;
+  }
 
-    // Add markers: use live events if already loaded, else fall back to static
+  Future<void> _onMapCreated(GoogleMapController controller) async {
+    _mapController = controller;
+
     if (_currentEvents.isNotEmpty && !_eventMarkersAdded) {
-      await _addEventMarkers(_currentEvents);
+      _addEventMarkers(_currentEvents);
       _eventMarkersAdded = true;
     } else if (!_eventMarkersAdded) {
-      final fallback = kBottomCards
-          .map((v) => PointAnnotationOptions(
-                geometry: Point(coordinates: Position(v.lng, v.lat)),
-                iconImage: 'marker-15',
-                iconSize: 2.5,
-              ))
-          .toList();
-      await _pointAnnotationManager?.createMulti(fallback);
+      _addEventMarkers(kBottomCards);
     }
 
-    final PermissionStatus permission =
-        await Permission.locationWhenInUse.request();
-    if (!permission.isGranted) {
-      _zoomToLocation(7.2200, 79.8500, zoom: 14.0);
+    final status = await Permission.locationWhenInUse.request();
+    if (!status.isGranted) {
+      _mapController?.moveCamera(CameraUpdate.newCameraPosition(const CameraPosition(
+        target: LatLng(7.2200, 79.8500),
+        zoom: 14.0,
+      )));
       return;
     }
 
-    final geo.Position position = await geo.Geolocator.getCurrentPosition(
-      locationSettings:
-          const geo.LocationSettings(accuracy: geo.LocationAccuracy.high),
-    );
+    setState(() => _locationPermissionGranted = true);
 
-    await controller.setCamera(
-      CameraOptions(
-        center: Point(coordinates: Position(position.longitude, position.latitude)),
-        zoom: 16.5,
-        pitch: 0.0,
-      ),
-    );
-
-    await controller.location.updateSettings(
-      LocationComponentSettings(enabled: true, puckBearingEnabled: true),
-    );
-
-    await controller.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
-    await controller.compass.updateSettings(CompassSettings(enabled: false));
-    await controller.logo.updateSettings(LogoSettings(enabled: false));
-    await controller.attribution
-        .updateSettings(AttributionSettings(clickable: false));
-
-    _pointAnnotationManager?.addOnPointAnnotationClickListener(this);
-  }
-
-  @override
-  void onPointAnnotationClick(PointAnnotation annotation) {
-    final lat = annotation.geometry.coordinates.lat.toDouble();
-    final lng = annotation.geometry.coordinates.lng.toDouble();
-
-    final candidates = _currentEvents.isNotEmpty ? _currentEvents : kBottomCards;
     try {
-      final venue = candidates.firstWhere(
-        (v) => (v.lat - lat).abs() < 0.0001 && (v.lng - lng).abs() < 0.0001,
+      final position = await geo.Geolocator.getCurrentPosition(
+        locationSettings: const geo.LocationSettings(accuracy: geo.LocationAccuracy.high),
       );
-      _onVenueSelected(venue);
-    } catch (_) {}
+      _mapController?.moveCamera(CameraUpdate.newCameraPosition(CameraPosition(
+        target: LatLng(position.latitude, position.longitude),
+        zoom: 16.5,
+      )));
+    } catch (e) {
+      debugPrint("Location error: $e");
+    }
   }
 
   void _showVenueModal(BuildContext context, MapBottomCardData data) {
@@ -646,21 +554,21 @@ class _MapPageState extends ConsumerState<MapPage>
       backgroundColor: AppTheme.scaffold,
       body: Stack(
         children: [
-          FlutterMap(
-            options: MapOptions(
+          fmap.FlutterMap(
+            options: fmap.MapOptions(
               initialCenter: const ll.LatLng(20.0, 0.0),
               initialZoom: 2.0,
               onTap: (_, __) => setState(() => _selectedVenue = null),
             ),
             children: [
-              TileLayer(
+              fmap.TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.therisetechvillage.nightride',
               ),
-              MarkerLayer(
+              fmap.MarkerLayer(
                 markers: displayEvents
                     .where((e) => e.lat != 0 && e.lng != 0)
-                    .map((e) => Marker(
+                    .map((e) => fmap.Marker(
                           point: ll.LatLng(e.lat, e.lng),
                           width: 40,
                           height: 40,

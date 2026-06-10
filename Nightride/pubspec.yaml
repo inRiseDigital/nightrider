@@ -19,7 +19,7 @@ dependencies:
   gap: ^3.0.1
   intl: ^0.20.2
   cached_network_image: ^3.4.1
-  mapbox_maps_flutter: ^2.17.0
+  google_maps_flutter: ^2.9.0
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
   flutter_dotenv: ^6.0.0
@@ -43,6 +43,8 @@ dependencies:
   latlong2: ^0.9.1
   flutter_local_notifications: ^21.0.0
   timezone: ^0.11.0
+  flutter_glass_morphism: ^1.0.2
+  palette_generator: ^0.3.3+7
 
 dev_dependencies:
   flutter_test:

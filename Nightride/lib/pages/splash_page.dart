@@ -67,64 +67,128 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final logoSize = AppResponsive.icon(context, 110).clamp(88.0, 120.0);
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF1A0F2E), Color(0xFF12091F), Color(0xFF090411)],
-          ),
-        ),
+        color: const Color(0xFF000000),
         child: Stack(
           children: [
-            /// Center Logo
-            Center(
-              child: Container(
-                width: AppResponsive.icon(context, 96).clamp(72.0, 96.0),
-                height: AppResponsive.icon(context, 96).clamp(72.0, 96.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
+            // Pink radial glow — top centre
+            Positioned(
+              top: -80,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: 340,
+                  height: 340,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [Color(0x33f15991), Color(0x00f15991)],
+                      stops: [0.0, 1.0],
+                    ),
+                  ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    fit: BoxFit.cover,
+              ),
+            ),
+            // Teal radial glow — bottom right
+            Positioned(
+              bottom: -60,
+              right: -60,
+              child: Container(
+                width: 260,
+                height: 260,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Color(0x222ec4b6), Color(0x002ec4b6)],
+                    stops: [0.0, 1.0],
                   ),
                 ),
               ),
             ),
 
-            /// Bottom Text
-            Positioned(
-              bottom: AppResponsive.gap(context, 48).clamp(32.0, 56.0),
-              left: 0,
-              right: 0,
+            // Center content: logo + brand name
+            Center(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'NightRide',
-                    style: GoogleFonts.inter(
-                      fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF8B5CF6),
-                      letterSpacing: 0.6,
+                  // Logo with pink glow ring
+                  Container(
+                    width: logoSize + 16,
+                    height: logoSize + 16,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x44f15991),
+                          blurRadius: 48,
+                          spreadRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Container(
+                      width: logoSize,
+                      height: logoSize,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: const Color(0x55f15991),
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(26),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: AppResponsive.gap(context, 28).clamp(20.0, 32.0)),
+                  // NIGHT RITE brand name
                   Text(
-                    'v2.0',
-                    style: GoogleFonts.inter(
-                      fontSize: AppResponsive.font(context, 11).clamp(9.0, 12.0),
+                    'NIGHT RITE',
+                    style: GoogleFonts.anton(
+                      fontSize: AppResponsive.font(context, 36).clamp(28.0, 42.0),
                       fontWeight: FontWeight.w400,
-                      color: const Color(0xFF6D28D9),
+                      color: const Color(0xFFf15991),
+                      letterSpacing: 4.0,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'PLAN THE RIGHT NIGHT',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.font(context, 12).clamp(10.0, 13.5),
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF2ec4b6),
+                      letterSpacing: 2.5,
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            // Version — bottom
+            Positioned(
+              bottom: AppResponsive.gap(context, 36).clamp(24.0, 44.0),
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  'v2.0',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.font(context, 11).clamp(9.0, 12.0),
+                    fontWeight: FontWeight.w400,
+                    color: const Color(0xFF2ec4b6).withValues(alpha: 0.55),
+                  ),
+                ),
               ),
             ),
           ],

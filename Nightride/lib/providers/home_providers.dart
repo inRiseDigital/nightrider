@@ -26,13 +26,13 @@ class FeaturedCarouselIndexNotifier extends Notifier<int> {
 /// Dark mode UI toggle (UI only)
 final homeDarkToggleProvider = StateProvider<bool>((ref) => true);
 
-/// Accent color options shown in Appearance settings
+/// Accent color options shown in Appearance settings — Night Rite brand palette
 const List<Color> kAccentColors = [
-  Color(0xFF9F7AEA), // purple (default)
-  Color(0xFFED64A6), // pink
-  Color(0xFF448AFF), // blue
-  Color(0xFF64FFDA), // teal
-  Color(0xFFFFAB40), // orange
+  Color(0xFFdbdf57), // neon lime (brand default)
+  Color(0xFFf15991), // hot pink
+  Color(0xFF2ec4b6), // teal
+  Color(0xFF448AFF), // electric blue
+  Color(0xFFFFD700), // gold
 ];
 
 /// Index into kAccentColors for the selected accent

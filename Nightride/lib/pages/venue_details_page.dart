@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 
+import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
@@ -28,12 +28,15 @@ class VenueDetailsPage extends ConsumerWidget {
     final String distLabel = formatDistance(km);
     final String travelLabel = formatTravel(km);
 
-    final String mapToken = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
-    final String staticMapUrl = (mapToken.isNotEmpty && data.lat != 0 && data.lng != 0)
-        ? 'https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/'
-            'pin-l+9f7aea(${data.lng},${data.lat})/'
-            '${data.lng},${data.lat},14,0/600x280@2x'
-            '?access_token=$mapToken'
+    const String mapsKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY', defaultValue: kGoogleMapsApiKey);
+    final String staticMapUrl = (mapsKey.isNotEmpty && mapsKey != 'YOUR_GOOGLE_MAPS_API_KEY_HERE' && data.lat != 0 && data.lng != 0)
+        ? 'https://maps.googleapis.com/maps/api/staticmap'
+            '?center=${data.lat},${data.lng}&zoom=14&size=600x280&scale=2'
+            '&markers=color:0xf15991%7C${data.lat},${data.lng}'
+            '&style=feature:all%7Celement:geometry%7Ccolor:0x242f3e'
+            '&style=feature:water%7Celement:geometry%7Ccolor:0x17263c'
+            '&style=feature:road%7Celement:geometry%7Ccolor:0x38414e'
+            '&key=$mapsKey'
         : '';
 
     return Scaffold(

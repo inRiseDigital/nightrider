@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/auth_dimensions.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 
-/// Brand row + page title + subtitle stack used at the top of every auth screen.
+/// Brand row + page title + subtitle used at the top of every auth screen.
 class AuthHeader extends StatelessWidget {
   const AuthHeader({
     super.key,
     required this.title,
     required this.subtitle,
-    this.brandLabel = 'Nightride',
-    this.brandLetter = 'N',
+    this.brandLabel = 'NIGHT RITE',
+    this.brandLetter = 'NR',
   });
 
   final String title;
@@ -37,12 +38,12 @@ class AuthHeader extends StatelessWidget {
               Text(
                 title,
                 textAlign: TextAlign.left,
-                style: TextStyle(
+                style: GoogleFonts.anton(
                   fontSize: AuthDimensions.titleFontSize(context),
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.primaryLight,
+                  fontWeight: FontWeight.w400,
+                  color: AppTheme.primary,
                   height: 1.05,
-                  letterSpacing: 0.2,
+                  letterSpacing: 1.0,
                 ),
               ),
               SizedBox(height: AuthDimensions.gapS(context)),
@@ -50,10 +51,10 @@ class AuthHeader extends StatelessWidget {
                 subtitle,
                 textAlign: TextAlign.left,
                 softWrap: true,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AuthDimensions.subtitleFontSize(context),
-                  height: 1.35,
-                  color: AppTheme.primaryLight.withValues(alpha: 0.6),
+                  height: 1.4,
+                  color: AppTheme.primaryLight.withValues(alpha: 0.85),
                   letterSpacing: 0.1,
                 ),
               ),
@@ -79,27 +80,27 @@ class _BrandRow extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: const Color(0xFFEDE9FE),
+            color: AppTheme.accent,
             borderRadius: BorderRadius.circular(size * 0.26),
           ),
           alignment: Alignment.center,
           child: Text(
             letter,
             style: TextStyle(
-              fontSize: size * 0.48,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.primary,
+              fontSize: size * 0.38,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
             ),
           ),
         ),
         SizedBox(width: AuthDimensions.gapM(context)),
         Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.anton(
             fontSize: AuthDimensions.brandFontSize(context),
-            fontWeight: FontWeight.w500,
-            color: AppTheme.primaryLight.withValues(alpha: 0.95),
-            letterSpacing: 0.2,
+            fontWeight: FontWeight.w400,
+            color: AppTheme.primaryLight,
+            letterSpacing: 1.5,
           ),
         ),
       ],

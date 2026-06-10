@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_glass_morphism/flutter_glass_morphism.dart';
 import 'package:nightride/core/responsive/app_dimensions.dart';
 import 'package:nightride/core/responsive/responsive.dart';
 
@@ -10,16 +12,6 @@ class AppNavItem {
   final IconData icon;
 }
 
-/// Pinned bottom navigation bar.
-///
-/// Responsive behaviour:
-/// • Item width derives from `Expanded` flex, never a hard `.w` value, so
-///   four icons always distribute evenly across the available width.
-/// • Bar height + icon size scale per [FormFactor].
-/// • On foldables/tablets the bar is capped at [AppDimensions.bottomNavMaxWidth]
-///   and centred, so it doesn't sprawl across the full ~720dp+ screen.
-/// • Bottom inset uses `MediaQuery.viewPaddingOf(...).bottom` (gesture/nav-bar
-///   safe), padded with a small visual margin from [AppDimensions].
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({
     super.key,
@@ -48,58 +40,71 @@ class AppBottomNavBar extends StatelessWidget {
       tablet: 14.0,
     );
 
+    Widget navRow = Row(
+      children: List.generate(items.length, (i) {
+        final isSelected = i == selectedIndex;
+        return Expanded(
+          child: InkWell(
+            onTap: () => onTap(i),
+            borderRadius: BorderRadius.circular(radius * 0.7),
+            child: SizedBox.expand(
+              child: Center(
+                child: Icon(
+                  items[i].icon,
+                  size: iconSize,
+                  color: isSelected
+                      ? AppTheme.primary
+                      : Colors.black.withValues(alpha: 0.45),
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+
+    final bool isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+    Widget bar = isIOS
+        ? GlassMorphismMaterial(
+            blurIntensity: 24.0,
+            opacity: 0.18,
+            tintColor: Colors.white,
+            borderRadius: BorderRadius.circular(radius),
+            enableGlassBorder: true,
+            enableBackgroundDistortion: false,
+            child: SizedBox(
+              height: height,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: innerHPad),
+                child: navRow,
+              ),
+            ),
+          )
+        : Container(
+            height: height,
+            padding: EdgeInsets.symmetric(horizontal: innerHPad),
+            decoration: BoxDecoration(
+              color: AppTheme.accent,
+              borderRadius: BorderRadius.circular(radius),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.accent.withValues(alpha: 0.30),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: navRow,
+          );
+
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 0, hPad, bottomMargin + bottomSafe),
-      // heightFactor:1 → Center shrinks vertically to its child instead of
-      // stretching to the slot's full maxHeight. Scaffold's bottomNavigationBar
-      // slot is laid out with maxHeight = screenHeight (NOT infinity), so a
-      // plain Center would expand to the full screen, collapsing the body to
-      // 0 dp and rendering the bar's content in the screen's vertical middle.
       child: Center(
         heightFactor: 1.0,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Container(
-            height: height,
-            padding: EdgeInsets.symmetric(horizontal: innerHPad),
-            decoration: BoxDecoration(
-              color: AppTheme.surface.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(radius),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.06),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              children: List.generate(items.length, (i) {
-                final isSelected = i == selectedIndex;
-                return Expanded(
-                  child: InkWell(
-                    onTap: () => onTap(i),
-                    borderRadius: BorderRadius.circular(radius * 0.7),
-                    child: SizedBox.expand(
-                      child: Center(
-                        child: Icon(
-                          items[i].icon,
-                          size: iconSize,
-                          color: isSelected
-                              ? AppTheme.primary
-                              : Colors.white.withValues(alpha: 0.55),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
+          child: bar,
         ),
       ),
     );

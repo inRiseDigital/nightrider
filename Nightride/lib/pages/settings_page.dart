@@ -25,9 +25,9 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context)!;
     return Scaffold(
-      backgroundColor: AppTheme.scaffold,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.scaffold,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(l.settings),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -483,9 +483,9 @@ class _SubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.scaffold,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.scaffold,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         title: Text(title),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -554,17 +554,25 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title.toUpperCase(),
-          style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w900, letterSpacing: 1.2),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.50),
+            fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0),
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.2,
+          ),
         ),
         const Gap(12),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(children: children),
@@ -584,18 +592,19 @@ class _SwitchSection extends StatelessWidget {
 }
 
 class _NavigableTile extends StatelessWidget {
-  const _NavigableTile({required this.icon, required this.label, required this.onTap, this.iconColor = Colors.white70});
+  const _NavigableTile({required this.icon, required this.label, required this.onTap, this.iconColor});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final Color iconColor;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
     return ListTile(
-      leading: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
-      title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 14),
+      leading: Icon(icon, color: iconColor ?? textColor.withValues(alpha: 0.65), size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
+      title: Text(label, style: TextStyle(color: textColor, fontSize: 14)),
+      trailing: Icon(Icons.arrow_forward_ios_rounded, color: textColor.withValues(alpha: 0.22), size: 14),
       onTap: onTap,
     );
   }
@@ -610,12 +619,15 @@ class _SwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
     return SwitchListTile(
-      title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)),
-      subtitle: subtitle != null ? Text(subtitle!, style: const TextStyle(color: Colors.white38, fontSize: 12)) : null,
+      title: Text(label, style: TextStyle(color: textColor, fontSize: 14)),
+      subtitle: subtitle != null
+          ? Text(subtitle!, style: TextStyle(color: textColor.withValues(alpha: 0.45), fontSize: 12))
+          : null,
       value: value,
       onChanged: onChanged,
-      activeThumbColor: AppTheme.primary,
+      activeThumbColor: Theme.of(context).colorScheme.primary,
     );
   }
 }

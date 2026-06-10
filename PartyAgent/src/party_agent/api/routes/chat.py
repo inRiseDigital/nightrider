@@ -105,7 +105,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
 
 @router.post("/stream")
 async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResponse:
-    """SSE endpoint consumed by the Flutter app. Wraps the same graph as /chat."""
+    """SSE endpoint consumed by the Flutter app. Streams tokens as they arrive."""
     graph = request.app.state.graph
 
     async def _generate() -> AsyncGenerator[str, None]:
@@ -121,30 +121,45 @@ async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResp
             "user_id": req.user_id,
         }
 
+        # Send a status event so the app shows "Thinking..." immediately
+        yield f"data: {json.dumps({'type': 'status', 'text': 'Thinking...'})}\n\n"
+
+        full_reply: list[str] = []
         try:
-            result = await asyncio.wait_for(
-                graph.ainvoke(
-                    state_input,
-                    config={"configurable": {"thread_id": thread_id, "user_id": req.user_id}},
-                ),
-                timeout=30.0,
-            )
-            last = result["messages"][-1]
-            reply_text = last.content if hasattr(last, "content") else str(last)
-            data = {
-                "type": "text",
-                "text": reply_text,
-                "suggestions": generate_suggestions(req.message, reply_text),
-                "routed_to": result.get("next_agent"),
-            }
-            yield f"data: {json.dumps(data)}\n\n"
+            async for event in graph.astream_events(
+                state_input,
+                config={"configurable": {"thread_id": thread_id, "user_id": req.user_id}},
+                version="v2",
+            ):
+                if event.get("event") != "on_chat_model_stream":
+                    continue
+                chunk = event["data"].get("chunk")
+                if chunk is None:
+                    continue
+                content = chunk.content if hasattr(chunk, "content") else ""
+                # Anthropic streams content as a list of dicts; other models as a string
+                if isinstance(content, list):
+                    for part in content:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            text = part.get("text", "")
+                            if text:
+                                full_reply.append(text)
+                                yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
+                elif isinstance(content, str) and content:
+                    full_reply.append(content)
+                    yield f"data: {json.dumps({'type': 'token', 'text': content})}\n\n"
+
         except asyncio.TimeoutError:
             log.error("chat_stream timed out for thread=%s", thread_id)
-            yield f"data: {json.dumps({'type': 'error', 'text': 'The agent took too long to respond. Please try again.'})}\n\n"
+            if not full_reply:
+                yield f"data: {json.dumps({'type': 'error', 'text': 'The agent took too long to respond. Please try again.'})}\n\n"
         except Exception as exc:
             log.error("chat_stream failed: %s", exc)
-            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+            if not full_reply:
+                yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
 
+        reply_text = "".join(full_reply)
+        yield f"data: {json.dumps({'type': 'done', 'suggestions': generate_suggestions(req.message, reply_text)})}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(_generate(), media_type="text/event-stream")

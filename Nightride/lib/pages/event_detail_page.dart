@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:palette_generator/palette_generator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
@@ -62,50 +64,103 @@ class _ErrorBody extends StatelessWidget {
         ),
       ),
       body: Center(
-        child: Text(AppLocalizations.of(context)!.eventNotFound, style: const TextStyle(color: Colors.white70)),
+        child: Text(AppLocalizations.of(context)!.eventNotFound,
+            style: const TextStyle(color: Colors.white70)),
       ),
     );
   }
 }
 
-class _DetailBody extends ConsumerWidget {
-  const _DetailBody({required this.data});
+// ── _DetailBody — converts to stateful so it can extract palette ──────────────
 
+class _DetailBody extends ConsumerStatefulWidget {
+  const _DetailBody({required this.data});
   final Map<String, dynamic> data;
 
-  String get _name => data['name'] as String? ?? '';
-  String get _coverImage => data['cover_image'] as String? ?? '';
-  String get _genre => data['genre'] as String? ?? 'Music';
-  String get _date => data['date'] as String? ?? '';
-  String get _startTime => data['start_time'] as String? ?? '';
-  String get _venueName => data['venue_name'] as String? ?? '';
-  String get _address => data['address'] as String? ?? '';
-  String get _city => data['city'] as String? ?? '';
-  String get _country => data['country'] as String? ?? '';
-  String get _priceHint => data['price_hint'] as String? ?? '';
-  String get _description => data['description'] as String? ?? '';
-  String get _ticketUrl => data['ticket_url'] as String? ?? '';
-  String get _language => data['language'] as String? ?? '';
+  @override
+  ConsumerState<_DetailBody> createState() => _DetailBodyState();
+}
+
+class _DetailBodyState extends ConsumerState<_DetailBody> {
+  Color _cardColor = AppTheme.accent;
+  bool _colorLoaded = false;
+
+  Color get _cardTextColor =>
+      _cardColor.computeLuminance() > 0.35 ? Colors.black : Colors.white;
+
+  // ── Field getters ─────────────────────────────────────────────────────────
+  String get _name        => widget.data['name'] as String? ?? '';
+  String get _coverImage  => widget.data['cover_image'] as String? ?? '';
+  String get _genre       => widget.data['genre'] as String? ?? 'Music';
+  String get _date        => widget.data['date'] as String? ?? '';
+  String get _startTime   => widget.data['start_time'] as String? ?? '';
+  String get _venueName   => widget.data['venue_name'] as String? ?? '';
+  String get _address     => widget.data['address'] as String? ?? '';
+  String get _city        => widget.data['city'] as String? ?? '';
+  String get _country     => widget.data['country'] as String? ?? '';
+  String get _priceHint   => widget.data['price_hint'] as String? ?? '';
+  String get _description => widget.data['description'] as String? ?? '';
+  String get _ticketUrl   => widget.data['ticket_url'] as String? ?? '';
+  String get _language    => widget.data['language'] as String? ?? '';
+  double get _lat         => (widget.data['lat'] as num? ?? 0).toDouble();
+  double get _lng         => (widget.data['lng'] as num? ?? 0).toDouble();
+
   List<String> get _artists =>
-      (data['artists'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+      (widget.data['artists'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList() ??
+      [];
 
   List<Map<String, dynamic>> get _performers {
-    final raw = data['performers'] as List<dynamic>?;
+    final raw = widget.data['performers'] as List<dynamic>?;
     if (raw == null || raw.isEmpty) return [];
     return raw.whereType<Map>().map((p) => Map<String, dynamic>.from(p)).toList();
   }
 
   Map<String, dynamic> get _policies =>
-      (data['policies'] as Map<String, dynamic>?) ?? {};
-  double get _lat => (data['lat'] as num? ?? 0).toDouble();
-  double get _lng => (data['lng'] as num? ?? 0).toDouble();
+      (widget.data['policies'] as Map<String, dynamic>?) ?? {};
 
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _extractColor();
+  }
+
+  Future<void> _extractColor() async {
+    if (_coverImage.isEmpty) {
+      if (mounted) setState(() { _colorLoaded = true; });
+      return;
+    }
+    try {
+      final palette = await PaletteGenerator.fromImageProvider(
+        CachedNetworkImageProvider(_coverImage),
+        maximumColorCount: 32,
+      );
+      final c = palette.vibrantColor?.color
+          ?? palette.lightVibrantColor?.color
+          ?? palette.darkVibrantColor?.color
+          ?? palette.mutedColor?.color
+          ?? palette.dominantColor?.color;
+      if (!mounted) return;
+      setState(() {
+        if (c != null) _cardColor = c;
+        _colorLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() { _colorLoaded = true; });
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   String _formatDateTime() {
     if (_date.isEmpty) return '';
     final parts = _date.split('-');
     if (parts.length < 3) return _date;
-    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
     final m = int.tryParse(parts[1]) ?? 0;
     final d = int.tryParse(parts[2]) ?? 0;
     final monthName = (m > 0 && m <= 12) ? months[m] : '';
@@ -119,52 +174,63 @@ class _DetailBody extends ConsumerWidget {
   Future<void> _openTickets() async {
     if (_ticketUrl.isEmpty) return;
     final uri = Uri.tryParse(_ticketUrl);
-    if (uri != null) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    String mapToken = '';
-    try { mapToken = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? ''; } catch (_) {}
-    final String staticMapUrl = (mapToken.isNotEmpty && _lat != 0 && _lng != 0)
-        ? 'https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/'
-            'pin-l+9f7aea($_lng,$_lat)/$_lng,$_lat,14,0/600x260@2x'
-            '?access_token=$mapToken'
-        : '';
+  Widget build(BuildContext context) {
+    const String mapsKey = String.fromEnvironment(
+      'GOOGLE_MAPS_API_KEY',
+      defaultValue: kGoogleMapsApiKey,
+    );
+    final String staticMapUrl =
+        (mapsKey.isNotEmpty &&
+                mapsKey != 'YOUR_GOOGLE_MAPS_API_KEY_HERE' &&
+                _lat != 0 &&
+                _lng != 0)
+            ? 'https://maps.googleapis.com/maps/api/staticmap'
+                '?center=$_lat,$_lng&zoom=14&size=600x260&scale=2'
+                '&markers=color:0x9f7aea%7C$_lat,$_lng'
+                '&style=feature:all%7Celement:geometry%7Ccolor:0x242f3e'
+                '&style=feature:water%7Celement:geometry%7Ccolor:0x17263c'
+                '&style=feature:road%7Celement:geometry%7Ccolor:0x38414e'
+                '&key=$mapsKey'
+            : '';
 
-    final locationLine = [_city, _country].where((s) => s.isNotEmpty).join(', ');
-    final addressLine = [_venueName, _address].where((s) => s.isNotEmpty).join(' · ');
+    final locationLine =
+        [_city, _country].where((s) => s.isNotEmpty).join(', ');
+    final addressLine =
+        [_venueName, _address].where((s) => s.isNotEmpty).join(' · ');
 
     return Stack(
       children: [
         CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ── Hero image ──────────────────────────────────────────────────
+            // ── Hero image ────────────────────────────────────────────────
             SliverAppBar(
-              expandedHeight: 360,
+              expandedHeight: 380,
               pinned: true,
               stretch: true,
               backgroundColor: AppTheme.scaffold,
-              leadingWidth: 70,
+              leadingWidth: 72,
               leading: Padding(
-                padding: const EdgeInsets.only(left: 14),
+                padding: const EdgeInsets.only(left: 16),
                 child: Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
                     child: Container(
-                      height: 40,
-                      width: 40,
+                      height: 44,
+                      width: 44,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                        color: const Color(0xFF555555),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                        onPressed: () => Navigator.of(context).pop(),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 18,
                       ),
                     ),
                   ),
@@ -178,20 +244,22 @@ class _DetailBody extends ConsumerWidget {
                     CachedNetworkImage(
                       imageUrl: _coverImage,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(color: AppTheme.surface),
-                      errorWidget: (_, __, ___) => Container(color: AppTheme.surface),
+                      placeholder: (_, __) =>
+                          Container(color: AppTheme.surface),
+                      errorWidget: (_, __, ___) =>
+                          Container(color: AppTheme.surface),
                     ),
-                    DecoratedBox(
+                    const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          stops: const [0.0, 0.45, 0.75, 1.0],
+                          stops: [0.0, 0.30, 0.65, 1.0],
                           colors: [
-                            Colors.black.withValues(alpha: 0.35),
-                            Colors.transparent,
-                            AppTheme.scaffold.withValues(alpha: 0.7),
-                            AppTheme.scaffold,
+                            Color(0x00000000),
+                            Color(0x22000000),
+                            Color(0xBB000000),
+                            Color(0xFF000000),
                           ],
                         ),
                       ),
@@ -201,106 +269,194 @@ class _DetailBody extends ConsumerWidget {
               ),
             ),
 
-            // ── Content ─────────────────────────────────────────────────────
+            // ── Content ───────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 130),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Genre badge
+                    // Category pill — always lime
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                        color: AppTheme.accent,
+                        borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         _genre.toUpperCase(),
-                        style: TextStyle(
-                          color: AppTheme.primaryLight,
-                          fontSize: AppResponsive.font(context, 10).clamp(8.5, 11.0),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.4,
+                        style: GoogleFonts.poppins(
+                          color: Colors.black,
+                          fontSize: AppResponsive.font(context, 11)
+                              .clamp(9.5, 12.0),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.8,
                         ),
                       ),
                     ),
-                    const Gap(14),
+                    const Gap(16),
 
                     // Title
                     Text(
-                      _name,
-                      style: TextStyle(
+                      _name.toUpperCase(),
+                      style: GoogleFonts.anton(
                         color: Colors.white,
-                        fontSize: AppResponsive.font(context, 26).clamp(22.0, 28.5),
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
+                        fontSize:
+                            AppResponsive.font(context, 32).clamp(26.0, 38.0),
+                        height: 1.02,
+                        letterSpacing: 0.3,
                       ),
                     ),
-                    const Gap(20),
+                    const Gap(22),
 
-                    // ── Info card ────────────────────────────────────────────
+                    // ── Dynamic Ticket Card ───────────────────────────────
+                    if (!_colorLoaded)
+                      Container(
+                        height: 220,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: AppTheme.accent,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      )
+                    else
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      clipBehavior: Clip.none,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                        color: _cardColor,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _cardColor.withValues(alpha: 0.35),
+                            blurRadius: 28,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Date & time
-                          if (_formatDateTime().isNotEmpty) ...[
-                            _InfoRow(
-                              icon: Icons.calendar_month_rounded,
-                              iconColor: AppTheme.accent,
-                              text: _formatDateTime(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'EVENT DETAILS',
+                                  style: GoogleFonts.poppins(
+                                    color: _cardTextColor
+                                        .withValues(alpha: 0.38),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 2.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                if (_formatDateTime().isNotEmpty) ...[
+                                  _TicketInfoRow(
+                                    icon: Icons.calendar_month_rounded,
+                                    label: 'DATE & TIME',
+                                    value: _formatDateTime(),
+                                    textColor: _cardTextColor,
+                                  ),
+                                  _TicketDivider(
+                                      lineColor: _cardTextColor),
+                                ],
+                                if (locationLine.isNotEmpty) ...[
+                                  _TicketInfoRow(
+                                    icon: Icons.location_on_rounded,
+                                    label: 'VENUE',
+                                    value: locationLine,
+                                    subValue: addressLine.isNotEmpty
+                                        ? addressLine
+                                        : null,
+                                    textColor: _cardTextColor,
+                                  ),
+                                ],
+                                if (_language.isNotEmpty) ...[
+                                  _TicketDivider(
+                                      lineColor: _cardTextColor),
+                                  _TicketInfoRow(
+                                    icon: Icons.language_rounded,
+                                    label: 'LANGUAGE',
+                                    value: _language,
+                                    textColor: _cardTextColor,
+                                  ),
+                                ],
+                                if (_priceHint.isNotEmpty) ...[
+                                  _TicketDivider(
+                                      lineColor: _cardTextColor),
+                                  _TicketInfoRow(
+                                    icon: Icons.local_activity_rounded,
+                                    label: 'PRICE',
+                                    value: _priceHint,
+                                    textColor: _cardTextColor,
+                                  ),
+                                ],
+                                if (_description.isNotEmpty) ...[
+                                  _TicketDivider(
+                                      lineColor: _cardTextColor),
+                                  _TicketInfoRow(
+                                    icon: Icons.info_outline_rounded,
+                                    label: 'ABOUT',
+                                    value: _description,
+                                    isMultiLine: true,
+                                    textColor: _cardTextColor,
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                              ],
                             ),
-                            _Divider(),
-                          ],
-
-                          // Venue
-                          if (locationLine.isNotEmpty)
-                            _InfoRow(
-                              icon: Icons.location_on_rounded,
-                              iconColor: AppTheme.primary,
-                              text: locationLine,
-                              subText: addressLine.isNotEmpty ? addressLine : null,
+                          ),
+                          // Perforated tear line
+                          _TicketTearLine(lineColor: _cardTextColor),
+                          // Barcode section
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _BarcodeStrip(color: _cardTextColor),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'ADMIT ONE  ·  NIGHT RITE',
+                                  style: GoogleFonts.poppins(
+                                    color: _cardTextColor
+                                        .withValues(alpha: 0.36),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 2.4,
+                                  ),
+                                ),
+                              ],
                             ),
-
-                          // Language
-                          if (_language.isNotEmpty) ...[
-                            _Divider(),
-                            _InfoRow(
-                              icon: Icons.language_rounded,
-                              iconColor: Colors.blueAccent,
-                              text: _language,
-                            ),
-                          ],
-
-                          // Price
-                          if (_priceHint.isNotEmpty) ...[
-                            _Divider(),
-                            _InfoRow(
-                              icon: Icons.local_activity_rounded,
-                              iconColor: Colors.greenAccent,
-                              text: _priceHint,
-                            ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
-                    const Gap(26),
+                    const Gap(28),
 
-                    // ── Performers ───────────────────────────────────────────
+                    // ── Performers ────────────────────────────────────────
                     if (_performers.isNotEmpty || _artists.isNotEmpty) ...[
                       Text(
-                        AppLocalizations.of(context)!.performers,
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
+                        AppLocalizations.of(context)!.performers.toUpperCase(),
+                        style: GoogleFonts.anton(
+                          color: AppTheme.primary,
+                          fontSize: AppResponsive.font(context, 18)
+                              .clamp(15.0, 20.0),
+                          letterSpacing: 1.0,
+                        ),
                       ),
                       const Gap(12),
-                      // Rich performer cards (from new performers field)
                       if (_performers.isNotEmpty)
                         Column(
                           children: _performers.map((p) {
@@ -311,9 +467,12 @@ class _DetailBody extends ConsumerWidget {
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.04),
+                                color:
+                                    Colors.white.withValues(alpha: 0.04),
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+                                border: Border.all(
+                                    color: Colors.white
+                                        .withValues(alpha: 0.07)),
                               ),
                               child: Row(
                                 children: [
@@ -321,34 +480,79 @@ class _DetailBody extends ConsumerWidget {
                                     width: 44,
                                     height: 44,
                                     decoration: BoxDecoration(
-                                      color: AppTheme.accent.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(12),
+                                      color: AppTheme.accent
+                                          .withValues(alpha: 0.15),
+                                      borderRadius:
+                                          BorderRadius.circular(12),
                                     ),
-                                    child: Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
+                                    child: Icon(
+                                      Icons.mic_rounded,
+                                      color: AppTheme.accent,
+                                      size: AppResponsive.icon(context, 20)
+                                          .clamp(17.0, 22.0),
+                                    ),
                                   ),
                                   const Gap(12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
                                             Expanded(
-                                              child: Text(name, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.5), fontWeight: FontWeight.w800)),
+                                              child: Text(
+                                                name,
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: AppResponsive
+                                                          .font(context, 14)
+                                                      .clamp(12.0, 15.5),
+                                                  fontWeight:
+                                                      FontWeight.w800,
+                                                ),
+                                              ),
                                             ),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 3),
                                               decoration: BoxDecoration(
-                                                color: AppTheme.primary.withValues(alpha: 0.2),
-                                                borderRadius: BorderRadius.circular(6),
+                                                color: AppTheme.primary
+                                                    .withValues(alpha: 0.2),
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        6),
                                               ),
-                                              child: Text(type, style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0), fontWeight: FontWeight.w700)),
+                                              child: Text(
+                                                type,
+                                                style: TextStyle(
+                                                  color:
+                                                      AppTheme.primaryLight,
+                                                  fontSize: AppResponsive
+                                                          .font(context, 10)
+                                                      .clamp(9.0, 11.0),
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                ),
+                                              ),
                                             ),
                                           ],
                                         ),
                                         if (bio.isNotEmpty) ...[
                                           const Gap(4),
-                                          Text(bio, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0)), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                          Text(
+                                            bio,
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: AppResponsive.font(
+                                                      context, 12)
+                                                  .clamp(10.5, 13.0),
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ],
                                       ],
                                     ),
@@ -358,36 +562,63 @@ class _DetailBody extends ConsumerWidget {
                             );
                           }).toList(),
                         )
-                      // Fallback: legacy plain artist name chips
                       else
                         Wrap(
                           spacing: 10,
                           runSpacing: 10,
-                          children: _artists.map((artist) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 13).clamp(11.0, 14.5)),
-                                const Gap(7),
-                                Text(artist, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          )).toList(),
+                          children: _artists
+                              .map((artist) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 9),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.05),
+                                      borderRadius:
+                                          BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.08)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.mic_rounded,
+                                          color: AppTheme.accent,
+                                          size: AppResponsive.icon(
+                                                  context, 13)
+                                              .clamp(11.0, 14.5),
+                                        ),
+                                        const Gap(7),
+                                        Text(
+                                          artist,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.9),
+                                            fontSize: AppResponsive.font(
+                                                    context, 13)
+                                                .clamp(11.0, 14.5),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
                         ),
                       const Gap(26),
                     ],
 
-                    // ── Event Policies ───────────────────────────────────────
+                    // ── Event Policies ────────────────────────────────────
                     if (_policies.isNotEmpty) ...[
                       Text(
-                        'Event Policies',
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
+                        'EVENT POLICIES',
+                        style: GoogleFonts.anton(
+                          color: AppTheme.primary,
+                          fontSize: AppResponsive.font(context, 18)
+                              .clamp(15.0, 20.0),
+                          letterSpacing: 1.0,
+                        ),
                       ),
                       const Gap(12),
                       Container(
@@ -395,37 +626,72 @@ class _DetailBody extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.04),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                          border: Border.all(
+                              color:
+                                  Colors.white.withValues(alpha: 0.06)),
                         ),
                         child: Column(
                           children: [
-                            if ((_policies['age_restriction'] as int? ?? 0) > 0) ...[
-                              _PolicyRow(icon: Icons.person_outline_rounded, iconColor: Colors.orangeAccent, label: 'Age Restriction', value: '${_policies['age_restriction']}+ only'),
+                            if ((_policies['age_restriction'] as int? ??
+                                    0) >
+                                0) ...[
+                              _PolicyRow(
+                                icon: Icons.person_outline_rounded,
+                                iconColor: Colors.orangeAccent,
+                                label: 'Age Restriction',
+                                value:
+                                    '${_policies['age_restriction']}+ only',
+                              ),
                               _DividerThin(),
                             ],
-                            if ((_policies['refund_policy'] as String? ?? '').isNotEmpty) ...[
-                              _PolicyRow(icon: Icons.receipt_long_rounded, iconColor: Colors.blueAccent, label: 'Refund Policy', value: _policies['refund_policy'] as String),
+                            if ((_policies['refund_policy'] as String? ??
+                                    '')
+                                .isNotEmpty) ...[
+                              _PolicyRow(
+                                icon: Icons.receipt_long_rounded,
+                                iconColor: Colors.blueAccent,
+                                label: 'Refund Policy',
+                                value:
+                                    _policies['refund_policy'] as String,
+                              ),
                               _DividerThin(),
                             ],
                             _PolicyRow(
                               icon: Icons.loop_rounded,
-                              iconColor: _policies['re_entry_allowed'] == true ? Colors.greenAccent : Colors.redAccent,
+                              iconColor:
+                                  _policies['re_entry_allowed'] == true
+                                      ? Colors.greenAccent
+                                      : Colors.redAccent,
                               label: 'Re-entry',
-                              value: _policies['re_entry_allowed'] == true ? 'Allowed' : 'Not allowed',
+                              value:
+                                  _policies['re_entry_allowed'] == true
+                                      ? 'Allowed'
+                                      : 'Not allowed',
                             ),
                             _DividerThin(),
                             _PolicyRow(
                               icon: Icons.accessible_rounded,
-                              iconColor: _policies['wheelchair_accessible'] == true ? Colors.greenAccent : Colors.white38,
+                              iconColor:
+                                  _policies['wheelchair_accessible'] == true
+                                      ? Colors.greenAccent
+                                      : Colors.white38,
                               label: 'Wheelchair Access',
-                              value: _policies['wheelchair_accessible'] == true ? 'Accessible' : 'Not specified',
+                              value:
+                                  _policies['wheelchair_accessible'] == true
+                                      ? 'Accessible'
+                                      : 'Not specified',
                             ),
                             _DividerThin(),
                             _PolicyRow(
                               icon: Icons.pets_rounded,
-                              iconColor: _policies['allow_pets'] == true ? Colors.greenAccent : Colors.white38,
+                              iconColor:
+                                  _policies['allow_pets'] == true
+                                      ? Colors.greenAccent
+                                      : Colors.white38,
                               label: 'Pets',
-                              value: _policies['allow_pets'] == true ? 'Allowed' : 'Not allowed',
+                              value: _policies['allow_pets'] == true
+                                  ? 'Allowed'
+                                  : 'Not allowed',
                             ),
                           ],
                         ),
@@ -433,25 +699,41 @@ class _DetailBody extends ConsumerWidget {
                       const Gap(26),
                     ],
 
-                    // ── Description ──────────────────────────────────────────
+                    // ── Description ───────────────────────────────────────
                     if (_description.isNotEmpty) ...[
                       Text(
-                        AppLocalizations.of(context)!.aboutThisEvent,
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
+                        AppLocalizations.of(context)!.aboutThisEvent
+                            .toUpperCase(),
+                        style: GoogleFonts.anton(
+                          color: AppTheme.primary,
+                          fontSize: AppResponsive.font(context, 18)
+                              .clamp(15.0, 20.0),
+                          letterSpacing: 1.0,
+                        ),
                       ),
                       const Gap(12),
                       Text(
                         _description,
-                        style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), height: 1.65),
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: AppResponsive.font(context, 14)
+                              .clamp(12.0, 15.0),
+                          height: 1.65,
+                        ),
                       ),
                       const Gap(26),
                     ],
 
-                    // ── Map preview ──────────────────────────────────────────
+                    // ── Map preview ───────────────────────────────────────
                     if (_lat != 0 && _lng != 0) ...[
                       Text(
-                        AppLocalizations.of(context)!.location,
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
+                        AppLocalizations.of(context)!.location.toUpperCase(),
+                        style: GoogleFonts.anton(
+                          color: AppTheme.primary,
+                          fontSize: AppResponsive.font(context, 18)
+                              .clamp(15.0, 20.0),
+                          letterSpacing: 1.0,
+                        ),
                       ),
                       const Gap(12),
                       GestureDetector(
@@ -459,7 +741,8 @@ class _DetailBody extends ConsumerWidget {
                           ref.read(mapFocusProvider.notifier).state =
                               MapFocus(_lat, _lng, label: _name);
                           ref.read(appNavProvider.notifier).setIndex(1);
-                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          Navigator.of(context)
+                              .popUntil((route) => route.isFirst);
                         },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(20),
@@ -472,33 +755,64 @@ class _DetailBody extends ConsumerWidget {
                                     ? Image.network(
                                         staticMapUrl,
                                         fit: BoxFit.cover,
-                                        loadingBuilder: (_, child, prog) => prog == null
-                                            ? child
-                                            : Container(
-                                                color: AppTheme.surface,
-                                                child: const Center(child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2)),
-                                              ),
-                                        errorBuilder: (_, __, ___) => _MapFallback(locationLine: locationLine),
+                                        loadingBuilder: (_, child, prog) =>
+                                            prog == null
+                                                ? child
+                                                : Container(
+                                                    color: AppTheme.surface,
+                                                    child: const Center(
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        color:
+                                                            AppTheme.primary,
+                                                        strokeWidth: 2,
+                                                      ),
+                                                    ),
+                                                  ),
+                                        errorBuilder: (_, __, ___) =>
+                                            _MapFallback(
+                                                locationLine: locationLine),
                                       )
-                                    : _MapFallback(locationLine: locationLine),
+                                    : _MapFallback(
+                                        locationLine: locationLine),
                               ),
-                              // "Open in Maps" overlay pill
                               Positioned(
                                 bottom: 10,
                                 right: 10,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.65),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                                    color: Colors.black
+                                        .withValues(alpha: 0.65),
+                                    borderRadius:
+                                        BorderRadius.circular(999),
+                                    border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.15)),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.open_in_new_rounded, color: Colors.white, size: AppResponsive.icon(context, 12).clamp(10.0, 13.5)),
+                                      Icon(
+                                        Icons.open_in_new_rounded,
+                                        color: Colors.white,
+                                        size: AppResponsive.icon(
+                                                context, 12)
+                                            .clamp(10.0, 13.5),
+                                      ),
                                       const Gap(5),
-                                      Text(AppLocalizations.of(context)!.openInMaps, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w700)),
+                                      Text(
+                                        AppLocalizations.of(context)!
+                                            .openInMaps,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: AppResponsive.font(
+                                                  context, 11)
+                                              .clamp(9.5, 12.0),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -515,7 +829,7 @@ class _DetailBody extends ConsumerWidget {
           ],
         ),
 
-        // ── Bottom action bar ────────────────────────────────────────────────
+        // ── Bottom action bar ──────────────────────────────────────────────
         Positioned(
           left: 0,
           right: 0,
@@ -524,9 +838,15 @@ class _DetailBody extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
             decoration: BoxDecoration(
               color: AppTheme.surface.withValues(alpha: 0.97),
-              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07))),
+              border: Border(
+                  top: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.07))),
               boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.55), blurRadius: 22, offset: const Offset(0, -6)),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  blurRadius: 22,
+                  offset: const Offset(0, -6),
+                ),
               ],
             ),
             child: Row(
@@ -538,8 +858,23 @@ class _DetailBody extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(AppLocalizations.of(context)!.price, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0))),
-                        Text(_priceHint, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.5), fontWeight: FontWeight.w900)),
+                        Text(
+                          AppLocalizations.of(context)!.price,
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: AppResponsive.font(context, 12)
+                                .clamp(10.5, 13.0),
+                          ),
+                        ),
+                        Text(
+                          _priceHint,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: AppResponsive.font(context, 16)
+                                .clamp(14.0, 17.5),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -549,21 +884,36 @@ class _DetailBody extends ConsumerWidget {
                     child: Container(
                       height: 54,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [AppTheme.primary, AppTheme.accentPurple]),
-                        borderRadius: BorderRadius.circular(16),
+                        color: _cardColor,
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
-                          BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6)),
+                          BoxShadow(
+                            color: _cardColor.withValues(alpha: 0.35),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
+                          ),
                         ],
                       ),
                       alignment: Alignment.center,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.open_in_new_rounded, color: Colors.white, size: AppResponsive.icon(context, 16).clamp(14.0, 17.5)),
+                          Icon(
+                            Icons.local_activity_rounded,
+                            color: _cardTextColor,
+                            size: AppResponsive.icon(context, 18)
+                                .clamp(15.0, 20.0),
+                          ),
                           const Gap(8),
                           Text(
-                            AppLocalizations.of(context)!.getTickets,
-                            style: TextStyle(fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.2),
+                            AppLocalizations.of(context)!.getTickets
+                                .toUpperCase(),
+                            style: GoogleFonts.anton(
+                              fontSize: AppResponsive.font(context, 15)
+                                  .clamp(13.0, 17.0),
+                              color: _cardTextColor,
+                              letterSpacing: 1.5,
+                            ),
                           ),
                         ],
                       ),
@@ -579,39 +929,75 @@ class _DetailBody extends ConsumerWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.iconColor, required this.text, this.subText});
+// ── Ticket info row ───────────────────────────────────────────────────────────
+
+class _TicketInfoRow extends StatelessWidget {
+  const _TicketInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.subValue,
+    this.isMultiLine = false,
+    this.textColor = Colors.black,
+  });
   final IconData icon;
-  final Color iconColor;
-  final String text;
-  final String? subText;
+  final String label;
+  final String value;
+  final String? subValue;
+  final bool isMultiLine;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 18).clamp(15.0, 20.0)),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon,
+                size: 18, color: textColor.withValues(alpha: 0.48)),
           ),
           const Gap(12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Gap(2),
-                Text(text, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.bold)),
-                if (subText != null && subText!.isNotEmpty) ...[
-                  const Gap(3),
-                  Text(subText!, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0)), maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: textColor.withValues(alpha: 0.40),
+                    letterSpacing: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize:
+                        AppResponsive.font(context, 15).clamp(13.5, 17.0),
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                    height: isMultiLine ? 1.5 : 1.2,
+                  ),
+                  maxLines: isMultiLine ? 5 : 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subValue != null && subValue!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    subValue!,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.font(context, 12)
+                          .clamp(11.0, 13.5),
+                      color: textColor.withValues(alpha: 0.50),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ],
             ),
@@ -622,19 +1008,147 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _Divider extends StatelessWidget {
-  const _Divider();
+// ── Dashed divider ────────────────────────────────────────────────────────────
+
+class _TicketDivider extends StatelessWidget {
+  const _TicketDivider({this.lineColor = Colors.black});
+  final Color lineColor;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: CustomPaint(
+          painter:
+              _DashedLinePainter(color: lineColor.withValues(alpha: 0.14)),
+          child: const SizedBox(height: 1, width: double.infinity),
+        ),
+      );
+}
+
+// ── Perforated tear line ──────────────────────────────────────────────────────
+
+class _TicketTearLine extends StatelessWidget {
+  const _TicketTearLine({this.lineColor = Colors.black});
+  final Color lineColor;
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
+    return SizedBox(
+      height: 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 11,
+            child: CustomPaint(
+              painter: _DashedLinePainter(
+                  color: lineColor.withValues(alpha: 0.18)),
+              child: const SizedBox(height: 1),
+            ),
+          ),
+          Positioned(
+            left: -10,
+            top: 2,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                  color: AppTheme.scaffold, shape: BoxShape.circle),
+            ),
+          ),
+          Positioned(
+            right: -10,
+            top: 2,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                  color: AppTheme.scaffold, shape: BoxShape.circle),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+// ── Barcode strip ─────────────────────────────────────────────────────────────
+
+class _BarcodeStrip extends StatelessWidget {
+  const _BarcodeStrip({this.color = Colors.black});
+  final Color color;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 38,
+        width: double.infinity,
+        child: CustomPaint(painter: _BarcodePainter(color: color)),
+      );
+}
+
+// ── Painters ──────────────────────────────────────────────────────────────────
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  const _DashedLinePainter({required this.color});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+    const dw = 5.0;
+    const sp = 4.0;
+    double x = 0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dw, 0), p);
+      x += dw + sp;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLinePainter old) =>
+      old.color != color;
+}
+
+class _BarcodePainter extends CustomPainter {
+  const _BarcodePainter({this.color = Colors.black});
+  final Color color;
+  static const _pat = [
+    3, 1, 4, 1, 5, 2, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 2,
+    1, 2, 1, 3, 1, 2, 2, 1, 3, 1, 2, 3, 1, 2, 1, 1, 3
+  ];
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = _pat.fold<int>(0, (a, b) => a + b);
+    final unit = size.width / total;
+    final p = Paint()..color = color;
+    double x = 0;
+    bool bar = true;
+    for (final u in _pat) {
+      if (bar) {
+        canvas.drawRect(
+          Rect.fromLTWH(x, size.height * 0.05, u * unit, size.height * 0.9),
+          p,
+        );
+      }
+      x += u * unit;
+      bar = !bar;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BarcodePainter old) => old.color != color;
+}
+
+// ── Policy widgets ────────────────────────────────────────────────────────────
+
 class _PolicyRow extends StatelessWidget {
-  const _PolicyRow({required this.icon, required this.iconColor, required this.label, required this.value});
+  const _PolicyRow({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+  });
   final IconData icon;
   final Color iconColor;
   final String label;
@@ -648,12 +1162,39 @@ class _PolicyRow extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
-            child: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 16).clamp(13.0, 18.0)),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon,
+                color: iconColor,
+                size:
+                    AppResponsive.icon(context, 16).clamp(13.0, 18.0)),
           ),
           const Gap(12),
-          Expanded(child: Text(label, style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0)))),
-          Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0), fontWeight: FontWeight.w700))),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize:
+                    AppResponsive.font(context, 13).clamp(11.5, 14.0),
+              ),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize:
+                    AppResponsive.font(context, 13).clamp(11.5, 14.0),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -663,8 +1204,11 @@ class _PolicyRow extends StatelessWidget {
 class _DividerThin extends StatelessWidget {
   const _DividerThin();
   @override
-  Widget build(BuildContext context) =>
-      Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Divider(color: Colors.white.withValues(alpha: 0.05), height: 1));
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Divider(
+            color: Colors.white.withValues(alpha: 0.05), height: 1),
+      );
 }
 
 class _MapFallback extends StatelessWidget {
@@ -678,9 +1222,18 @@ class _MapFallback extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.map_rounded, color: AppTheme.primary, size: AppResponsive.icon(context, 36).clamp(28.0, 40.0)),
+          Icon(Icons.map_rounded,
+              color: AppTheme.primary,
+              size: AppResponsive.icon(context, 36).clamp(28.0, 40.0)),
           const Gap(8),
-          Text(locationLine, style: TextStyle(color: Colors.white60, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5))),
+          Text(
+            locationLine,
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize:
+                  AppResponsive.font(context, 13).clamp(11.0, 14.5),
+            ),
+          ),
         ],
       ),
     );

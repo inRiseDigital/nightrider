@@ -19,6 +19,8 @@ import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/providers/live_hub_providers.dart';
 import 'package:nightride/pages/clubs_page.dart';
 import 'package:nightride/providers/profile_providers.dart';
+import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/components/nightrite_refresh.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../data/home_dummy_data.dart';
@@ -49,7 +51,14 @@ class HomePage extends ConsumerWidget {
                 colors: [AppTheme.background, AppTheme.scaffold],
               ),
             ),
-            child: SingleChildScrollView(
+            child: NightRiteRefresh(
+              onRefresh: () async {
+                ref.invalidate(featuredEventsProvider);
+                ref.invalidate(trendingEventsProvider);
+                ref.invalidate(clubUpdatesProvider);
+                await Future<void>.delayed(const Duration(milliseconds: 600));
+              },
+              child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics(),
               ),
@@ -113,6 +122,7 @@ class HomePage extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ),

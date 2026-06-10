@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nightride/core/responsive/app_dimensions.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/home_dummy_data.dart';
 import 'package:nightride/domain/home_models.dart';
@@ -130,7 +131,7 @@ class _FeaturedHeroCard extends StatelessWidget {
                 offset: Offset(0, 16),
               ),
               BoxShadow(
-                color: Color(0x1A7B2FFF),
+                color: Color(0x26f15991),
                 blurRadius: 30,
                 offset: Offset(0, 18),
               ),
@@ -253,10 +254,11 @@ class _FeaturedBottomRow extends StatelessWidget {
                 event.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.0),
-                  fontWeight: FontWeight.w800,
+                style: GoogleFonts.anton(
+                  fontSize: AppResponsive.font(context, 17).clamp(14.0, 18.0),
+                  fontWeight: FontWeight.w400,
                   color: Colors.white,
+                  letterSpacing: 0.8,
                 ),
               ),
               SizedBox(height: AppResponsive.gap(context, 5)),
@@ -264,10 +266,10 @@ class _FeaturedBottomRow extends StatelessWidget {
                 event.subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.5),
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.72),
+                  color: AppTheme.primaryLight.withValues(alpha: 0.88),
                 ),
               ),
             ],

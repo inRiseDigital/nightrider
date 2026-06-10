@@ -15,7 +15,7 @@ class HomeLocationRow extends StatelessWidget {
       children: <Widget>[
         Icon(
           Icons.location_on_rounded,
-          color: Colors.white.withValues(alpha: 0.55),
+          color: AppTheme.primaryLight,
           size: AppResponsive.icon(context, 16).clamp(14.0, 18.0),
         ),
         Gap(AppResponsive.gap(context, 6).clamp(4.0, 8.0)),

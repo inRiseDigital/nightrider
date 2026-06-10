@@ -214,7 +214,7 @@ class _TrendingCard extends ConsumerWidget {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(AppResponsive.radius(context, 24).clamp(20.0, 28.0)),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.06),
+                        color: AppTheme.primary.withValues(alpha: 0.18),
                         width: 1,
                       ),
                     ),
@@ -275,7 +275,7 @@ class _Meta extends StatelessWidget {
         Icon(
           icon,
           size: AppResponsive.metaIconSize(context),
-          color: Colors.white.withValues(alpha: 0.72),
+          color: AppTheme.primaryLight.withValues(alpha: 0.85),
         ),
         SizedBox(width: AppResponsive.gap(context, 5)),
         expand ? Expanded(child: label) : Flexible(child: label),
@@ -296,12 +296,8 @@ class _TagPill extends StatelessWidget {
         vertical: AppResponsive.gap(context, 7).clamp(5.0, 8.0),
       ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.35),
+        color: AppTheme.accent,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
-          width: 1,
-        ),
       ),
       child: Text(
         text,
@@ -311,7 +307,7 @@ class _TagPill extends StatelessWidget {
           fontSize: AppResponsive.font(context, 11).clamp(10.0, 12.0),
           fontWeight: FontWeight.w900,
           letterSpacing: 1.0,
-          color: Colors.white.withValues(alpha: 0.92),
+          color: Colors.black,
         ),
       ),
     );
@@ -403,9 +399,9 @@ class _ActionPill extends StatelessWidget {
         ),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.10),
+          color: AppTheme.primary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.55)),
         ),
         child: Text(
           text,
@@ -414,7 +410,7 @@ class _ActionPill extends StatelessWidget {
           style: TextStyle(
             fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.0),
             fontWeight: FontWeight.w900,
-            color: Colors.white.withValues(alpha: 0.92),
+            color: AppTheme.primary,
           ),
         ),
       ),

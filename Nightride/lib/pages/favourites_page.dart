@@ -1,10 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:nightride/components/nightrite_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
+import 'package:nightride/pages/auth/sign_in_page.dart';
+import 'package:nightride/pages/event_detail_page.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/favourites_service.dart';
 
@@ -29,43 +32,67 @@ class FavouritesPage extends ConsumerWidget {
                 AppResponsive.gap(context, 20).clamp(16.0, 24.0),
                 8,
               ),
-              child: Text(
-                'Favourites',
-                style: GoogleFonts.inter(
-                  fontSize: AppResponsive.font(context, 26).clamp(22.0, 28.0),
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SAVED',
+                    style: GoogleFonts.anton(
+                      fontSize: AppResponsive.font(context, 32).clamp(26.0, 36.0),
+                      fontWeight: FontWeight.w400,
+                      color: AppTheme.primary,
+                      letterSpacing: 2.0,
+                      height: 1.0,
+                    ),
+                  ),
+                  Text(
+                    'EVENTS',
+                    style: GoogleFonts.anton(
+                      fontSize: AppResponsive.font(context, 32).clamp(26.0, 36.0),
+                      fontWeight: FontWeight.w400,
+                      color: AppTheme.accent,
+                      letterSpacing: 2.0,
+                      height: 1.0,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
-              child: favAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2),
-                ),
-                error: (_, __) => _empty('Could not load favourites'),
-                data: (favs) {
-                  if (favs.isEmpty) {
-                    return _empty(
-                      user == null
-                          ? 'Sign in to save your favourite events'
-                          : 'No saved events yet\nTap the heart on any event to save it',
-                    );
-                  }
-                  return ListView.separated(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.gap(context, 16).clamp(12.0, 20.0),
-                      vertical: 8,
+              child: user == null
+                  ? _guestSignInPrompt(context)
+                  : NightRiteRefresh(
+                      onRefresh: () async {
+                        ref.invalidate(favouritesStreamProvider);
+                        await Future<void>.delayed(const Duration(milliseconds: 600));
+                      },
+                      child: favAsync.when(
+                        loading: () => const Center(
+                          child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2),
+                        ),
+                        error: (_, __) => _emptyScrollable('Could not load favourites'),
+                        data: (favs) {
+                          if (favs.isEmpty) {
+                            return _emptyScrollable(
+                              'No saved events yet\nTap the heart on any event to save it',
+                            );
+                          }
+                          return ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppResponsive.gap(context, 16).clamp(12.0, 20.0),
+                              vertical: 8,
+                            ),
+                            itemCount: favs.length,
+                            separatorBuilder: (_, __) => const Gap(12),
+                            itemBuilder: (context, i) {
+                              final fav = favs[i];
+                              return _FavCard(fav: fav);
+                            },
+                          );
+                        },
+                      ),
                     ),
-                    itemCount: favs.length,
-                    separatorBuilder: (_, __) => const Gap(12),
-                    itemBuilder: (context, i) {
-                      final fav = favs[i];
-                      return _FavCard(fav: fav);
-                    },
-                  );
-                },
-              ),
             ),
           ],
         ),
@@ -73,28 +100,131 @@ class FavouritesPage extends ConsumerWidget {
     );
   }
 
-  Widget _empty(String msg) => Center(
+  Widget _emptyScrollable(String msg) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: 400,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Builder(
+                    builder: (context) => Icon(
+                      Icons.local_activity_rounded,
+                      color: AppTheme.primary.withValues(alpha: 0.55),
+                      size: AppResponsive.icon(context, 64).clamp(48.0, 64.0),
+                    ),
+                  ),
+                  const Gap(16),
+                  Builder(
+                    builder: (context) => Text(
+                      msg,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
+                        color: AppTheme.primaryLight.withValues(alpha: 0.70),
+                        height: 1.6,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _guestSignInPrompt(BuildContext context) => Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 36),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Builder(
-                builder: (context) => Icon(
-                  Icons.favorite_border_rounded,
-                  color: Colors.white24,
-                  size: AppResponsive.icon(context, 56).clamp(40.0, 56.0),
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.30),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.bookmark_rounded,
+                  color: AppTheme.primary,
+                  size: 40,
                 ),
               ),
-              const Gap(16),
-              Builder(
-                builder: (context) => Text(
-                  msg,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
-                    color: Colors.white38,
-                    height: 1.6,
+              const Gap(24),
+              Text(
+                'SIGN IN TO SAVE EVENTS',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.anton(
+                  fontSize: AppResponsive.font(context, 20).clamp(17.0, 22.0),
+                  color: Colors.white,
+                  letterSpacing: 1.2,
+                  height: 1.2,
+                ),
+              ),
+              const Gap(10),
+              Text(
+                'Create a free account to bookmark events,\ntrack your favourites and get reminders.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.font(context, 13).clamp(12.0, 14.0),
+                  color: Colors.white.withValues(alpha: 0.50),
+                  height: 1.6,
+                ),
+              ),
+              const Gap(32),
+              SizedBox(
+                width: double.infinity,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SignInPage()),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.accent.withValues(alpha: 0.35),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      'SIGN IN',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.anton(
+                        fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
+                        color: Colors.black,
+                        letterSpacing: 2.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const Gap(12),
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const SignInPage(),
+                  ),
+                ),
+                child: Text(
+                  "Don't have an account? Sign up",
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.font(context, 12).clamp(11.0, 13.0),
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -126,17 +256,22 @@ class _FavCard extends ConsumerWidget {
             ? 'Today!'
             : daysLeft == 1
                 ? 'Tomorrow!'
-                : '$daysLeft days away';
+                : '$daysLeft days';
 
     const double deleteWidth = 48;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+    return GestureDetector(
+      onTap: id.isEmpty ? null : () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => EventDetailPage(id: id)),
       ),
-      // LayoutBuilder lets us compute the exact content column width so that
-      // IntrinsicHeight can measure multi-line text at the real width (not ∞).
+      child: Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.22)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x1Af15991), blurRadius: 16, offset: Offset(0, 6)),
+        ],
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final contentWidth =
@@ -145,12 +280,20 @@ class _FavCard extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Lime left accent stripe
+                Container(
+                  width: 4,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.accent,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                    ),
+                  ),
+                ),
                 // Thumbnail — stretches to match content height
                 ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    bottomLeft: Radius.circular(16),
-                  ),
+                  borderRadius: BorderRadius.zero,
                   child: CachedNetworkImage(
                     imageUrl: image,
                     width: imgSize,
@@ -161,10 +304,10 @@ class _FavCard extends ConsumerWidget {
                       width: imgSize,
                       height: imgSize,
                       child: Container(
-                        color: Colors.white10,
+                        color: AppTheme.surface,
                         alignment: Alignment.center,
                         child: Icon(Icons.music_note_rounded,
-                            color: Colors.white24,
+                            color: AppTheme.primary.withValues(alpha: 0.40),
                             size: AppResponsive.icon(context, 28).clamp(22.0, 28.0)),
                       ),
                     ),
@@ -184,33 +327,42 @@ class _FavCard extends ConsumerWidget {
                           title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.font(context, 13.5).clamp(12.0, 15.0),
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
                           ),
                         ),
                         if (city.isNotEmpty) ...[
                           const Gap(3),
-                          Text(
-                            city,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: AppResponsive.font(context, 12).clamp(10.0, 13.0),
-                              color: Colors.white54,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.location_on_rounded,
+                                  size: 11, color: AppTheme.primaryLight),
+                              const Gap(3),
+                              Flexible(
+                                child: Text(
+                                  city,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.font(context, 11.5).clamp(10.0, 13.0),
+                                    color: AppTheme.primaryLight,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                         if (genre.isNotEmpty || daysLeft != null) ...[
                           const Gap(6),
-                          // Row instead of Wrap — genre chip shrinks via Flexible
-                          // so chips always stay on one line (avoids IntrinsicHeight measurement bug with Wrap)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (genre.isNotEmpty)
-                                Flexible(child: _Chip(genre)),
+                                Flexible(child: _Chip(genre, color: AppTheme.primary)),
                               if (genre.isNotEmpty && daysLeft != null)
                                 const Gap(6),
                               if (daysLeft != null)
@@ -232,8 +384,8 @@ class _FavCard extends ConsumerWidget {
                   width: deleteWidth,
                   child: Center(
                     child: IconButton(
-                      icon: const Icon(Icons.favorite_rounded,
-                          color: AppTheme.accent, size: 22),
+                      icon: Icon(Icons.favorite_rounded,
+                          color: AppTheme.primary.withValues(alpha: 0.90), size: 22),
                       onPressed: () async {
                         final user = ref.read(authStateProvider).asData?.value;
                         if (user == null) return;
@@ -246,6 +398,7 @@ class _FavCard extends ConsumerWidget {
             ),
           );
         },
+      ),
       ),
     );
   }
@@ -271,18 +424,18 @@ class _Chip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.inter(
+        style: GoogleFonts.poppins(
           fontSize: AppResponsive.font(context, 10).clamp(8.0, 11.0),
           fontWeight: FontWeight.w600,
-          color: color == AppTheme.accent ? AppTheme.accent : Colors.white60,
+          color: color,
         ),
       ),
     );

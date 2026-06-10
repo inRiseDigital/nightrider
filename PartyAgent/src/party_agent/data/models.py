@@ -16,6 +16,13 @@ class Event:
     rsvps: int
     description: str = ""
     event_date: datetime | None = None
+    # Google Maps enrichment (populated on demand via integrations/google_maps.py)
+    venue_place_id: str | None = None
+    venue_address: str | None = None
+    venue_google_maps_url: str | None = None
+    distance_from_user_meters: int | None = None
+    estimated_travel_time_minutes: int | None = None
+    recommended_travel_mode: str | None = None
 
 
 @dataclass

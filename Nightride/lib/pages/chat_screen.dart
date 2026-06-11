@@ -7,12 +7,14 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/app_theme.dart';
 import '../data/models/chat_message.dart';
 import '../data/models/chat_session.dart';
 import '../data/services/chat_service.dart' show ChatService, ChatStreamHandle;
 import '../data/services/chat_history_service.dart';
+import '../providers/app_nav_provider.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -792,7 +794,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         onTapLink: (text, href, title) async {
           if (href == null) return;
           final uri = Uri.tryParse(href);
-          if (uri != null && await canLaunchUrl(uri)) {
+          if (uri == null) return;
+
+          // Google Maps links → open the in-app map instead of external browser
+          if (uri.host.contains('google.com') && uri.path.contains('map')) {
+            double? lat, lng;
+            final dest = uri.queryParameters['destination'];
+            if (dest != null) {
+              final parts = dest.split(',');
+              if (parts.length == 2) {
+                lat = double.tryParse(parts[0].trim());
+                lng = double.tryParse(parts[1].trim());
+              }
+            }
+            final container = ProviderScope.containerOf(context, listen: false);
+            if (lat != null && lng != null) {
+              container.read(mapFocusProvider.notifier).state =
+                  MapFocus(lat, lng, label: text);
+            }
+            container.read(appNavProvider.notifier).setIndex(1);
+            return;
+          }
+
+          if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           }
         },

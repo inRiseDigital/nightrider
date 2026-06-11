@@ -17,7 +17,7 @@ class ChatStreamHandle {
 class ChatService {
   static const String _baseUrl = String.fromEnvironment(
     'BACKEND_URL',
-    defaultValue: 'http://192.168.24.149:8000',
+    defaultValue: 'https://5r5cqck5-8000.asse.devtunnels.ms',
   );
 
   static const String _apiKey = String.fromEnvironment('APP_API_KEY');

@@ -66,4 +66,8 @@ HARD RULES
   the change persisted.
 - Hand back to event_discovery whenever the user wants to FIND events;
   social_companion is about what they've decided to do, not discovery.
+- NEVER name competitor platforms — do not mention Eventbrite, Resident Advisor,
+  RA, Bandsintown, Ticketmaster, Songkick, Dice, Skiddle, or any similar app by
+  name. Night Rite is the platform. If users need to check for lineups, direct
+  them to the venue's own Instagram or website.
 """ + _spec("agent3_social_companion.md", "FULL SOCIAL & CULTURAL SPEC")

@@ -83,11 +83,8 @@ class _MapPageState extends ConsumerState<MapPage> {
 
     ref.listen<MapFocus?>(mapFocusProvider, (_, focus) {
       if (focus == null) return;
-      _mapController?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-        target: LatLng(focus.lat, focus.lng),
-        zoom: 14.0,
-      )));
       _dropRedPin(focus.lat, focus.lng);
+      _drawRouteToFocus(focus.lat, focus.lng);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(mapFocusProvider.notifier).state = null;
       });
@@ -319,6 +316,37 @@ class _MapPageState extends ConsumerState<MapPage> {
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       ));
     });
+  }
+
+  Future<void> _drawRouteToFocus(double destLat, double destLng) async {
+    try {
+      final position = await geo.Geolocator.getCurrentPosition(
+        locationSettings: const geo.LocationSettings(accuracy: geo.LocationAccuracy.medium),
+      ).timeout(const Duration(seconds: 5));
+
+      await _fetchAndDrawRoute(
+        position.latitude, position.longitude,
+        destLat, destLng,
+      );
+
+      // Fit camera to show both the user and the destination
+      final sw = LatLng(
+        position.latitude < destLat ? position.latitude : destLat,
+        position.longitude < destLng ? position.longitude : destLng,
+      );
+      final ne = LatLng(
+        position.latitude > destLat ? position.latitude : destLat,
+        position.longitude > destLng ? position.longitude : destLng,
+      );
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngBounds(LatLngBounds(southwest: sw, northeast: ne), 80),
+      );
+    } catch (e) {
+      // Fallback: just animate to destination if location unavailable
+      _mapController?.animateCamera(CameraUpdate.newCameraPosition(
+        CameraPosition(target: LatLng(destLat, destLng), zoom: 14.0),
+      ));
+    }
   }
 
   void _addEventMarkers(List<MapBottomCardData> events) {

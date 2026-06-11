@@ -124,6 +124,20 @@ async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResp
         # Send a status event so the app shows "Thinking..." immediately
         yield f"data: {json.dumps({'type': 'status', 'text': 'Thinking...'})}\n\n"
 
+        _TOOL_STATUS: dict[str, str] = {
+            "search_events":    "Searching events...",
+            "trending_events":  "Finding trending parties...",
+            "nearby_events":    "Scanning nearby events...",
+            "travel_estimate":  "Calculating travel time...",
+            "maps_find_nearby_parties": "Searching nearby venues...",
+            "maps_get_event_travel_info": "Getting directions...",
+            "get_weather":      "Checking weather...",
+            "ride_to":          "Getting ride options...",
+            "check_in":         "Recording check-in...",
+            "check_progress":   "Loading your stats...",
+            "post_rsvp":        "Saving RSVP...",
+        }
+
         full_reply: list[str] = []
         try:
             async for event in graph.astream_events(
@@ -131,7 +145,15 @@ async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResp
                 config={"configurable": {"thread_id": thread_id, "user_id": req.user_id}},
                 version="v2",
             ):
-                if event.get("event") != "on_chat_model_stream":
+                ev_type = event.get("event")
+
+                if ev_type == "on_tool_start":
+                    tool_name = event.get("name", "")
+                    status = _TOOL_STATUS.get(tool_name, f"Working on it...")
+                    yield f"data: {json.dumps({'type': 'status', 'text': status})}\n\n"
+                    continue
+
+                if ev_type != "on_chat_model_stream":
                     continue
                 chunk = event["data"].get("chunk")
                 if chunk is None:
@@ -151,12 +173,15 @@ async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResp
 
         except asyncio.TimeoutError:
             log.error("chat_stream timed out for thread=%s", thread_id)
-            if not full_reply:
-                yield f"data: {json.dumps({'type': 'error', 'text': 'The agent took too long to respond. Please try again.'})}\n\n"
+            error_token = "\n\n⚠️ The search took too long. Please try again."
+            yield f"data: {json.dumps({'type': 'token', 'text': error_token})}\n\n"
         except Exception as exc:
             log.error("chat_stream failed: %s", exc)
+            error_token = f"\n\n⚠️ Something went wrong: {exc}"
             if not full_reply:
                 yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'token', 'text': error_token})}\n\n"
 
         reply_text = "".join(full_reply)
         yield f"data: {json.dumps({'type': 'done', 'suggestions': generate_suggestions(req.message, reply_text)})}\n\n"

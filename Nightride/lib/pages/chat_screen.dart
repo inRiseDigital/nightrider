@@ -293,7 +293,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             assistantMsg = msg;
             setState(() {
               _messages.add(msg);
-              _statusText = null;
             });
             _typingTarget = token;
             _startTypingAnimation(msg.id);

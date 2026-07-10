@@ -10,6 +10,7 @@ class MapCategory {
 class MapBottomCardData {
   const MapBottomCardData({
     this.id = '',
+    this.placeId,
     required this.title,
     required this.subtitle,
     required this.locationLine,
@@ -23,6 +24,7 @@ class MapBottomCardData {
   });
 
   final String id;
+  final String? placeId;
   final String title;
   final String subtitle;
   final String locationLine;
@@ -36,6 +38,7 @@ class MapBottomCardData {
 
   MapBottomCardData copyWith({
     String? id,
+    String? placeId,
     String? title,
     String? subtitle,
     String? locationLine,
@@ -49,6 +52,7 @@ class MapBottomCardData {
   }) {
     return MapBottomCardData(
       id: id ?? this.id,
+      placeId: placeId ?? this.placeId,
       title: title ?? this.title,
       subtitle: subtitle ?? this.subtitle,
       locationLine: locationLine ?? this.locationLine,

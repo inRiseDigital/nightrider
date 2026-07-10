@@ -1,17 +1,33 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:palette_generator/palette_generator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
 import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/services/auth_service.dart';
+import 'package:nightride/services/favourites_service.dart';
+
+// ── Palette ────────────────────────────────────────────────────────────────────
+class _P {
+  static const black     = Color(0xFF070707);
+  static const surface   = Color(0xFF0F0F0F);
+  static const darkGray  = Color(0xFF151515);
+  static const borderGray= Color(0xFF333333);
+  static const cream     = Color(0xFFF3EAD6);
+  static const neonLime  = Color(0xFFDFFF2F);
+  static const hotPink   = Color(0xFFFF3D73);
+  static const teal      = Color(0xFF62D6C8);
+  static const white     = Color(0xFFFAFAFA);
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────────
 
 class EventDetailPage extends ConsumerWidget {
   const EventDetailPage({super.key, required this.id});
@@ -23,7 +39,7 @@ class EventDetailPage extends ConsumerWidget {
     final async = ref.watch(eventDetailProvider(id));
 
     return Scaffold(
-      backgroundColor: AppTheme.scaffold,
+      backgroundColor: _P.black,
       body: async.when(
         loading: () => const _LoadingBody(),
         error: (_, __) => const _ErrorBody(),
@@ -36,42 +52,57 @@ class EventDetailPage extends ConsumerWidget {
   }
 }
 
+// ── Loading ────────────────────────────────────────────────────────────────────
+
 class _LoadingBody extends StatelessWidget {
   const _LoadingBody();
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.scaffold,
-      appBar: AppBar(backgroundColor: AppTheme.scaffold),
-      body: const Center(
-        child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2),
+    return const Scaffold(
+      backgroundColor: _P.black,
+      body: Center(
+        child: CircularProgressIndicator(color: _P.neonLime, strokeWidth: 2),
       ),
     );
   }
 }
+
+// ── Error ──────────────────────────────────────────────────────────────────────
 
 class _ErrorBody extends StatelessWidget {
   const _ErrorBody();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.scaffold,
-      appBar: AppBar(
-        backgroundColor: AppTheme.scaffold,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+      backgroundColor: _P.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _CircleButton(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: _P.white, size: 18),
+                ),
+              ),
+            ),
+            const Expanded(
+              child: Center(
+                child: Text('Event not found',
+                    style: TextStyle(color: Colors.white54)),
+              ),
+            ),
+          ],
         ),
-      ),
-      body: Center(
-        child: Text(AppLocalizations.of(context)!.eventNotFound,
-            style: const TextStyle(color: Colors.white70)),
       ),
     );
   }
 }
 
-// ── _DetailBody — converts to stateful so it can extract palette ──────────────
+// ── Detail body ───────────────────────────────────────────────────────────────
 
 class _DetailBody extends ConsumerStatefulWidget {
   const _DetailBody({required this.data});
@@ -82,13 +113,8 @@ class _DetailBody extends ConsumerStatefulWidget {
 }
 
 class _DetailBodyState extends ConsumerState<_DetailBody> {
-  Color _cardColor = AppTheme.accent;
-  bool _colorLoaded = false;
-
-  Color get _cardTextColor =>
-      _cardColor.computeLuminance() > 0.35 ? Colors.black : Colors.white;
-
   // ── Field getters ─────────────────────────────────────────────────────────
+  String get _id          => widget.data['id'] as String? ?? '';
   String get _name        => widget.data['name'] as String? ?? '';
   String get _coverImage  => widget.data['cover_image'] as String? ?? '';
   String get _genre       => widget.data['genre'] as String? ?? 'Music';
@@ -120,55 +146,39 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
   Map<String, dynamic> get _policies =>
       (widget.data['policies'] as Map<String, dynamic>?) ?? {};
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
-  @override
-  void initState() {
-    super.initState();
-    _extractColor();
-  }
-
-  Future<void> _extractColor() async {
-    if (_coverImage.isEmpty) {
-      if (mounted) setState(() { _colorLoaded = true; });
-      return;
-    }
-    try {
-      final palette = await PaletteGenerator.fromImageProvider(
-        CachedNetworkImageProvider(_coverImage),
-        maximumColorCount: 32,
-      );
-      final c = palette.vibrantColor?.color
-          ?? palette.lightVibrantColor?.color
-          ?? palette.darkVibrantColor?.color
-          ?? palette.mutedColor?.color
-          ?? palette.dominantColor?.color;
-      if (!mounted) return;
-      setState(() {
-        if (c != null) _cardColor = c;
-        _colorLoaded = true;
-      });
-    } catch (_) {
-      if (mounted) setState(() { _colorLoaded = true; });
-    }
-  }
-
   // ── Helpers ───────────────────────────────────────────────────────────────
-  String _formatDateTime() {
+
+  /// Returns e.g. "JUN 14" for the date badge circle
+  String _formatDayMonth() {
     if (_date.isEmpty) return '';
     final parts = _date.split('-');
-    if (parts.length < 3) return _date;
+    if (parts.length < 3) return _date.toUpperCase();
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      '', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
     ];
     final m = int.tryParse(parts[1]) ?? 0;
     final d = int.tryParse(parts[2]) ?? 0;
     final monthName = (m > 0 && m <= 12) ? months[m] : '';
-    final year = parts[0];
-    final timeStr = _startTime.contains('T')
-        ? _startTime.split('T').last.substring(0, 5)
-        : '';
-    return '$monthName $d, $year${timeStr.isNotEmpty ? ' · $timeStr' : ''}';
+    return '$monthName $d';
+  }
+
+  /// Returns formatted time e.g. "9:30PM"
+  String _formatTime() {
+    if (_startTime.isEmpty) return '';
+    String t = _startTime.contains('T')
+        ? _startTime.split('T').last
+        : _startTime;
+    // trim to HH:MM
+    if (t.length >= 5) t = t.substring(0, 5);
+    // parse and convert to 12h
+    final colonIdx = t.indexOf(':');
+    if (colonIdx < 0) return t.toUpperCase();
+    final hh = int.tryParse(t.substring(0, colonIdx)) ?? 0;
+    final mm = t.substring(colonIdx + 1);
+    final ampm = hh >= 12 ? 'PM' : 'AM';
+    final hour12 = hh % 12 == 0 ? 12 : hh % 12;
+    return '$hour12:$mm$ampm';
   }
 
   Future<void> _openTickets() async {
@@ -177,9 +187,51 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _share(BuildContext context) async {
+    final text = _ticketUrl.isNotEmpty ? '$_name\n$_ticketUrl' : _name;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: _P.surface,
+          content: Text('Link copied to clipboard',
+              style: TextStyle(color: _P.white)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleFavourite(bool isCurrentlyFav) async {
+    final svc = ref.read(favouritesServiceProvider);
+    final user = ref.read(authStateProvider).asData?.value;
+    if (user == null) return;
+    if (isCurrentlyFav) {
+      await svc.remove(user.uid, _id);
+    } else {
+      await svc.add(user.uid, {
+        ...widget.data,
+        'id': _id,
+      });
+    }
+    ref.invalidate(isFavouriteProvider(_id));
+    ref.invalidate(favouritesStreamProvider);
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final heroHeight = screenHeight * 0.42;
+    // cream card overlaps hero by ~80px
+    const cardOverlap = 80.0;
+
+    final isFavAsync = ref.watch(isFavouriteProvider(_id));
+    final isFav = isFavAsync.asData?.value ?? false;
+
+    final favsAll = ref.watch(favouritesStreamProvider).asData?.value ?? [];
+    final attendeeCount = widget.data['attendee_count'] as int?
+        ?? (favsAll.isNotEmpty ? favsAll.length : null);
+
     const String mapsKey = String.fromEnvironment(
       'GOOGLE_MAPS_API_KEY',
       defaultValue: kGoogleMapsApiKey,
@@ -202,804 +254,800 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
         [_city, _country].where((s) => s.isNotEmpty).join(', ');
     final addressLine =
         [_venueName, _address].where((s) => s.isNotEmpty).join(' · ');
+    final priceLabel = _priceHint.isNotEmpty ? _priceHint.toUpperCase() : 'FREE';
+    final dayMonth  = _formatDayMonth();
+    final timeStr   = _formatTime();
 
-    return Stack(
-      children: [
-        CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // ── Hero image ────────────────────────────────────────────────
-            SliverAppBar(
-              expandedHeight: 380,
-              pinned: true,
-              stretch: true,
-              backgroundColor: AppTheme.scaffold,
-              leadingWidth: 72,
-              leading: Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      height: 44,
-                      width: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF555555),
-                        borderRadius: BorderRadius.circular(14),
+    return Scaffold(
+      backgroundColor: _P.black,
+      body: Stack(
+        children: [
+          // ── Scrollable content ─────────────────────────────────────────────
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Hero image ───────────────────────────────────────────────
+                SizedBox(
+                  height: heroHeight,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _coverImage.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: _coverImage,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) =>
+                                  Container(color: _P.darkGray),
+                              errorWidget: (_, __, ___) =>
+                                  Container(color: _P.darkGray),
+                            )
+                          : Container(color: _P.darkGray),
+                      // Strong gradient toward bottom so cream card reads over it
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: [0.0, 0.40, 0.75, 1.0],
+                            colors: [
+                              Color(0x00070707),
+                              Color(0x15070707),
+                              Color(0xAA070707),
+                              Color(0xFF070707),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                stretchModes: const [StretchMode.zoomBackground],
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: _coverImage,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) =>
-                          Container(color: AppTheme.surface),
-                      errorWidget: (_, __, ___) =>
-                          Container(color: AppTheme.surface),
-                    ),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: [0.0, 0.30, 0.65, 1.0],
-                          colors: [
-                            Color(0x00000000),
-                            Color(0x22000000),
-                            Color(0xBB000000),
-                            Color(0xFF000000),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
 
-            // ── Content ───────────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 130),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Category pill — always lime
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accent,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        _genre.toUpperCase(),
-                        style: GoogleFonts.poppins(
-                          color: Colors.black,
-                          fontSize: AppResponsive.font(context, 11)
-                              .clamp(9.5, 12.0),
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.8,
-                        ),
+                // ── Cream ticket card — overlaps hero ────────────────────────
+                Transform.translate(
+                  offset: const Offset(0, -cardOverlap),
+                  child: Container(
+                    margin: EdgeInsets.zero,
+                    decoration: const BoxDecoration(
+                      color: _P.cream,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(32),
+                        topRight: Radius.circular(32),
                       ),
                     ),
-                    const Gap(16),
-
-                    // Title
-                    Text(
-                      _name.toUpperCase(),
-                      style: GoogleFonts.anton(
-                        color: Colors.white,
-                        fontSize:
-                            AppResponsive.font(context, 32).clamp(26.0, 38.0),
-                        height: 1.02,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const Gap(22),
-
-                    // ── Dynamic Ticket Card ───────────────────────────────
-                    if (!_colorLoaded)
-                      Container(
-                        height: 220,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                        ),
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: AppTheme.accent,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      )
-                    else
-                    Container(
-                      clipBehavior: Clip.none,
-                      decoration: BoxDecoration(
-                        color: _cardColor,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _cardColor.withValues(alpha: 0.35),
-                            blurRadius: 28,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'EVENT DETAILS',
-                                  style: GoogleFonts.poppins(
-                                    color: _cardTextColor
-                                        .withValues(alpha: 0.38),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 2.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                if (_formatDateTime().isNotEmpty) ...[
-                                  _TicketInfoRow(
-                                    icon: Icons.calendar_month_rounded,
-                                    label: 'DATE & TIME',
-                                    value: _formatDateTime(),
-                                    textColor: _cardTextColor,
-                                  ),
-                                  _TicketDivider(
-                                      lineColor: _cardTextColor),
-                                ],
-                                if (locationLine.isNotEmpty) ...[
-                                  _TicketInfoRow(
-                                    icon: Icons.location_on_rounded,
-                                    label: 'VENUE',
-                                    value: locationLine,
-                                    subValue: addressLine.isNotEmpty
-                                        ? addressLine
-                                        : null,
-                                    textColor: _cardTextColor,
-                                  ),
-                                ],
-                                if (_language.isNotEmpty) ...[
-                                  _TicketDivider(
-                                      lineColor: _cardTextColor),
-                                  _TicketInfoRow(
-                                    icon: Icons.language_rounded,
-                                    label: 'LANGUAGE',
-                                    value: _language,
-                                    textColor: _cardTextColor,
-                                  ),
-                                ],
-                                if (_priceHint.isNotEmpty) ...[
-                                  _TicketDivider(
-                                      lineColor: _cardTextColor),
-                                  _TicketInfoRow(
-                                    icon: Icons.local_activity_rounded,
-                                    label: 'PRICE',
-                                    value: _priceHint,
-                                    textColor: _cardTextColor,
-                                  ),
-                                ],
-                                if (_description.isNotEmpty) ...[
-                                  _TicketDivider(
-                                      lineColor: _cardTextColor),
-                                  _TicketInfoRow(
-                                    icon: Icons.info_outline_rounded,
-                                    label: 'ABOUT',
-                                    value: _description,
-                                    isMultiLine: true,
-                                    textColor: _cardTextColor,
-                                  ),
-                                ],
-                                const SizedBox(height: 10),
-                              ],
-                            ),
-                          ),
-                          // Perforated tear line
-                          _TicketTearLine(lineColor: _cardTextColor),
-                          // Barcode section
-                          Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _BarcodeStrip(color: _cardTextColor),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'ADMIT ONE  ·  NIGHT RITE',
-                                  style: GoogleFonts.poppins(
-                                    color: _cardTextColor
-                                        .withValues(alpha: 0.36),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 2.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Gap(28),
-
-                    // ── Performers ────────────────────────────────────────
-                    if (_performers.isNotEmpty || _artists.isNotEmpty) ...[
-                      Text(
-                        AppLocalizations.of(context)!.performers.toUpperCase(),
-                        style: GoogleFonts.anton(
-                          color: AppTheme.primary,
-                          fontSize: AppResponsive.font(context, 18)
-                              .clamp(15.0, 20.0),
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const Gap(12),
-                      if (_performers.isNotEmpty)
-                        Column(
-                          children: _performers.map((p) {
-                            final name = p['name'] as String? ?? '';
-                            final type = p['type'] as String? ?? 'DJ';
-                            final bio = p['bio'] as String? ?? '';
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color:
-                                    Colors.white.withValues(alpha: 0.04),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                    color: Colors.white
-                                        .withValues(alpha: 0.07)),
-                              ),
-                              child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Card main content ────────────────────────────────
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(22, 28, 22, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ── Time badge + genre row ───────────────────
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.accent
-                                          .withValues(alpha: 0.15),
-                                      borderRadius:
-                                          BorderRadius.circular(12),
+                                  // Teal circle badge with date + time
+                                  if (dayMonth.isNotEmpty || timeStr.isNotEmpty)
+                                    _TimeBadge(
+                                      dayMonth: dayMonth,
+                                      time: timeStr,
                                     ),
-                                    child: Icon(
-                                      Icons.mic_rounded,
-                                      color: AppTheme.accent,
-                                      size: AppResponsive.icon(context, 20)
-                                          .clamp(17.0, 22.0),
+                                  const Gap(12),
+                                  // Genre pill
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: _GenrePill(genre: _genre),
+                                  ),
+                                ],
+                              ),
+                              const Gap(16),
+
+                              // ── Event title ──────────────────────────────
+                              Text(
+                                _name.toUpperCase(),
+                                style: GoogleFonts.anton(
+                                  color: _P.black,
+                                  fontSize: AppResponsive.font(context, 38)
+                                      .clamp(30.0, 46.0),
+                                  height: 0.95,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const Gap(8),
+
+                              // ── Address line ─────────────────────────────
+                              if (addressLine.isNotEmpty ||
+                                  locationLine.isNotEmpty)
+                                Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 1),
+                                      child: Icon(Icons.location_on_rounded,
+                                          color: _P.hotPink, size: 16),
+                                    ),
+                                    const Gap(5),
+                                    Expanded(
+                                      child: Text(
+                                        [
+                                          if (addressLine.isNotEmpty)
+                                            addressLine,
+                                          if (locationLine.isNotEmpty)
+                                            locationLine,
+                                        ].join(' · '),
+                                        style: GoogleFonts.poppins(
+                                          color: _P.black
+                                              .withValues(alpha: 0.55),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.4,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              const Gap(20),
+
+                              // ── Dashed separator ─────────────────────────
+                              _DashedDivider(
+                                  color: _P.black.withValues(alpha: 0.18)),
+                              const Gap(16),
+
+                              // ── People going section ─────────────────────
+                              if (attendeeCount != null &&
+                                  attendeeCount > 0) ...[
+                                Row(
+                                  children: [
+                                    Text(
+                                      'PEOPLE GOING',
+                                      style: GoogleFonts.poppins(
+                                        color: _P.black
+                                            .withValues(alpha: 0.40),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 2.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Gap(8),
+                                _PeopleGoingRow(count: attendeeCount),
+                                const Gap(16),
+                                _DashedDivider(
+                                    color: _P.black.withValues(alpha: 0.12)),
+                                const Gap(16),
+                              ],
+
+                              // ── Entry row ────────────────────────────────
+                              Row(
+                                children: [
+                                  Text(
+                                    'ENTRY',
+                                    style: GoogleFonts.poppins(
+                                      color: _P.black.withValues(alpha: 0.40),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 2.2,
                                     ),
                                   ),
-                                  const Gap(12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
+                                  const Gap(14),
+                                  Text(
+                                    priceLabel,
+                                    style: GoogleFonts.anton(
+                                      color: _P.black,
+                                      fontSize: 22,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Gap(14),
+
+                              // ── Language row ─────────────────────────────
+                              if (_language.isNotEmpty) ...[
+                                Row(
+                                  children: [
+                                    Icon(Icons.language_rounded,
+                                        color:
+                                            _P.black.withValues(alpha: 0.35),
+                                        size: 15),
+                                    const Gap(6),
+                                    Text(
+                                      _language.toUpperCase(),
+                                      style: GoogleFonts.poppins(
+                                        color:
+                                            _P.black.withValues(alpha: 0.50),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Gap(14),
+                              ],
+
+                              // ── Perforated tear line ──────────────────────
+                              _TicketTearLine(),
+                              const Gap(10),
+
+                              // ── Barcode strip ─────────────────────────────
+                              _BarcodeStrip(
+                                  color: _P.black.withValues(alpha: 0.50)),
+                              const Gap(4),
+                              Text(
+                                'ADMIT ONE  ·  NIGHT RITE',
+                                style: GoogleFonts.poppins(
+                                  color: _P.black.withValues(alpha: 0.28),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 2.4,
+                                ),
+                              ),
+                              const Gap(28),
+                            ],
+                          ),
+                        ),
+
+                        // ── Performers section ─────────────────────────────
+                        if (_performers.isNotEmpty || _artists.isNotEmpty) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppLocalizations.of(context)!.performers
+                                      .toUpperCase(),
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const Gap(14),
+                                if (_performers.isNotEmpty)
+                                  Column(
+                                    children: _performers.map((p) {
+                                      final pName =
+                                          p['name'] as String? ?? '';
+                                      final type =
+                                          p['type'] as String? ?? 'DJ';
+                                      final bio =
+                                          p['bio'] as String? ?? '';
+                                      return Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: _P.black
+                                              .withValues(alpha: 0.06),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: _P.black
+                                                .withValues(alpha: 0.10),
+                                          ),
+                                        ),
+                                        child: Row(
                                           children: [
-                                            Expanded(
-                                              child: Text(
-                                                name,
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: AppResponsive
-                                                          .font(context, 14)
-                                                      .clamp(12.0, 15.5),
-                                                  fontWeight:
-                                                      FontWeight.w800,
-                                                ),
+                                            Container(
+                                              width: 44,
+                                              height: 44,
+                                              decoration: BoxDecoration(
+                                                color: _P.hotPink
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: const Icon(
+                                                Icons.mic_rounded,
+                                                color: _P.hotPink,
+                                                size: 20,
                                               ),
                                             ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.primary
-                                                    .withValues(alpha: 0.2),
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        6),
-                                              ),
-                                              child: Text(
-                                                type,
-                                                style: TextStyle(
-                                                  color:
-                                                      AppTheme.primaryLight,
-                                                  fontSize: AppResponsive
-                                                          .font(context, 10)
-                                                      .clamp(9.0, 11.0),
-                                                  fontWeight:
-                                                      FontWeight.w700,
-                                                ),
+                                            const Gap(12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          pName,
+                                                          style: GoogleFonts
+                                                              .poppins(
+                                                            color: _P.black,
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.w800,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 3),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: _P.teal
+                                                              .withValues(
+                                                                  alpha: 0.22),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(6),
+                                                        ),
+                                                        child: Text(
+                                                          type.toUpperCase(),
+                                                          style:
+                                                              GoogleFonts.poppins(
+                                                            color: const Color(
+                                                                0xFF006B62),
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  if (bio.isNotEmpty) ...[
+                                                    const Gap(4),
+                                                    Text(
+                                                      bio,
+                                                      style: GoogleFonts.poppins(
+                                                        color: _P.black
+                                                            .withValues(
+                                                                alpha: 0.50),
+                                                        fontSize: 12,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
-                                        if (bio.isNotEmpty) ...[
-                                          const Gap(4),
-                                          Text(
-                                            bio,
-                                            style: TextStyle(
-                                              color: Colors.white54,
-                                              fontSize: AppResponsive.font(
-                                                      context, 12)
-                                                  .clamp(10.5, 13.0),
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        )
-                      else
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: _artists
-                              .map((artist) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 9),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white
-                                          .withValues(alpha: 0.05),
-                                      borderRadius:
-                                          BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.08)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.mic_rounded,
-                                          color: AppTheme.accent,
-                                          size: AppResponsive.icon(
-                                                  context, 13)
-                                              .clamp(11.0, 14.5),
-                                        ),
-                                        const Gap(7),
-                                        Text(
-                                          artist,
-                                          style: TextStyle(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.9),
-                                            fontSize: AppResponsive.font(
-                                                    context, 13)
-                                                .clamp(11.0, 14.5),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ))
-                              .toList(),
-                        ),
-                      const Gap(26),
-                    ],
-
-                    // ── Event Policies ────────────────────────────────────
-                    if (_policies.isNotEmpty) ...[
-                      Text(
-                        'EVENT POLICIES',
-                        style: GoogleFonts.anton(
-                          color: AppTheme.primary,
-                          fontSize: AppResponsive.font(context, 18)
-                              .clamp(15.0, 20.0),
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const Gap(12),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color:
-                                  Colors.white.withValues(alpha: 0.06)),
-                        ),
-                        child: Column(
-                          children: [
-                            if ((_policies['age_restriction'] as int? ??
-                                    0) >
-                                0) ...[
-                              _PolicyRow(
-                                icon: Icons.person_outline_rounded,
-                                iconColor: Colors.orangeAccent,
-                                label: 'Age Restriction',
-                                value:
-                                    '${_policies['age_restriction']}+ only',
-                              ),
-                              _DividerThin(),
-                            ],
-                            if ((_policies['refund_policy'] as String? ??
-                                    '')
-                                .isNotEmpty) ...[
-                              _PolicyRow(
-                                icon: Icons.receipt_long_rounded,
-                                iconColor: Colors.blueAccent,
-                                label: 'Refund Policy',
-                                value:
-                                    _policies['refund_policy'] as String,
-                              ),
-                              _DividerThin(),
-                            ],
-                            _PolicyRow(
-                              icon: Icons.loop_rounded,
-                              iconColor:
-                                  _policies['re_entry_allowed'] == true
-                                      ? Colors.greenAccent
-                                      : Colors.redAccent,
-                              label: 'Re-entry',
-                              value:
-                                  _policies['re_entry_allowed'] == true
-                                      ? 'Allowed'
-                                      : 'Not allowed',
-                            ),
-                            _DividerThin(),
-                            _PolicyRow(
-                              icon: Icons.accessible_rounded,
-                              iconColor:
-                                  _policies['wheelchair_accessible'] == true
-                                      ? Colors.greenAccent
-                                      : Colors.white38,
-                              label: 'Wheelchair Access',
-                              value:
-                                  _policies['wheelchair_accessible'] == true
-                                      ? 'Accessible'
-                                      : 'Not specified',
-                            ),
-                            _DividerThin(),
-                            _PolicyRow(
-                              icon: Icons.pets_rounded,
-                              iconColor:
-                                  _policies['allow_pets'] == true
-                                      ? Colors.greenAccent
-                                      : Colors.white38,
-                              label: 'Pets',
-                              value: _policies['allow_pets'] == true
-                                  ? 'Allowed'
-                                  : 'Not allowed',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Gap(26),
-                    ],
-
-                    // ── Description ───────────────────────────────────────
-                    if (_description.isNotEmpty) ...[
-                      Text(
-                        AppLocalizations.of(context)!.aboutThisEvent
-                            .toUpperCase(),
-                        style: GoogleFonts.anton(
-                          color: AppTheme.primary,
-                          fontSize: AppResponsive.font(context, 18)
-                              .clamp(15.0, 20.0),
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const Gap(12),
-                      Text(
-                        _description,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: AppResponsive.font(context, 14)
-                              .clamp(12.0, 15.0),
-                          height: 1.65,
-                        ),
-                      ),
-                      const Gap(26),
-                    ],
-
-                    // ── Map preview ───────────────────────────────────────
-                    if (_lat != 0 && _lng != 0) ...[
-                      Text(
-                        AppLocalizations.of(context)!.location.toUpperCase(),
-                        style: GoogleFonts.anton(
-                          color: AppTheme.primary,
-                          fontSize: AppResponsive.font(context, 18)
-                              .clamp(15.0, 20.0),
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const Gap(12),
-                      GestureDetector(
-                        onTap: () {
-                          ref.read(mapFocusProvider.notifier).state =
-                              MapFocus(_lat, _lng, label: _name);
-                          ref.read(appNavProvider.notifier).setIndex(1);
-                          Navigator.of(context)
-                              .popUntil((route) => route.isFirst);
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Stack(
-                            children: [
-                              SizedBox(
-                                height: 190,
-                                width: double.infinity,
-                                child: staticMapUrl.isNotEmpty
-                                    ? Image.network(
-                                        staticMapUrl,
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (_, child, prog) =>
-                                            prog == null
-                                                ? child
-                                                : Container(
-                                                    color: AppTheme.surface,
-                                                    child: const Center(
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                        color:
-                                                            AppTheme.primary,
-                                                        strokeWidth: 2,
-                                                      ),
+                                      );
+                                    }).toList(),
+                                  )
+                                else
+                                  Wrap(
+                                    spacing: 10,
+                                    runSpacing: 10,
+                                    children: _artists
+                                        .map((artist) => Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 9),
+                                              decoration: BoxDecoration(
+                                                color: _P.black
+                                                    .withValues(alpha: 0.06),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: _P.black
+                                                      .withValues(alpha: 0.10),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.mic_rounded,
+                                                      color: _P.hotPink,
+                                                      size: 13),
+                                                  const Gap(7),
+                                                  Text(
+                                                    artist,
+                                                    style: GoogleFonts.poppins(
+                                                      color: _P.black,
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
-                                        errorBuilder: (_, __, ___) =>
-                                            _MapFallback(
-                                                locationLine: locationLine),
-                                      )
-                                    : _MapFallback(
-                                        locationLine: locationLine),
-                              ),
-                              Positioned(
-                                bottom: 10,
-                                right: 10,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black
-                                        .withValues(alpha: 0.65),
-                                    borderRadius:
-                                        BorderRadius.circular(999),
-                                    border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.15)),
+                                                ],
+                                              ),
+                                            ))
+                                        .toList(),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                const Gap(22),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // ── Event policies ─────────────────────────────────
+                        if (_policies.isNotEmpty) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'EVENT POLICIES',
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const Gap(14),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: _P.black.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: _P.black.withValues(alpha: 0.08),
+                                    ),
+                                  ),
+                                  child: Column(
                                     children: [
-                                      Icon(
-                                        Icons.open_in_new_rounded,
-                                        color: Colors.white,
-                                        size: AppResponsive.icon(
-                                                context, 12)
-                                            .clamp(10.0, 13.5),
-                                      ),
-                                      const Gap(5),
-                                      Text(
-                                        AppLocalizations.of(context)!
-                                            .openInMaps,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: AppResponsive.font(
-                                                  context, 11)
-                                              .clamp(9.5, 12.0),
-                                          fontWeight: FontWeight.w700,
+                                      if ((_policies['age_restriction']
+                                                  as int? ??
+                                              0) >
+                                          0) ...[
+                                        _PolicyRow(
+                                          icon: Icons.person_outline_rounded,
+                                          iconColor: Colors.orangeAccent,
+                                          label: 'Age Restriction',
+                                          value:
+                                              '${_policies['age_restriction']}+ only',
                                         ),
+                                        _PolicyDivider(),
+                                      ],
+                                      if ((_policies['refund_policy']
+                                                  as String? ??
+                                              '')
+                                          .isNotEmpty) ...[
+                                        _PolicyRow(
+                                          icon: Icons.receipt_long_rounded,
+                                          iconColor: Colors.blue,
+                                          label: 'Refund Policy',
+                                          value: _policies['refund_policy']
+                                              as String,
+                                        ),
+                                        _PolicyDivider(),
+                                      ],
+                                      _PolicyRow(
+                                        icon: Icons.loop_rounded,
+                                        iconColor:
+                                            _policies['re_entry_allowed'] ==
+                                                    true
+                                                ? Colors.green
+                                                : Colors.redAccent,
+                                        label: 'Re-entry',
+                                        value:
+                                            _policies['re_entry_allowed'] ==
+                                                    true
+                                                ? 'Allowed'
+                                                : 'Not allowed',
+                                      ),
+                                      _PolicyDivider(),
+                                      _PolicyRow(
+                                        icon: Icons.accessible_rounded,
+                                        iconColor:
+                                            _policies['wheelchair_accessible'] ==
+                                                    true
+                                                ? Colors.green
+                                                : Colors.black38,
+                                        label: 'Wheelchair Access',
+                                        value:
+                                            _policies['wheelchair_accessible'] ==
+                                                    true
+                                                ? 'Accessible'
+                                                : 'Not specified',
+                                      ),
+                                      _PolicyDivider(),
+                                      _PolicyRow(
+                                        icon: Icons.pets_rounded,
+                                        iconColor:
+                                            _policies['allow_pets'] == true
+                                                ? Colors.green
+                                                : Colors.black38,
+                                        label: 'Pets',
+                                        value: _policies['allow_pets'] == true
+                                            ? 'Allowed'
+                                            : 'Not allowed',
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        // ── Bottom action bar ──────────────────────────────────────────────
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
-            decoration: BoxDecoration(
-              color: AppTheme.surface.withValues(alpha: 0.97),
-              border: Border(
-                  top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.07))),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  blurRadius: 22,
-                  offset: const Offset(0, -6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                if (_priceHint.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppLocalizations.of(context)!.price,
-                          style: TextStyle(
-                            color: Colors.white54,
-                            fontSize: AppResponsive.font(context, 12)
-                                .clamp(10.5, 13.0),
-                          ),
-                        ),
-                        Text(
-                          _priceHint,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: AppResponsive.font(context, 16)
-                                .clamp(14.0, 17.5),
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: _openTickets,
-                    child: Container(
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: _cardColor,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _cardColor.withValues(alpha: 0.35),
-                            blurRadius: 18,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.local_activity_rounded,
-                            color: _cardTextColor,
-                            size: AppResponsive.icon(context, 18)
-                                .clamp(15.0, 20.0),
-                          ),
-                          const Gap(8),
-                          Text(
-                            AppLocalizations.of(context)!.getTickets
-                                .toUpperCase(),
-                            style: GoogleFonts.anton(
-                              fontSize: AppResponsive.font(context, 15)
-                                  .clamp(13.0, 17.0),
-                              color: _cardTextColor,
-                              letterSpacing: 1.5,
+                                const Gap(22),
+                              ],
                             ),
                           ),
                         ],
-                      ),
+
+                        // ── About / description ────────────────────────────
+                        if (_description.isNotEmpty) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppLocalizations.of(context)!.aboutThisEvent
+                                      .toUpperCase(),
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const Gap(12),
+                                Text(
+                                  _description,
+                                  style: GoogleFonts.poppins(
+                                    color: _P.black.withValues(alpha: 0.60),
+                                    fontSize: AppResponsive.font(context, 14)
+                                        .clamp(12.0, 15.0),
+                                    height: 1.65,
+                                  ),
+                                ),
+                                const Gap(22),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // ── Map ────────────────────────────────────────────
+                        if (_lat != 0 && _lng != 0) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppLocalizations.of(context)!.location
+                                      .toUpperCase(),
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const Gap(12),
+                                GestureDetector(
+                                  onTap: () {
+                                    ref.read(mapFocusProvider.notifier).state =
+                                        MapFocus(_lat, _lng, label: _name);
+                                    ref
+                                        .read(appNavProvider.notifier)
+                                        .setIndex(0);
+                                    Navigator.of(context)
+                                        .popUntil((route) => route.isFirst);
+                                  },
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Stack(
+                                      children: [
+                                        SizedBox(
+                                          height: 190,
+                                          width: double.infinity,
+                                          child: staticMapUrl.isNotEmpty
+                                              ? Image.network(
+                                                  staticMapUrl,
+                                                  fit: BoxFit.cover,
+                                                  loadingBuilder:
+                                                      (_, child, prog) =>
+                                                          prog == null
+                                                              ? child
+                                                              : Container(
+                                                                  color: _P
+                                                                      .darkGray,
+                                                                  child:
+                                                                      const Center(
+                                                                    child: CircularProgressIndicator(
+                                                                        color: _P
+                                                                            .teal,
+                                                                        strokeWidth:
+                                                                            2),
+                                                                  ),
+                                                                ),
+                                                  errorBuilder: (_, __, ___) =>
+                                                      _MapFallback(
+                                                          locationLine:
+                                                              locationLine),
+                                                )
+                                              : _MapFallback(
+                                                  locationLine: locationLine),
+                                        ),
+                                        Positioned(
+                                          bottom: 10,
+                                          right: 10,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: _P.black
+                                                  .withValues(alpha: 0.72),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              border: Border.all(
+                                                  color: _P.white
+                                                      .withValues(alpha: 0.15)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                    Icons.open_in_new_rounded,
+                                                    color: _P.white,
+                                                    size: 12),
+                                                const Gap(5),
+                                                Text(
+                                                  AppLocalizations.of(context)!
+                                                      .openInMaps,
+                                                  style: GoogleFonts.poppins(
+                                                    color: _P.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const Gap(22),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Bottom spacing for action bar
+                        const SizedBox(height: 124),
+                      ],
                     ),
+                  ),
+                ),
+
+                // Collapse the overlap offset so scroll doesn't over-extend
+                const SizedBox(height: 0 - cardOverlap),
+              ],
+            ),
+          ),
+
+          // ── Back button — top left ─────────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 16,
+            child: _CircleButton(
+              onTap: () => Navigator.of(context).pop(),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: _P.white, size: 18),
+            ),
+          ),
+
+          // ── Share + Favourite — top right ──────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            right: 16,
+            child: Column(
+              children: [
+                _CircleButton(
+                  onTap: () => _share(context),
+                  child: const Icon(Icons.ios_share_rounded,
+                      color: _P.white, size: 18),
+                ),
+                const Gap(8),
+                _CircleButton(
+                  onTap: () => _toggleFavourite(isFav),
+                  child: Icon(
+                    isFav
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFav ? _P.hotPink : _P.white,
+                    size: 18,
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
 
-// ── Ticket info row ───────────────────────────────────────────────────────────
-
-class _TicketInfoRow extends StatelessWidget {
-  const _TicketInfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.subValue,
-    this.isMultiLine = false,
-    this.textColor = Colors.black,
-  });
-  final IconData icon;
-  final String label;
-  final String value;
-  final String? subValue;
-  final bool isMultiLine;
-  final Color textColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon,
-                size: 18, color: textColor.withValues(alpha: 0.48)),
-          ),
-          const Gap(12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: textColor.withValues(alpha: 0.40),
-                    letterSpacing: 1.6,
+          // ── Bottom action bar — I'M GOING ──────────────────────────────────
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(
+                20, 16, 20,
+                MediaQuery.of(context).padding.bottom + 20,
+              ),
+              decoration: BoxDecoration(
+                color: _P.black.withValues(alpha: 0.97),
+                border: Border(
+                  top: BorderSide(
+                    color: _P.borderGray.withValues(alpha: 0.5),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: GoogleFonts.poppins(
-                    fontSize:
-                        AppResponsive.font(context, 15).clamp(13.5, 17.0),
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                    height: isMultiLine ? 1.5 : 1.2,
-                  ),
-                  maxLines: isMultiLine ? 5 : 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (subValue != null && subValue!.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    subValue!,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.font(context, 12)
-                          .clamp(11.0, 13.5),
-                      color: textColor.withValues(alpha: 0.50),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                boxShadow: [
+                  BoxShadow(
+                    color: _P.black.withValues(alpha: 0.70),
+                    blurRadius: 24,
+                    offset: const Offset(0, -8),
                   ),
                 ],
-              ],
+              ),
+              child: GestureDetector(
+                onTap: _ticketUrl.isNotEmpty
+                    ? _openTickets
+                    : () => _toggleFavourite(isFav),
+                child: Container(
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: _P.neonLime,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _P.neonLime.withValues(alpha: 0.35),
+                        blurRadius: 22,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isFav
+                            ? Icons.check_circle_rounded
+                            : Icons.local_activity_rounded,
+                        color: _P.black,
+                        size: 22,
+                      ),
+                      const Gap(10),
+                      Text(
+                        _ticketUrl.isNotEmpty
+                            ? AppLocalizations.of(context)!.getTickets
+                                .toUpperCase()
+                            : "I'M GOING",
+                        style: GoogleFonts.anton(
+                          color: _P.black,
+                          fontSize: AppResponsive.font(context, 17)
+                              .clamp(15.0, 19.0),
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -1008,27 +1056,207 @@ class _TicketInfoRow extends StatelessWidget {
   }
 }
 
+// ── Time badge (teal circle with day/month + time) ────────────────────────────
+
+class _TimeBadge extends StatelessWidget {
+  const _TimeBadge({required this.dayMonth, required this.time});
+  final String dayMonth;
+  final String time;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: const BoxDecoration(
+        color: _P.teal,
+        shape: BoxShape.circle,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (dayMonth.isNotEmpty)
+            Text(
+              dayMonth,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                color: _P.black,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                letterSpacing: 0.5,
+              ),
+            ),
+          if (time.isNotEmpty) ...[
+            const SizedBox(height: 1),
+            Text(
+              time,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anton(
+                color: _P.black,
+                fontSize: 14,
+                height: 1.1,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Genre pill ────────────────────────────────────────────────────────────────
+
+class _GenrePill extends StatelessWidget {
+  const _GenrePill({required this.genre});
+  final String genre;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: _P.hotPink,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        genre.toUpperCase(),
+        style: GoogleFonts.poppins(
+          color: _P.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.6,
+        ),
+      ),
+    );
+  }
+}
+
+// ── People going row ──────────────────────────────────────────────────────────
+
+class _PeopleGoingRow extends StatelessWidget {
+  const _PeopleGoingRow({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarColors = [
+      _P.hotPink,
+      _P.teal,
+      _P.neonLime,
+      const Color(0xFFFF8C42),
+    ];
+    final shown = count.clamp(0, 4);
+    const avatarSize = 32.0;
+    const overlap = 22.0;
+    final stackWidth = shown * overlap + (avatarSize - overlap);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: stackWidth.clamp(avatarSize, double.infinity),
+          height: avatarSize,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: List.generate(shown, (i) {
+              return Positioned(
+                left: i * overlap,
+                child: Container(
+                  width: avatarSize,
+                  height: avatarSize,
+                  decoration: BoxDecoration(
+                    color: avatarColors[i % avatarColors.length]
+                        .withValues(alpha: 0.88),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _P.cream, width: 2.5),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.person_rounded,
+                        color: _P.black.withValues(alpha: 0.65), size: 15),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const Gap(12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$count GOING',
+              style: GoogleFonts.anton(
+                color: _P.black,
+                fontSize: 18,
+                letterSpacing: 0.5,
+              ),
+            ),
+            Text(
+              'are attending this event',
+              style: GoogleFonts.poppins(
+                color: _P.black.withValues(alpha: 0.42),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Circle button ─────────────────────────────────────────────────────────────
+
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({required this.onTap, required this.child});
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: _P.surface.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          border: Border.all(color: _P.borderGray.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: _P.black.withValues(alpha: 0.55),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
 // ── Dashed divider ────────────────────────────────────────────────────────────
 
-class _TicketDivider extends StatelessWidget {
-  const _TicketDivider({this.lineColor = Colors.black});
-  final Color lineColor;
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider({this.color = const Color(0x28000000)});
+  final Color color;
+
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: CustomPaint(
-          painter:
-              _DashedLinePainter(color: lineColor.withValues(alpha: 0.14)),
-          child: const SizedBox(height: 1, width: double.infinity),
-        ),
+  Widget build(BuildContext context) => CustomPaint(
+        painter: _DashedLinePainter(color: color),
+        child: const SizedBox(height: 1, width: double.infinity),
       );
 }
 
-// ── Perforated tear line ──────────────────────────────────────────────────────
+// ── Ticket perforated tear line ───────────────────────────────────────────────
 
 class _TicketTearLine extends StatelessWidget {
-  const _TicketTearLine({this.lineColor = Colors.black});
-  final Color lineColor;
+  const _TicketTearLine();
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -1042,34 +1270,50 @@ class _TicketTearLine extends StatelessWidget {
             top: 11,
             child: CustomPaint(
               painter: _DashedLinePainter(
-                  color: lineColor.withValues(alpha: 0.18)),
+                color: _P.black.withValues(alpha: 0.20),
+                dashWidth: 7,
+                gapWidth: 5,
+              ),
               child: const SizedBox(height: 1),
             ),
           ),
+          // Left notch circle (black, punched out)
           Positioned(
-            left: -10,
+            left: -22,
             top: 2,
             child: Container(
               width: 20,
               height: 20,
               decoration: const BoxDecoration(
-                  color: AppTheme.scaffold, shape: BoxShape.circle),
+                  color: _P.black, shape: BoxShape.circle),
             ),
           ),
+          // Right notch circle (black, punched out)
           Positioned(
-            right: -10,
+            right: -22,
             top: 2,
             child: Container(
               width: 20,
               height: 20,
               decoration: const BoxDecoration(
-                  color: AppTheme.scaffold, shape: BoxShape.circle),
+                  color: _P.black, shape: BoxShape.circle),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+// ── Section divider ───────────────────────────────────────────────────────────
+
+class _SectionDivider extends StatelessWidget {
+  const _SectionDivider();
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 1,
+        color: _P.black.withValues(alpha: 0.10),
+      );
 }
 
 // ── Barcode strip ─────────────────────────────────────────────────────────────
@@ -1079,7 +1323,7 @@ class _BarcodeStrip extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 38,
+        height: 40,
         width: double.infinity,
         child: CustomPaint(painter: _BarcodePainter(color: color)),
       );
@@ -1089,25 +1333,31 @@ class _BarcodeStrip extends StatelessWidget {
 
 class _DashedLinePainter extends CustomPainter {
   final Color color;
-  const _DashedLinePainter({required this.color});
+  final double dashWidth;
+  final double gapWidth;
+  const _DashedLinePainter({
+    required this.color,
+    this.dashWidth = 5.0,
+    this.gapWidth = 4.0,
+  });
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()
       ..color = color
-      ..strokeWidth = 1.0
+      ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
-    const dw = 5.0;
-    const sp = 4.0;
     double x = 0;
     while (x < size.width) {
-      canvas.drawLine(Offset(x, 0), Offset(x + dw, 0), p);
-      x += dw + sp;
+      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth, 0), p);
+      x += dashWidth + gapWidth;
     }
   }
 
   @override
   bool shouldRepaint(covariant _DashedLinePainter old) =>
-      old.color != color;
+      old.color != color ||
+      old.dashWidth != dashWidth ||
+      old.gapWidth != gapWidth;
 }
 
 class _BarcodePainter extends CustomPainter {
@@ -1127,7 +1377,7 @@ class _BarcodePainter extends CustomPainter {
     for (final u in _pat) {
       if (bar) {
         canvas.drawRect(
-          Rect.fromLTWH(x, size.height * 0.05, u * unit, size.height * 0.9),
+          Rect.fromLTWH(x, size.height * 0.05, u * unit, size.height * 0.90),
           p,
         );
       }
@@ -1140,7 +1390,7 @@ class _BarcodePainter extends CustomPainter {
   bool shouldRepaint(covariant _BarcodePainter old) => old.color != color;
 }
 
-// ── Policy widgets ────────────────────────────────────────────────────────────
+// ── Policy row ────────────────────────────────────────────────────────────────
 
 class _PolicyRow extends StatelessWidget {
   const _PolicyRow({
@@ -1166,19 +1416,15 @@ class _PolicyRow extends StatelessWidget {
               color: iconColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon,
-                color: iconColor,
-                size:
-                    AppResponsive.icon(context, 16).clamp(13.0, 18.0)),
+            child: Icon(icon, color: iconColor, size: 16),
           ),
           const Gap(12),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize:
-                    AppResponsive.font(context, 13).clamp(11.5, 14.0),
+              style: GoogleFonts.poppins(
+                color: _P.black.withValues(alpha: 0.55),
+                fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0),
               ),
             ),
           ),
@@ -1187,10 +1433,9 @@ class _PolicyRow extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize:
-                    AppResponsive.font(context, 13).clamp(11.5, 14.0),
+              style: GoogleFonts.poppins(
+                color: _P.black,
+                fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1201,15 +1446,17 @@ class _PolicyRow extends StatelessWidget {
   }
 }
 
-class _DividerThin extends StatelessWidget {
-  const _DividerThin();
+class _PolicyDivider extends StatelessWidget {
+  const _PolicyDivider();
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Divider(
-            color: Colors.white.withValues(alpha: 0.05), height: 1),
+            color: _P.black.withValues(alpha: 0.08), height: 1),
       );
 }
+
+// ── Map fallback ──────────────────────────────────────────────────────────────
 
 class _MapFallback extends StatelessWidget {
   const _MapFallback({required this.locationLine});
@@ -1218,20 +1465,17 @@ class _MapFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 190,
-      color: AppTheme.surface,
+      color: _P.darkGray,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.map_rounded,
-              color: AppTheme.primary,
-              size: AppResponsive.icon(context, 36).clamp(28.0, 40.0)),
+          const Icon(Icons.map_rounded, color: _P.teal, size: 36),
           const Gap(8),
           Text(
             locationLine,
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize:
-                  AppResponsive.font(context, 13).clamp(11.0, 14.5),
+            style: GoogleFonts.poppins(
+              color: _P.white.withValues(alpha: 0.55),
+              fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5),
             ),
           ),
         ],

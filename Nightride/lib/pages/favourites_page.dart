@@ -2,14 +2,30 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:nightride/components/nightrite_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/pages/auth/sign_in_page.dart';
 import 'package:nightride/pages/event_detail_page.dart';
+import 'package:nightride/providers/app_nav_provider.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/favourites_service.dart';
+
+// ── Retro Nightlife Palette ──────────────────────────────────────────────────
+const _kBg       = Color(0xFF070707);
+const _kSurface  = Color(0xFF0F0F0F);
+const _kDarkGray = Color(0xFF151515);
+const _kBorder   = Color(0xFF2A2A2A);
+const _kBorderLt = Color(0xFF3A3A3A);
+const _kCream    = Color(0xFFF3EAD6);
+const _kLime     = Color(0xFFDFFF2F);
+const _kPink     = Color(0xFFFF3D73);
+const _kTeal     = Color(0xFF62D6C8);
+const _kWhite    = Color(0xFFFAFAFA);
+
+// ── Filter tab index provider (local) ────────────────────────────────────────
+final _filterProvider = StateProvider<int>((_) => 0);
 
 class FavouritesPage extends ConsumerWidget {
   const FavouritesPage({super.key});
@@ -17,388 +33,380 @@ class FavouritesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final favAsync = ref.watch(favouritesStreamProvider);
-    final user = ref.watch(authStateProvider).asData?.value;
+    final user     = ref.watch(authStateProvider).asData?.value;
+    final tabIndex = ref.watch(_filterProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.scaffold,
+      backgroundColor: _kBg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header ──────────────────────────────────────────────────────
+            _Header(),
+
+            // ── Filter pills ─────────────────────────────────────────────────
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppResponsive.gap(context, 20).clamp(16.0, 24.0),
-                AppResponsive.gap(context, 20).clamp(16.0, 24.0),
-                AppResponsive.gap(context, 20).clamp(16.0, 24.0),
-                8,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+              child: Row(
                 children: [
-                  Text(
-                    'SAVED',
-                    style: GoogleFonts.anton(
-                      fontSize: AppResponsive.font(context, 32).clamp(26.0, 36.0),
-                      fontWeight: FontWeight.w400,
-                      color: AppTheme.primary,
-                      letterSpacing: 2.0,
-                      height: 1.0,
-                    ),
-                  ),
-                  Text(
-                    'EVENTS',
-                    style: GoogleFonts.anton(
-                      fontSize: AppResponsive.font(context, 32).clamp(26.0, 36.0),
-                      fontWeight: FontWeight.w400,
-                      color: AppTheme.accent,
-                      letterSpacing: 2.0,
-                      height: 1.0,
-                    ),
-                  ),
+                  _FilterPill(label: 'PLACES', index: 0, selected: tabIndex == 0),
+                  const Gap(10),
+                  _FilterPill(label: 'EVENTS', index: 1, selected: tabIndex == 1),
+                  const Gap(10),
+                  _FilterPill(label: 'PEOPLE', index: 2, selected: tabIndex == 2),
                 ],
               ),
             ),
+
+            // ── Divider ───────────────────────────────────────────────────────
+            Container(
+              height: 1,
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _kPink.withValues(alpha: 0.0),
+                    _kPink.withValues(alpha: 0.45),
+                    _kLime.withValues(alpha: 0.45),
+                    _kLime.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Body ─────────────────────────────────────────────────────────
             Expanded(
               child: user == null
-                  ? _guestSignInPrompt(context)
-                  : NightRiteRefresh(
-                      onRefresh: () async {
-                        ref.invalidate(favouritesStreamProvider);
-                        await Future<void>.delayed(const Duration(milliseconds: 600));
-                      },
-                      child: favAsync.when(
-                        loading: () => const Center(
-                          child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2),
-                        ),
-                        error: (_, __) => _emptyScrollable('Could not load favourites'),
-                        data: (favs) {
-                          if (favs.isEmpty) {
-                            return _emptyScrollable(
-                              'No saved events yet\nTap the heart on any event to save it',
-                            );
-                          }
-                          return ListView.separated(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: EdgeInsets.symmetric(
-                              horizontal: AppResponsive.gap(context, 16).clamp(12.0, 20.0),
-                              vertical: 8,
+                  ? const _GuestPrompt()
+                  : tabIndex == 2
+                      ? const _PeopleComingSoon()
+                      : NightRiteRefresh(
+                          onRefresh: () async {
+                            ref.invalidate(favouritesStreamProvider);
+                            await Future<void>.delayed(
+                                const Duration(milliseconds: 600));
+                          },
+                          child: favAsync.when(
+                            loading: () => const _ShimmerList(),
+                            error: (_, __) => const _EmptyState(
+                              message: 'COULD NOT LOAD\nFAVOURITES',
+                              showExplore: false,
                             ),
-                            itemCount: favs.length,
-                            separatorBuilder: (_, __) => const Gap(12),
-                            itemBuilder: (context, i) {
-                              final fav = favs[i];
-                              return _FavCard(fav: fav);
+                            data: (favs) {
+                              final filtered = tabIndex == 0
+                                  ? favs
+                                      .where((f) =>
+                                          (f['type'] as String?)
+                                              ?.toLowerCase() ==
+                                          'place')
+                                      .toList()
+                                  : favs
+                                      .where((f) =>
+                                          (f['type'] as String?)
+                                              ?.toLowerCase() !=
+                                          'place')
+                                      .toList();
+
+                              if (filtered.isEmpty) {
+                                return const _EmptyState(
+                                  message: 'YOUR NIGHT\nSTARTS HERE',
+                                  showExplore: true,
+                                );
+                              }
+
+                              return ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const Gap(12),
+                                itemBuilder: (context, i) =>
+                                    _FavCard(fav: filtered[i]),
+                              );
                             },
-                          );
-                        },
-                      ),
-                    ),
+                          ),
+                        ),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _emptyScrollable(String msg) => SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: SizedBox(
-          height: 400,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+// ── Header ────────────────────────────────────────────────────────────────────
+class _Header extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: RichText(
+              text: TextSpan(
                 children: [
-                  Builder(
-                    builder: (context) => Icon(
-                      Icons.local_activity_rounded,
-                      color: AppTheme.primary.withValues(alpha: 0.55),
-                      size: AppResponsive.icon(context, 64).clamp(48.0, 64.0),
+                  TextSpan(
+                    text: 'FAVOURITES ',
+                    style: GoogleFonts.anton(
+                      fontSize: AppResponsive.font(context, 36)
+                          .clamp(28.0, 42.0),
+                      color: _kCream,
+                      letterSpacing: 2.5,
+                      height: 1.0,
                     ),
                   ),
-                  const Gap(16),
-                  Builder(
-                    builder: (context) => Text(
-                      msg,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
-                        color: AppTheme.primaryLight.withValues(alpha: 0.70),
-                        height: 1.6,
-                      ),
+                  TextSpan(
+                    text: '♥',
+                    style: GoogleFonts.anton(
+                      fontSize: AppResponsive.font(context, 34)
+                          .clamp(26.0, 40.0),
+                      color: _kPink,
+                      letterSpacing: 0,
+                      height: 1.0,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        ),
-      );
-
-  Widget _guestSignInPrompt(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 36),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppTheme.primary.withValues(alpha: 0.30),
-                    width: 1.5,
-                  ),
-                ),
-                child: Icon(
-                  Icons.bookmark_rounded,
-                  color: AppTheme.primary,
-                  size: 40,
-                ),
-              ),
-              const Gap(24),
-              Text(
-                'SIGN IN TO SAVE EVENTS',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.anton(
-                  fontSize: AppResponsive.font(context, 20).clamp(17.0, 22.0),
-                  color: Colors.white,
-                  letterSpacing: 1.2,
-                  height: 1.2,
-                ),
-              ),
-              const Gap(10),
-              Text(
-                'Create a free account to bookmark events,\ntrack your favourites and get reminders.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.font(context, 13).clamp(12.0, 14.0),
-                  color: Colors.white.withValues(alpha: 0.50),
-                  height: 1.6,
-                ),
-              ),
-              const Gap(32),
-              SizedBox(
-                width: double.infinity,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SignInPage()),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accent,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.accent.withValues(alpha: 0.35),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      'SIGN IN',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.anton(
-                        fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
-                        color: Colors.black,
-                        letterSpacing: 2.0,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const Gap(12),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const SignInPage(),
-                  ),
-                ),
-                child: Text(
-                  "Don't have an account? Sign up",
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.font(context, 12).clamp(11.0, 13.0),
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+        ],
+      ),
+    );
+  }
 }
 
+// ── Filter Pill ───────────────────────────────────────────────────────────────
+class _FilterPill extends ConsumerWidget {
+  const _FilterPill({
+    required this.label,
+    required this.index,
+    required this.selected,
+  });
+  final String label;
+  final int    index;
+  final bool   selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () => ref.read(_filterProvider.notifier).state = index,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? _kLime : Colors.transparent,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: selected ? _kLime : _kBorderLt,
+            width: 1.5,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: _kLime.withValues(alpha: 0.25),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.anton(
+            fontSize: 13,
+            color: selected ? Colors.black : _kWhite.withValues(alpha: 0.70),
+            letterSpacing: 1.4,
+            height: 1.1,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Favourite Card ────────────────────────────────────────────────────────────
 class _FavCard extends ConsumerWidget {
   const _FavCard({required this.fav});
   final Map<String, dynamic> fav;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String title = fav['name'] as String? ?? fav['title'] as String? ?? '';
-    final String image = fav['cover_image'] as String? ?? '';
-    final String city  = fav['city'] as String? ?? '';
-    final String date  = fav['date'] as String? ?? '';
-    final String genre = fav['genre'] as String? ?? '';
-    final String id    = fav['id'] as String? ?? '';
+    final String title    = fav['name']        as String? ?? fav['title'] as String? ?? '';
+    final String image    = fav['cover_image'] as String? ?? '';
+    final String city     = fav['city']        as String? ?? '';
+    final String date     = fav['date']        as String? ?? '';
+    final String genre    = fav['genre']       as String? ?? '';
+    final String category = fav['category']    as String? ?? genre;
+    final String address  = fav['address']     as String? ?? city;
+    final String id       = fav['id']          as String? ?? '';
+    final bool   isPlace  = (fav['type'] as String?)?.toLowerCase() == 'place';
 
     final daysLeft = _daysUntil(date);
 
-    final double imgSize = AppResponsive.gap(context, 96).clamp(84.0, 108.0);
-    final String daysLabel = daysLeft == null
-        ? ''
-        : daysLeft == 0
-            ? 'Today!'
-            : daysLeft == 1
-                ? 'Tomorrow!'
-                : '$daysLeft days';
-
-    const double deleteWidth = 48;
     return GestureDetector(
-      onTap: id.isEmpty ? null : () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => EventDetailPage(id: id)),
-      ),
+      onTap: id.isEmpty
+          ? null
+          : () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => EventDetailPage(id: id)),
+              ),
       child: Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.22)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x1Af15991), blurRadius: 16, offset: Offset(0, 6)),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final contentWidth =
-              (constraints.maxWidth - imgSize - 12 - deleteWidth).clamp(60.0, double.infinity);
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Lime left accent stripe
-                Container(
-                  width: 4,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.accent,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
-                    ),
-                  ),
-                ),
-                // Thumbnail — stretches to match content height
-                ClipRRect(
-                  borderRadius: BorderRadius.zero,
-                  child: CachedNetworkImage(
+        decoration: BoxDecoration(
+          color: _kSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _kBorder, width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.55),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // ── Thumbnail ──────────────────────────────────────────────────
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft:    Radius.circular(15),
+                bottomLeft: Radius.circular(15),
+              ),
+              child: Stack(
+                children: [
+                  CachedNetworkImage(
                     imageUrl: image,
-                    width: imgSize,
+                    width: 84,
+                    height: 84,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) =>
-                        SizedBox(width: imgSize, height: imgSize, child: Container(color: Colors.white10)),
-                    errorWidget: (_, __, ___) => SizedBox(
-                      width: imgSize,
-                      height: imgSize,
-                      child: Container(
-                        color: AppTheme.surface,
-                        alignment: Alignment.center,
-                        child: Icon(Icons.music_note_rounded,
-                            color: AppTheme.primary.withValues(alpha: 0.40),
-                            size: AppResponsive.icon(context, 28).clamp(22.0, 28.0)),
+                    placeholder: (_, __) => Container(
+                      width: 84,
+                      height: 84,
+                      color: _kDarkGray,
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      width: 84,
+                      height: 84,
+                      color: _kDarkGray,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        isPlace
+                            ? Icons.place_rounded
+                            : Icons.music_note_rounded,
+                        color: _kBorderLt,
+                        size: 32,
                       ),
                     ),
                   ),
-                ),
-                const Gap(12),
-                // Info — fixed width so IntrinsicHeight measures text correctly
-                SizedBox(
-                  width: contentWidth,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.font(context, 13.5).clamp(12.0, 15.0),
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
+                  // subtle gradient overlay on thumbnail
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.20),
+                          ],
                         ),
-                        if (city.isNotEmpty) ...[
-                          const Gap(3),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.location_on_rounded,
-                                  size: 11, color: AppTheme.primaryLight),
-                              const Gap(3),
-                              Flexible(
-                                child: Text(
-                                  city,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.font(context, 11.5).clamp(10.0, 13.0),
-                                    color: AppTheme.primaryLight,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (genre.isNotEmpty || daysLeft != null) ...[
-                          const Gap(6),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (genre.isNotEmpty)
-                                Flexible(child: _Chip(genre, color: AppTheme.primary)),
-                              if (genre.isNotEmpty && daysLeft != null)
-                                const Gap(6),
-                              if (daysLeft != null)
-                                _Chip(
-                                  daysLabel,
-                                  color: daysLeft <= 3
-                                      ? AppTheme.accent
-                                      : Colors.white24,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                // Remove button centered in the card height
-                SizedBox(
-                  width: deleteWidth,
-                  child: Center(
-                    child: IconButton(
-                      icon: Icon(Icons.favorite_rounded,
-                          color: AppTheme.primary.withValues(alpha: 0.90), size: 22),
-                      onPressed: () async {
-                        final user = ref.read(authStateProvider).asData?.value;
-                        if (user == null) return;
-                        await ref.read(favouritesServiceProvider).remove(user.uid, id);
-                      },
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          );
-        },
-      ),
+
+            const Gap(14),
+
+            // ── Info ───────────────────────────────────────────────────────
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.anton(
+                        fontSize: 16,
+                        color: _kWhite,
+                        letterSpacing: 0.5,
+                        height: 1.15,
+                      ),
+                    ),
+                    if (category.isNotEmpty) ...[
+                      const Gap(4),
+                      Row(
+                        children: [
+                          Container(
+                            width: 3,
+                            height: 3,
+                            decoration: const BoxDecoration(
+                              color: _kTeal,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const Gap(5),
+                          Flexible(
+                            child: Text(
+                              category.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.anton(
+                                fontSize: 11,
+                                color: _kTeal,
+                                letterSpacing: 1.2,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (address.isNotEmpty) ...[
+                      const Gap(3),
+                      Text(
+                        address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _kWhite.withValues(alpha: 0.45),
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                    if (!isPlace && daysLeft != null) ...[
+                      const Gap(6),
+                      _DaysChip(daysLeft: daysLeft),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Unfavourite button ─────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                icon: const Icon(Icons.favorite_rounded, color: _kPink, size: 24),
+                splashRadius: 22,
+                tooltip: 'Remove from favourites',
+                onPressed: () async {
+                  final u = ref.read(authStateProvider).asData?.value;
+                  if (u == null || id.isEmpty) return;
+                  await ref.read(favouritesServiceProvider).remove(u.uid, id);
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -414,28 +422,426 @@ class _FavCard extends ConsumerWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip(this.label, {this.color = Colors.white24});
-  final String label;
-  final Color color;
+// ── Days chip ─────────────────────────────────────────────────────────────────
+class _DaysChip extends StatelessWidget {
+  const _DaysChip({required this.daysLeft});
+  final int daysLeft;
 
   @override
   Widget build(BuildContext context) {
+    final String label = daysLeft == 0
+        ? 'TONIGHT'
+        : daysLeft == 1
+            ? 'TOMORROW'
+            : '$daysLeft DAYS AWAY';
+    final bool urgent = daysLeft <= 3;
+    final Color col   = urgent ? _kLime : _kBorderLt;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: col.withValues(alpha: urgent ? 0.14 : 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
+        border: Border.all(color: col.withValues(alpha: 0.50), width: 1),
       ),
       child: Text(
         label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.font(context, 10).clamp(8.0, 11.0),
-          fontWeight: FontWeight.w600,
-          color: color,
+        style: GoogleFonts.anton(
+          fontSize: 10,
+          color: col,
+          letterSpacing: 1.0,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+class _EmptyState extends ConsumerWidget {
+  const _EmptyState({required this.message, required this.showExplore});
+  final String message;
+  final bool   showExplore;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Mascot / logo with pink glow ring
+            Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: _kPink.withValues(alpha: 0.18),
+                    blurRadius: 40,
+                    spreadRadius: 10,
+                  ),
+                ],
+              ),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 140,
+                height: 140,
+                fit: BoxFit.contain,
+                color: _kWhite.withValues(alpha: 0.30),
+                colorBlendMode: BlendMode.modulate,
+              ),
+            ),
+            const Gap(28),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anton(
+                fontSize: 28,
+                color: _kCream,
+                letterSpacing: 2.0,
+                height: 1.15,
+              ),
+            ),
+            if (showExplore) ...[
+              const Gap(10),
+              Text(
+                'TAP THE HEART ON ANY EVENT OR PLACE TO SAVE IT HERE',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.anton(
+                  fontSize: 11,
+                  color: _kWhite.withValues(alpha: 0.38),
+                  letterSpacing: 1.2,
+                  height: 1.5,
+                ),
+              ),
+              const Gap(32),
+              GestureDetector(
+                onTap: () => ref.read(appNavProvider.notifier).setIndex(1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 15),
+                  decoration: BoxDecoration(
+                    color: _kLime,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kLime.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    'EXPLORE EVENTS',
+                    style: GoogleFonts.anton(
+                      fontSize: 14,
+                      color: Colors.black,
+                      letterSpacing: 2.5,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── People coming soon ────────────────────────────────────────────────────────
+class _PeopleComingSoon extends StatelessWidget {
+  const _PeopleComingSoon();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon with teal glow
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: _kTeal.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _kTeal.withValues(alpha: 0.30),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _kTeal.withValues(alpha: 0.15),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.people_rounded,
+                color: _kTeal,
+                size: 44,
+              ),
+            ),
+            const Gap(28),
+            Text(
+              'YOUR CREW',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anton(
+                fontSize: 30,
+                color: _kCream,
+                letterSpacing: 2.5,
+                height: 1.0,
+              ),
+            ),
+            const Gap(6),
+            Text(
+              'COMING SOON',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anton(
+                fontSize: 16,
+                color: _kLime,
+                letterSpacing: 3.5,
+                height: 1.1,
+              ),
+            ),
+            const Gap(20),
+            Text(
+              'Friends & crew features are in the works.\nYour squad is almost here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: _kWhite.withValues(alpha: 0.40),
+                height: 1.65,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Guest sign-in prompt ──────────────────────────────────────────────────────
+class _GuestPrompt extends StatelessWidget {
+  const _GuestPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Pink glow heart circle
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: _kPink.withValues(alpha: 0.09),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _kPink.withValues(alpha: 0.38),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _kPink.withValues(alpha: 0.22),
+                    blurRadius: 32,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.favorite_rounded, color: _kPink, size: 42),
+            ),
+            const Gap(26),
+            Text(
+              'SIGN IN TO SAVE\nYOUR NIGHTS',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anton(
+                fontSize: 26,
+                color: _kCream,
+                letterSpacing: 1.8,
+                height: 1.15,
+              ),
+            ),
+            const Gap(12),
+            Text(
+              'Create a free account to bookmark events,\ntrack your favourites and get reminders.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: _kWhite.withValues(alpha: 0.48),
+                height: 1.65,
+              ),
+            ),
+            const Gap(34),
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SignInPage()),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 17),
+                  decoration: BoxDecoration(
+                    color: _kLime,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kLime.withValues(alpha: 0.30),
+                        blurRadius: 22,
+                        offset: const Offset(0, 7),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    'SIGN IN',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.anton(
+                      fontSize: 15,
+                      color: Colors.black,
+                      letterSpacing: 3.0,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const Gap(16),
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SignInPage()),
+              ),
+              child: Text(
+                "Don't have an account?  Sign up free",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _kTeal,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shimmer skeleton ──────────────────────────────────────────────────────────
+class _ShimmerList extends StatefulWidget {
+  const _ShimmerList();
+
+  @override
+  State<_ShimmerList> createState() => _ShimmerListState();
+}
+
+class _ShimmerListState extends State<_ShimmerList>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.25, end: 0.60)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        itemCount: 5,
+        separatorBuilder: (_, __) => const Gap(12),
+        itemBuilder: (_, __) => Container(
+          height: 84,
+          decoration: BoxDecoration(
+            color: _kSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _kBorder),
+          ),
+          child: Row(
+            children: [
+              // thumbnail slab
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft:    Radius.circular(15),
+                  bottomLeft: Radius.circular(15),
+                ),
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  color: _kDarkGray.withValues(alpha: _anim.value),
+                ),
+              ),
+              const Gap(14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 14,
+                      width: 150,
+                      decoration: BoxDecoration(
+                        color: _kBorderLt.withValues(alpha: _anim.value),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const Gap(8),
+                    Container(
+                      height: 10,
+                      width: 90,
+                      decoration: BoxDecoration(
+                        color: _kBorderLt.withValues(alpha: _anim.value * 0.55),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const Gap(6),
+                    Container(
+                      height: 9,
+                      width: 120,
+                      decoration: BoxDecoration(
+                        color: _kBorderLt.withValues(alpha: _anim.value * 0.35),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // heart placeholder
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(
+                  Icons.favorite_rounded,
+                  color: _kPink.withValues(alpha: _anim.value * 0.4),
+                  size: 22,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

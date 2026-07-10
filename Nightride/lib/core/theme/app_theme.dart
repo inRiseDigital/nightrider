@@ -1,23 +1,41 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // ── Night Rite Brand Palette ──────────────────────────────────────────────
-  static const primary = Color(0xFFf15991);       // hot pink — main brand
+  // ── Night Rite Retro Poster Palette ──────────────────────────────────────
+  static const primary = Color(0xFFFF3D73);       // hot pink — main brand
   static const primaryDark = Color(0xFFd63b7a);   // deeper pink (light theme)
-  static const primaryLight = Color(0xFF2ec4b6);  // teal — secondary/links/icons
+  static const primaryLight = Color(0xFF62D6C8);  // teal — secondary/links/icons
 
-  static const accent = Color(0xFFdbdf57);        // neon lime — highlights
-  static const accentPurple = Color(0xFF2ec4b6);  // teal (secondary accent)
+  static const accent = Color(0xFFDFFF2F);        // neon lime — highlights
+  static const accentPurple = Color(0xFF62D6C8);  // teal (secondary accent)
 
-  static const background = Color(0xFF000000);    // pure black
-  static const surface = Color(0xFF111111);       // near-black for cards/surfaces
-  static const scaffold = Color(0xFF000000);      // pure black
+  static const background = Color(0xFF070707);    // near-black brand black
+  static const surface = Color(0xFF0F0F0F);       // card surface
+  static const scaffold = Color(0xFF070707);      // near-black brand black
 
   static const textPrimary = Color(0xFFfafafa);   // off-white
   static const textSecondary = Color(0xFF9EAFA0); // muted cool-gray
   static const textHint = Color(0xFF6B7280);      // gray
 
-  // Dynamic color getters
+  // ── Extended Palette ─────────────────────────────────────────────────────
+  static const cream = Color(0xFFF3EAD6);
+  static const neonLime = Color(0xFFDFFF2F);
+  static const hotPink = Color(0xFFFF3D73);
+  static const teal = Color(0xFF62D6C8);
+  static const darkGray = Color(0xFF151515);
+  static const borderGray = Color(0xFF333333);
+  static const cardSurface = Color(0xFF0F0F0F);
+
+  // ── Accent color swatches (settings page picker) ─────────────────────────
+  static const List<Color> kAccentColors = [
+    Color(0xFFDFFF2F), // neon lime (brand default)
+    Color(0xFFFF3D73), // hot pink
+    Color(0xFF62D6C8), // teal
+    Color(0xFF448AFF), // electric blue
+    Color(0xFFFFD700), // gold
+  ];
+
+  // ── Dynamic color getters ─────────────────────────────────────────────────
   static Color getPrimary(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? primary : primaryDark;
   static Color getSurface(BuildContext context) =>
@@ -54,7 +72,7 @@ class AppTheme {
       onSurface: textPrimary,
       error: Colors.redAccent,
     ),
-    cardColor: surface,
+    cardColor: cardSurface,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,

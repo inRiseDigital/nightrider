@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:nightride/components/profile_section_card.dart'
-    show ProfileSectionCard;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
+
+// ─── Palette ────────────────────────────────────────────────────────────────
+const _kNeonLime   = Color(0xFFDFFF2F);
+const _kBorderGray = Color(0xFF333333);
+const _kWhite      = Color(0xFFFAFAFA);
+const _kCard       = Color(0xFF151515);
 
 class ProfileBioCard extends StatelessWidget {
   const ProfileBioCard({
@@ -17,23 +22,73 @@ class ProfileBioCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProfileSectionCard(
-      title: 'Bio',
-      child:
-          isEditing
-              ? _BioEditor(initial: value, onChanged: onChanged)
-              : Text(
-                value,
-                style: TextStyle(
-                  fontSize: AppResponsive.profileBodyFont(context),
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
-                  color: Colors.white.withValues(alpha: 0.78),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _kBorderGray, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Section heading ──
+          Row(
+            children: [
+              Container(
+                width: 3,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: _kNeonLime,
+                  borderRadius: BorderRadius.circular(99),
                 ),
               ),
+              const SizedBox(width: 8),
+              Text(
+                'BIO',
+                style: GoogleFonts.anton(
+                  fontSize: AppResponsive.font(context, 12).clamp(10.0, 13.0),
+                  color: _kNeonLime,
+                  letterSpacing: 1.8,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── Body: editor or display ──
+          if (isEditing)
+            _BioEditor(initial: value, onChanged: onChanged)
+          else
+            value.trim().isEmpty
+                ? Text(
+                    'ADD YOUR BIO...',
+                    style: TextStyle(
+                      fontSize: AppResponsive.profileBodyFont(context),
+                      fontWeight: FontWeight.w600,
+                      height: 1.45,
+                      color: _kWhite.withValues(alpha: 0.25),
+                      letterSpacing: 0.3,
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: AppResponsive.profileBodyFont(context),
+                      fontWeight: FontWeight.w500,
+                      height: 1.55,
+                      color: _kWhite,
+                    ),
+                  ),
+        ],
+      ),
     );
   }
 }
+
+// ─── Bio text field ──────────────────────────────────────────────────────────
 
 class _BioEditor extends StatefulWidget {
   const _BioEditor({required this.initial, required this.onChanged});
@@ -63,21 +118,23 @@ class _BioEditorState extends State<_BioEditor> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _c,
-      maxLines: 3,
-      minLines: 1,
+      maxLines: 5,
+      minLines: 2,
       onChanged: widget.onChanged,
       style: TextStyle(
         fontSize: AppResponsive.profileBodyFont(context),
-        fontWeight: FontWeight.w600,
-        color: Colors.white.withValues(alpha: 0.92),
+        fontWeight: FontWeight.w500,
+        color: _kWhite,
+        height: 1.55,
       ),
+      cursorColor: _kNeonLime,
       decoration: InputDecoration(
         border: InputBorder.none,
-        hintText: 'Write something about you…',
+        hintText: 'Write something about yourself...',
         hintStyle: TextStyle(
           fontSize: AppResponsive.profileBodyFont(context),
-          fontWeight: FontWeight.w600,
-          color: Colors.white.withValues(alpha: 0.35),
+          fontWeight: FontWeight.w500,
+          color: _kWhite.withValues(alpha: 0.25),
         ),
       ),
     );

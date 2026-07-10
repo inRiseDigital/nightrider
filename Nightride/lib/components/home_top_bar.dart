@@ -1,50 +1,59 @@
-// lib/features/home/presentation/widgets/home_top_bar.dart
+// lib/components/home_top_bar.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:nightride/core/responsive/app_responsive.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../providers/home_providers.dart';
-import 'home_language_sheet.dart';
+import 'package:nightride/core/theme/app_theme.dart';
+import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/components/home_language_sheet.dart';
 
 class HomeTopBar extends ConsumerWidget {
-  const HomeTopBar({super.key, required this.title});
-  final String title;
+  const HomeTopBar({super.key, required this.username});
+  final String username;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ignore: unused_local_variable — kept for potential title-styling use later
-    final bool darkOn = ref.watch(homeDarkToggleProvider);
     final HomeLanguage lang = ref.watch(homeLanguageProvider);
-
     final actionH = AppResponsive.headerActionHeight(context);
     final notifSize = AppResponsive.notificationButtonSize(context);
     final langWidth = AppResponsive.languageButtonWidth(context);
 
+    final displayName = username.isEmpty ? 'YOU' : username.toUpperCase();
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
-        Flexible(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.anton(
-              fontSize: AppResponsive.font(context, 20).clamp(16.0, 22.0),
-              fontWeight: FontWeight.w400,
-              color: AppTheme.primary,
-              letterSpacing: 1.5,
-            ),
+        // Greeting text block
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'HEY $displayName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.anton(
+                  fontSize: AppResponsive.font(context, 22).clamp(18.0, 26.0),
+                  fontWeight: FontWeight.w400,
+                  color: AppTheme.cream,
+                  letterSpacing: 1.8,
+                ),
+              ),
+            ],
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 10),
+        // Language button
         _LanguageButton(
           label: langLabel(lang),
           height: actionH,
           width: langWidth,
           onTap: () => HomeLanguageSheet.show(context, ref),
         ),
-        SizedBox(width: AppResponsive.gap(context, 10)),
+        SizedBox(width: AppResponsive.gap(context, 8)),
+        // Notification bell
         _NotificationButton(
           size: notifSize,
           onTap: () {},
@@ -71,7 +80,7 @@ class _LanguageButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
+      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 10)),
       child: Container(
         height: height,
         width: width,
@@ -79,9 +88,10 @@ class _LanguageButton extends StatelessWidget {
           horizontal: AppResponsive.gap(context, 10),
         ),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          color: AppTheme.darkGray,
+          borderRadius:
+              BorderRadius.circular(AppResponsive.radius(context, 10)),
+          border: Border.all(color: AppTheme.borderGray, width: 1),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -95,14 +105,15 @@ class _LanguageButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: AppResponsive.headerActionFontSize(context),
                   fontWeight: FontWeight.w800,
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: AppTheme.cream,
+                  letterSpacing: 0.8,
                 ),
               ),
             ),
             SizedBox(width: AppResponsive.gap(context, 2)),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: AppTheme.cream.withValues(alpha: 0.75),
               size: AppResponsive.headerActionIconSize(context),
             ),
           ],
@@ -121,19 +132,20 @@ class _NotificationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
+      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 10)),
       child: Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          color: AppTheme.darkGray,
+          borderRadius:
+              BorderRadius.circular(AppResponsive.radius(context, 10)),
+          border: Border.all(color: AppTheme.borderGray, width: 1),
         ),
         alignment: Alignment.center,
         child: Icon(
-          Icons.notifications_rounded,
-          color: Colors.white.withValues(alpha: 0.9),
+          Icons.notifications_outlined,
+          color: AppTheme.cream.withValues(alpha: 0.9),
           size: AppResponsive.headerActionIconSize(context),
         ),
       ),

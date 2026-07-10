@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
 
 class CategoryChipsRow extends StatelessWidget {
@@ -15,14 +14,18 @@ class CategoryChipsRow extends StatelessWidget {
   final int? selectedIndex;
   final ValueChanged<int?>? onSelected;
 
+  static const _neonLime     = Color(0xFFDFFF2F);
+  static const _border       = Color(0xFF333333);
+  static const _cardSurface  = Color(0xFF0F0F0F);
+
   @override
   Widget build(BuildContext context) {
     final chipHeight = AppResponsive.mapChipHeight(context);
-    final hPad = AppResponsive.pagePadding(context);
-    final innerPadH = AppResponsive.gap(context, 14);
-    final innerPadV = AppResponsive.gap(context, 6);
-    final fontSize = AppResponsive.font(context, 12);
-    final separator = AppResponsive.gap(context, 8);
+    final hPad       = AppResponsive.pagePadding(context);
+    final innerPadH  = AppResponsive.gap(context, 16);
+    final innerPadV  = AppResponsive.gap(context, 8);
+    final fontSize   = AppResponsive.font(context, 13);
+    final separator  = AppResponsive.gap(context, 8);
 
     return SizedBox(
       height: chipHeight,
@@ -33,8 +36,8 @@ class CategoryChipsRow extends StatelessWidget {
         itemCount: items.length,
         separatorBuilder: (_, __) => SizedBox(width: separator),
         itemBuilder: (BuildContext context, int index) {
-          final MapCategory item = items[index];
-          final bool selected = selectedIndex == index;
+          final MapCategory item    = items[index];
+          final bool        selected = selectedIndex == index;
           return GestureDetector(
             onTap: () => onSelected?.call(selected ? null : index),
             child: ConstrainedBox(
@@ -44,20 +47,17 @@ class CategoryChipsRow extends StatelessWidget {
               ),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
                 padding: EdgeInsets.symmetric(
                   horizontal: innerPadH,
-                  vertical: innerPadV,
+                  vertical:   innerPadV,
                 ),
                 decoration: BoxDecoration(
-                  color: selected
-                      ? AppTheme.primary.withValues(alpha: 0.85)
-                      : AppTheme.surface.withValues(alpha: 0.70),
+                  color: selected ? _neonLime : _cardSurface,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: selected
-                        ? AppTheme.primary
-                        : AppTheme.primary.withValues(alpha: 0.55),
-                    width: selected ? 1.5 : 1,
+                    color: selected ? _neonLime : _border,
+                    width: selected ? 1.5 : 1.0,
                   ),
                 ),
                 alignment: Alignment.center,
@@ -67,8 +67,9 @@ class CategoryChipsRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: fontSize,
-                    color: selected ? Colors.white : AppTheme.primaryLight,
+                    color: selected ? const Color(0xFF070707) : Colors.white,
                     fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),

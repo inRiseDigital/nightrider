@@ -17,12 +17,12 @@ class ChatHistoryService {
         .collection('chat_sessions');
   }
 
-  /// Live stream of sessions, newest first.
+  /// Live stream of sessions, ordered by creation time (newest first, never reorders on open).
   Stream<List<ChatSession>> sessionsStream() {
     final col = _col();
     if (col == null) return const Stream.empty();
     return col
-        .orderBy('updatedAt', descending: true)
+        .orderBy('createdAt', descending: true)
         .limit(_maxSessions)
         .snapshots()
         .map((snap) => snap.docs

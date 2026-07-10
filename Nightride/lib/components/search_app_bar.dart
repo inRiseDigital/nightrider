@@ -1,9 +1,15 @@
+// lib/components/search_app_bar.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/providers/common_search_providers.dart';
 
-import '../core/theme/app_theme.dart';
+// ── Palette ──────────────────────────────────────────────────────────────────
+const Color _darkGray   = Color(0xFF151515);
+const Color _borderGray = Color(0xFF2A2A2A);
+const Color _neonLime   = Color(0xFFDFFF2F);
+const Color _white      = Color(0xFFFAFAFA);
 
 class SearchAppBarRow extends ConsumerStatefulWidget {
   const SearchAppBarRow({super.key, required this.hintText});
@@ -45,9 +51,10 @@ class _SearchAppBarRowState extends ConsumerState<SearchAppBarRow> {
 
   @override
   Widget build(BuildContext context) {
-    final String query = ref.watch(searchQueryProvider);
-    final bool focused = ref.watch(searchBarFocusedProvider);
+    final String query  = ref.watch(searchQueryProvider);
+    final bool focused  = ref.watch(searchBarFocusedProvider);
 
+    // Keep controller in sync with external state changes (e.g. filter pills)
     if (_controller.text != query) {
       _controller.value = _controller.value.copyWith(
         text: query,
@@ -56,157 +63,140 @@ class _SearchAppBarRowState extends ConsumerState<SearchAppBarRow> {
       );
     }
 
-    final bool glowOn = focused || query.isNotEmpty;
-
-    final Color borderColor = glowOn
-        ? AppTheme.primary.withValues(alpha: 0.3)
-        : Colors.white.withValues(alpha: 0.06);
+    final bool glowOn     = focused || query.isNotEmpty;
+    final Color borderCol = glowOn
+        ? _neonLime.withValues(alpha: 0.60)
+        : _borderGray;
 
     final List<BoxShadow> glowShadows = glowOn
         ? <BoxShadow>[
             BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.22),
-              blurRadius: 16,
-              spreadRadius: 0.5,
-              offset: const Offset(0, 0),
+              color: _neonLime.withValues(alpha: 0.20),
+              blurRadius: 20,
+              spreadRadius: 0,
             ),
             BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.12),
-              blurRadius: 38,
-              spreadRadius: 3,
-              offset: const Offset(0, 5),
+              color: _neonLime.withValues(alpha: 0.08),
+              blurRadius: 40,
+              spreadRadius: 4,
+              offset: const Offset(0, 4),
             ),
           ]
         : const <BoxShadow>[];
 
-    final barHeight = AppResponsive.gap(context, 46).clamp(42.0, 52.0);
-    final inputFont = AppResponsive.font(context, 13.5).clamp(12.0, 14.5);
-    final hintFont = AppResponsive.font(context, 13).clamp(11.5, 14.0);
-    final iconSize = AppResponsive.icon(context, 18).clamp(15.0, 20.0);
-    final clearBtnSize = AppResponsive.gap(context, 30).clamp(26.0, 34.0);
+    final double barHeight    = AppResponsive.gap(context, 50).clamp(46.0, 56.0);
+    final double inputFont    = AppResponsive.font(context, 14).clamp(12.5, 15.0);
+    final double hintFont     = AppResponsive.font(context, 13.5).clamp(12.0, 14.5);
+    final double iconSize     = AppResponsive.icon(context, 20).clamp(17.0, 22.0);
+    final double clearBtnSize = AppResponsive.gap(context, 28).clamp(24.0, 32.0);
 
-    return Row(
-      children: <Widget>[
-        InkWell(
-          onTap: () => Navigator.of(context).maybePop(),
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      height: barHeight,
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.gap(context, 14).clamp(10.0, 16.0),
+      ),
+      decoration: BoxDecoration(
+        color: _darkGray,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderCol, width: 1.5),
+        boxShadow: glowShadows,
+      ),
+      child: Row(
+        children: <Widget>[
+          // ── Magnifier icon ───────────────────────────────────────────────
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 150),
             child: Icon(
-              Icons.arrow_back_ios_new_rounded,
+              Icons.search_rounded,
+              key: ValueKey<bool>(glowOn),
               size: iconSize,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: glowOn ? _neonLime : _neonLime.withValues(alpha: 0.50),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
+          const SizedBox(width: 10),
 
-        Expanded(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 170),
-            curve: Curves.easeOut,
-            height: barHeight,
-            padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.gap(context, 12).clamp(10.0, 14.0),
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: borderColor, width: 1.2),
-              boxShadow: glowShadows,
-            ),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  Icons.search_rounded,
-                  size: iconSize,
-                  color: Colors.white.withValues(alpha: glowOn ? 0.92 : 0.78),
+          // ── Text field ───────────────────────────────────────────────────
+          Expanded(
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                focusColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                inputDecorationTheme: const InputDecorationTheme(
+                  border: _noBorder,
+                  enabledBorder: _noBorder,
+                  focusedBorder: _noBorder,
+                  disabledBorder: _noBorder,
+                  errorBorder: _noBorder,
+                  focusedErrorBorder: _noBorder,
+                  isDense: true,
                 ),
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      focusColor: Colors.transparent,
-                      splashColor: Colors.transparent,
-                      highlightColor: Colors.transparent,
-                      inputDecorationTheme: const InputDecorationTheme(
-                        border: _noBorder,
-                        enabledBorder: _noBorder,
-                        focusedBorder: _noBorder,
-                        disabledBorder: _noBorder,
-                        errorBorder: _noBorder,
-                        focusedErrorBorder: _noBorder,
-                        isDense: true,
-                      ),
-                    ),
-                    child: TextField(
-                      focusNode: _focusNode,
-                      controller: _controller,
-                      onChanged: _setQuery,
-                      style: TextStyle(
-                        fontSize: inputFont,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.92),
-                      ),
-                      cursorColor: AppTheme.primary,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        border: _noBorder,
-                        enabledBorder: _noBorder,
-                        focusedBorder: _noBorder,
-                        disabledBorder: _noBorder,
-                        errorBorder: _noBorder,
-                        focusedErrorBorder: _noBorder,
-                        hintText: widget.hintText,
-                        hintStyle: TextStyle(
-                          fontSize: hintFont,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.35),
-                        ),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
+              ),
+              child: TextField(
+                focusNode: _focusNode,
+                controller: _controller,
+                onChanged: _setQuery,
+                style: GoogleFonts.sourceSans3(
+                  fontSize: inputFont,
+                  fontWeight: FontWeight.w600,
+                  color: _white.withValues(alpha: 0.95),
+                ),
+                cursorColor: _neonLime,
+                cursorWidth: 2,
+                decoration: InputDecoration(
+                  isDense: true,
+                  border: _noBorder,
+                  enabledBorder: _noBorder,
+                  focusedBorder: _noBorder,
+                  disabledBorder: _noBorder,
+                  errorBorder: _noBorder,
+                  focusedErrorBorder: _noBorder,
+                  hintText: widget.hintText,
+                  hintStyle: GoogleFonts.sourceSans3(
+                    fontSize: hintFont,
+                    fontWeight: FontWeight.w400,
+                    color: _white.withValues(alpha: 0.28),
+                    letterSpacing: 0.2,
                   ),
+                  contentPadding: EdgeInsets.zero,
                 ),
-
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 120),
-                  opacity: query.isNotEmpty ? 1 : 0,
-                  child: IgnorePointer(
-                    ignoring: query.isEmpty,
-                    child: InkWell(
-                      onTap: _clear,
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        width: clearBtnSize,
-                        height: clearBtnSize,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(
-                            alpha: glowOn ? 0.08 : 0.06,
-                          ),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: Colors.white.withValues(
-                              alpha: glowOn ? 0.10 : 0.06,
-                            ),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: AppResponsive.icon(context, 16).clamp(13.0, 18.0),
-                          color: Colors.white.withValues(alpha: 0.78),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+
+          // ── Clear button ─────────────────────────────────────────────────
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 130),
+            opacity: query.isNotEmpty ? 1.0 : 0.0,
+            child: IgnorePointer(
+              ignoring: query.isEmpty,
+              child: GestureDetector(
+                onTap: _clear,
+                child: Container(
+                  width: clearBtnSize,
+                  height: clearBtnSize,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _borderGray,
+                      width: 1,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: AppResponsive.icon(context, 13).clamp(11.0, 15.0),
+                    color: _white.withValues(alpha: 0.65),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

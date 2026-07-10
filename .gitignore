@@ -40,3 +40,7 @@ yarn-error.log*
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Temp / scratch folders ────────────────────────────────────────────────────
+_nightrider_agent_tmp/
+_nightrider_agent_tmp

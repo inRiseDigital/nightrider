@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:nightride/core/responsive/auth_dimensions.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 
 /// "Continue as Guest" text-button at the bottom of the Sign In screen.
 class GuestButton extends StatelessWidget {
@@ -15,18 +14,28 @@ class GuestButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fontSize = AuthDimensions.subtitleFontSize(context);
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.25),
+            width: 1.0,
+          ),
+        ),
         child: Text(
-          label,
+          label.toUpperCase(),
           style: TextStyle(
-            fontSize: AuthDimensions.subtitleFontSize(context),
-            color: AppTheme.primaryLight.withValues(alpha: 0.9),
+            fontSize: fontSize,
+            color: Colors.white.withValues(alpha: 0.54),
             fontWeight: FontWeight.w600,
-            letterSpacing: 0.2,
+            letterSpacing: 1.2,
           ),
         ),
       ),

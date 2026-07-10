@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:nightride/core/responsive/app_responsive.dart';
-import '../../../../../core/theme/app_theme.dart';
 
 class ProfileChip extends StatelessWidget {
   const ProfileChip({
@@ -9,32 +8,39 @@ class ProfileChip extends StatelessWidget {
     required this.text,
     required this.editable,
     required this.onTap,
+    this.isSelected = false,
   });
 
   final String text;
   final bool editable;
   final VoidCallback onTap;
+  final bool isSelected;
+
+  static const _neonLime = Color(0xFFDFFF2F);
+  static const _border   = Color(0xFF333333);
 
   @override
   Widget build(BuildContext context) {
+    final selected = isSelected;
     return InkWell(
       onTap: editable ? onTap : null,
       borderRadius: BorderRadius.circular(999),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
         constraints: BoxConstraints(
           minHeight: AppResponsive.interestChipHeight(context),
         ),
         padding: EdgeInsets.symmetric(
           horizontal: AppResponsive.profileChipPaddingH(context),
-          vertical: AppResponsive.profileChipPaddingV(context),
+          vertical:   AppResponsive.profileChipPaddingV(context),
         ),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: selected ? _neonLime : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: editable
-                ? AppTheme.primary.withValues(alpha: 0.22)
-                : Colors.white.withValues(alpha: 0.10),
+            color: selected ? _neonLime : _border,
+            width: 1.5,
           ),
         ),
         child: Center(
@@ -45,8 +51,8 @@ class ProfileChip extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: AppResponsive.profileChipFont(context),
-              fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.86),
+              fontWeight: FontWeight.w700,
+              color: selected ? const Color(0xFF070707) : Colors.white,
             ),
           ),
         ),

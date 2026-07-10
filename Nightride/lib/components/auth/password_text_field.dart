@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:nightride/core/responsive/auth_dimensions.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 
 import 'auth_text_field.dart';
 
@@ -44,7 +43,7 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
           icon: Icon(
             _obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
             size: fontSize + 5,
-            color: AppTheme.primaryLight.withValues(alpha: 0.55),
+            color: const Color(0xFFDFFF2F),
           ),
         ),
       ),

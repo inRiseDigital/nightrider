@@ -1,16 +1,17 @@
 // lib/components/home_trending_list.dart
+//
+// Retro nightlife poster style — horizontal scroll of sticker/polaroid-style
+// event cards. Uses real data from trendingEventsProvider.
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gap/gap.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-// ignore: unused_import
-import 'package:nightride/core/responsive/app_dimensions.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/home_dummy_data.dart';
 import 'package:nightride/domain/home_models.dart';
-import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/event_detail_page.dart';
 import 'package:nightride/providers/home_providers.dart';
 import 'package:nightride/services/auth_service.dart';
@@ -22,207 +23,277 @@ class HomeTrendingList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(trendingEventsProvider);
+
     if (async.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2));
+      return const _TrendingSkeletonRow();
     }
 
     final allLive = async.asData?.value ?? [];
     final filtered = ref.watch(filteredTrendingProvider);
-    final cat     = ref.watch(selectedCategoryProvider);
+    final cat = ref.watch(selectedCategoryProvider);
     final country = ref.watch(selectedCountryProvider);
 
-    // No Firestore data at all → show dummy fallback
-    if (allLive.isEmpty) return _buildList(kTrendingEvents);
+    // No Firestore data at all — show dummy fallback
+    if (allLive.isEmpty) return _buildRow(kTrendingEvents);
 
-    // Filter active but nothing in Firestore matches → fall back to dummy events
+    // Filter active but nothing in Firestore matches — fall back to dummy
     if (filtered.isEmpty && (cat != 'ALL' || country != 'ALL')) {
       final fallback = cat == 'ALL'
           ? kTrendingEvents
-          : kTrendingEvents.where((e) => e.categoryTag == cat).toList();
-      return _buildList(fallback.isNotEmpty ? fallback : kTrendingEvents);
+          : kTrendingEvents
+              .where((e) => e.categoryTag == cat)
+              .toList();
+      return _buildRow(
+          fallback.isNotEmpty ? fallback : kTrendingEvents);
     }
 
-    return _buildList(filtered.isNotEmpty ? filtered : allLive);
+    return _buildRow(filtered.isNotEmpty ? filtered : allLive);
   }
 
-  Widget _buildList(List<TrendingEvent> events) {
-    return Column(
-      children: List<Widget>.generate(events.length, (int i) {
-        final TrendingEvent e = events[i];
-        return Padding(
-          padding: EdgeInsets.only(bottom: i == events.length - 1 ? 0 : 12.0),
-          child: _TrendingCard(event: e),
-        );
-      }),
+  Widget _buildRow(List<TrendingEvent> events) {
+    return SizedBox(
+      height: 240,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(right: 4, bottom: 4),
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemCount: events.length,
+        itemBuilder: (ctx, i) => _PolaroidCard(event: events[i]),
+      ),
     );
   }
 }
 
-class _TrendingCard extends ConsumerWidget {
-  const _TrendingCard({required this.event});
+// ── Polaroid / sticker card ───────────────────────────────────────────────────
+
+class _PolaroidCard extends ConsumerWidget {
+  const _PolaroidCard({required this.event});
   final TrendingEvent event;
+
+  // Pick an accent colour per genre tag for the venue name row
+  Color _accentFor(String tag) {
+    final t = tag.toUpperCase();
+    if (t.contains('TECHNO') || t.contains('INDUSTRIAL')) {
+      return AppTheme.teal;
+    }
+    if (t.contains('HOUSE')) return AppTheme.neonLime;
+    if (t.contains('LATIN') || t.contains('REGGAETON')) {
+      return AppTheme.hotPink;
+    }
+    if (t.contains('LIVE') || t.contains('BAND')) return AppTheme.cream;
+    if (t.contains('EDM') || t.contains('DANCE')) {
+      return const Color(0xFFFFAA3E);
+    }
+    if (t.contains('HIP') || t.contains('RAP') || t.contains('TRAP')) {
+      return const Color(0xFFDD6BFF);
+    }
+    return AppTheme.hotPink;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final favs = ref.watch(favouritesStreamProvider).asData?.value ?? [];
+    final favs =
+        ref.watch(favouritesStreamProvider).asData?.value ?? [];
     final bool liked = favs.any((f) => f['id'] == event.id);
+    final accent = _accentFor(event.categoryTag);
 
-    final cardHeight = AppResponsive.eventCardHeight(context);
-    final pad = AppResponsive.gap(context, 14).clamp(12.0, 16.0);
-    // Width reserved on the right side for the heart (top) and View (bottom)
-    // buttons. Keeps the title/meta/interested column from running underneath
-    // those buttons — this is what was causing the V3 overlap.
-    final actionCol = AppResponsive.trendingActionColumnWidth(context);
-
-    return InkWell(
+    return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => EventDetailPage(id: event.id)),
       ),
-      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 24).clamp(20.0, 28.0)),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppResponsive.radius(context, 24).clamp(20.0, 28.0)),
-        child: SizedBox(
-          height: cardHeight,
-          child: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              // 1. Background image
-              CachedNetworkImage(
-                imageUrl: event.imageUrl,
-                fit: BoxFit.cover,
-                placeholder: (_, __) =>
-                    Container(color: Colors.white.withValues(alpha: 0.06)),
-                errorWidget: (_, __, ___) => Container(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.broken_image_rounded,
-                    color: Colors.white.withValues(alpha: 0.55),
-                  ),
-                ),
+      child: Container(
+        width: 175,
+        decoration: BoxDecoration(
+          color: AppTheme.darkGray,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.borderGray, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Image area ─────────────────────────────────────────────
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(13),
+                topRight: Radius.circular(13),
               ),
-              // 2. Gradient overlay
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: <Color>[
-                      Color(0x1A000000),
-                      Color(0x4D000000),
-                      Color(0xD9000000),
-                    ],
-                    stops: <double>[0.0, 0.55, 1.0],
-                  ),
-                ),
-              ),
-
-              // 3. Heart button — top-right (in the reserved right column).
-              Positioned(
-                top: pad,
-                right: pad,
-                child: _HeartIconButton(
-                  active: liked,
-                  onTap: () => _toggleFavourite(ref, liked),
-                ),
-              ),
-
-              // 4. SINGLE text column (tag-pill + title + meta + interested
-              //    row). Putting the tag-pill *inside* the same Column as the
-              //    title makes overlap structurally impossible — they share
-              //    the column's vertical layout and a Spacer between them
-              //    naturally absorbs whatever extra height the card has.
-              //    `right: pad + actionCol` reserves space on the right for
-              //    the heart and View buttons so text doesn't run under them.
-              Positioned(
-                left: pad,
-                top: pad,
-                right: pad + actionCol,
-                bottom: pad,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: _TagPill(text: event.categoryTag),
-                    ),
-                    const Spacer(),
-                    Text(
-                      event.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
-                      style: TextStyle(
-                        fontSize: AppResponsive.font(context, 16).clamp(13.5, 17.0),
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
+              child: SizedBox(
+                height: 140,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: event.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) =>
+                          Container(color: const Color(0xFF1A1A1A)),
+                      errorWidget: (_, __, ___) => Container(
+                        color: const Color(0xFF1A1A1A),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.music_note_rounded,
+                          color: AppTheme.borderGray,
+                          size: 30,
+                        ),
                       ),
                     ),
-                    SizedBox(height: AppResponsive.gap(context, 6)),
-                    Row(
-                      children: <Widget>[
-                        _Meta(
-                          icon: Icons.schedule_rounded,
-                          text: event.dateText,
-                        ),
-                        if (event.language.isNotEmpty) ...[
-                          SizedBox(width: AppResponsive.gap(context, 8)),
-                          _Meta(
-                            icon: Icons.language_rounded,
-                            text: event.language,
-                          ),
-                        ],
-                        SizedBox(width: AppResponsive.gap(context, 8)),
-                        Expanded(
-                          child: _Meta(
-                            icon: Icons.location_on_rounded,
-                            text: event.locationText,
-                            expand: true,
+                    // Bottom gradient scrim
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 60,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.75),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                    SizedBox(height: AppResponsive.gap(context, 8)),
-                    _InterestedRow(
-                      avatars: event.avatars,
-                      countText: event.interestedCountText,
+                    // Category tag — top left
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.55),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          event.categoryTag,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: accent,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Heart button — top right
+                    Positioned(
+                      top: 7,
+                      right: 7,
+                      child: GestureDetector(
+                        onTap: () => _toggleFavourite(ref, liked),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color:
+                                  Colors.white.withValues(alpha: 0.1),
+                              width: 1,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            liked
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            size: 14,
+                            color: liked
+                                ? AppTheme.hotPink
+                                : AppTheme.cream
+                                    .withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Date badge — bottom left
+                    Positioned(
+                      left: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: AppTheme.borderGray,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          event.dateText,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.cream
+                                .withValues(alpha: 0.85),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
+            ),
 
-              // 5. View button — bottom-right (won't overlap text because
-              //    the text column above reserved `actionCol` of right space).
-              Positioned(
-                right: pad,
-                bottom: pad,
-                child: _ActionPill(
-                  text: AppLocalizations.of(context)!.view,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => EventDetailPage(id: event.id),
-                    ),
-                  ),
-                ),
-              ),
-
-              // 7. Hairline border outline
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 24).clamp(20.0, 28.0)),
-                      border: Border.all(
-                        color: AppTheme.primary.withValues(alpha: 0.18),
-                        width: 1,
+            // ── Text area — polaroid bottom strip ──────────────────────
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Event name
+                    Text(
+                      event.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.anton(
+                        fontSize: AppResponsive.font(context, 13)
+                            .clamp(11.0, 14.5),
+                        fontWeight: FontWeight.w400,
+                        color: AppTheme.cream,
+                        letterSpacing: 0.5,
+                        height: 1.25,
                       ),
                     ),
-                  ),
+                    // Location in accent colour
+                    Text(
+                      event.locationText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -250,207 +321,27 @@ class _TrendingCard extends ConsumerWidget {
   }
 }
 
-class _Meta extends StatelessWidget {
-  const _Meta({required this.icon, required this.text, this.expand = false});
-  final IconData icon;
-  final String text;
-  final bool expand;
+// ── Skeleton placeholder ──────────────────────────────────────────────────────
+
+class _TrendingSkeletonRow extends StatelessWidget {
+  const _TrendingSkeletonRow();
 
   @override
   Widget build(BuildContext context) {
-    final Widget label = Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
-        fontWeight: FontWeight.w700,
-        color: Colors.white.withValues(alpha: 0.78),
-      ),
-    );
-
-    return Row(
-      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-      children: <Widget>[
-        Icon(
-          icon,
-          size: AppResponsive.metaIconSize(context),
-          color: AppTheme.primaryLight.withValues(alpha: 0.85),
-        ),
-        SizedBox(width: AppResponsive.gap(context, 5)),
-        expand ? Expanded(child: label) : Flexible(child: label),
-      ],
-    );
-  }
-}
-
-class _TagPill extends StatelessWidget {
-  const _TagPill({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppResponsive.gap(context, 10).clamp(8.0, 12.0),
-        vertical: AppResponsive.gap(context, 7).clamp(5.0, 8.0),
-      ),
-      decoration: BoxDecoration(
-        color: AppTheme.accent,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: AppResponsive.font(context, 11).clamp(10.0, 12.0),
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.0,
-          color: Colors.black,
-        ),
-      ),
-    );
-  }
-}
-
-class _InterestedRow extends StatelessWidget {
-  const _InterestedRow({required this.avatars, required this.countText});
-  final List<String> avatars;
-  final String countText;
-
-  @override
-  Widget build(BuildContext context) {
-    final int show = avatars.length > 3 ? 3 : avatars.length;
-
-    return Row(
-      children: <Widget>[
-        SizedBox(
-          height: 26,
-          width: (show == 0) ? 0 : (26.0 + (show - 1) * 16.0),
-          child: Stack(
-            children: List<Widget>.generate(show, (int i) {
-              return Positioned(
-                left: i * 16.0,
-                child: Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      width: 1.6,
-                    ),
-                    boxShadow: const <BoxShadow>[
-                      BoxShadow(
-                        color: Color(0x33000000),
-                        blurRadius: 10,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: CachedNetworkImage(
-                      imageUrl: avatars[i],
-                      fit: BoxFit.cover,
-                      placeholder:
-                          (_, __) => Container(
-                            color: Colors.white.withValues(alpha: 0.06),
-                          ),
-                      errorWidget:
-                          (_, __, ___) => Container(
-                            color: Colors.white.withValues(alpha: 0.06),
-                          ),
-                    ),
-                  ),
-                ),
-              );
-            }),
+    return SizedBox(
+      height: 240,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemCount: 4,
+        itemBuilder: (_, __) => Container(
+          width: 175,
+          decoration: BoxDecoration(
+            color: AppTheme.darkGray,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.borderGray, width: 1),
           ),
-        ),
-        if (show > 0) const Gap(8),
-        Text(
-          countText,
-          style: TextStyle(
-            fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
-            fontWeight: FontWeight.w900,
-            color: Colors.white.withValues(alpha: 0.88),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionPill extends StatelessWidget {
-  const _ActionPill({required this.text, required this.onTap});
-  final String text;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        height: AppResponsive.trendingViewButtonHeight(context),
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.gap(context, 14),
-        ),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppTheme.primary.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.55)),
-        ),
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.0),
-            fontWeight: FontWeight.w900,
-            color: AppTheme.primary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Heart button ─────────────────────────────────────────────────────────────
-
-class _HeartIconButton extends StatelessWidget {
-  const _HeartIconButton({required this.active, required this.onTap});
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 16)),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        width: AppResponsive.trendingFavoriteSize(context),
-        height: AppResponsive.trendingFavoriteSize(context),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.12),
-            width: 1,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Icon(
-          active ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-          size: AppResponsive.icon(context, 18).clamp(15.0, 20.0),
-          color:
-              active
-                  ? AppTheme.primary.withValues(alpha: 0.95)
-                  : Colors.white.withValues(alpha: 0.92),
         ),
       ),
     );

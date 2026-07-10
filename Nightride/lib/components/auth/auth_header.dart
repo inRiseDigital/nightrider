@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/auth_dimensions.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 
 /// Brand row + page title + subtitle used at the top of every auth screen.
 class AuthHeader extends StatelessWidget {
@@ -36,12 +35,12 @@ class AuthHeader extends StatelessWidget {
               _BrandRow(label: brandLabel, letter: brandLetter),
               SizedBox(height: AuthDimensions.brandToTitleGap(context)),
               Text(
-                title,
+                title.toUpperCase(),
                 textAlign: TextAlign.left,
                 style: GoogleFonts.anton(
                   fontSize: AuthDimensions.titleFontSize(context),
                   fontWeight: FontWeight.w400,
-                  color: AppTheme.primary,
+                  color: const Color(0xFFF3EAD6),
                   height: 1.05,
                   letterSpacing: 1.0,
                 ),
@@ -52,9 +51,9 @@ class AuthHeader extends StatelessWidget {
                 textAlign: TextAlign.left,
                 softWrap: true,
                 style: GoogleFonts.poppins(
-                  fontSize: AuthDimensions.subtitleFontSize(context),
+                  fontSize: 14,
                   height: 1.4,
-                  color: AppTheme.primaryLight.withValues(alpha: 0.85),
+                  color: Colors.white.withValues(alpha: 0.60),
                   letterSpacing: 0.1,
                 ),
               ),
@@ -80,7 +79,7 @@ class _BrandRow extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: AppTheme.accent,
+            color: const Color(0xFFDFFF2F),
             borderRadius: BorderRadius.circular(size * 0.26),
           ),
           alignment: Alignment.center,
@@ -99,7 +98,7 @@ class _BrandRow extends StatelessWidget {
           style: GoogleFonts.anton(
             fontSize: AuthDimensions.brandFontSize(context),
             fontWeight: FontWeight.w400,
-            color: AppTheme.primaryLight,
+            color: const Color(0xFF62D6C8),
             letterSpacing: 1.5,
           ),
         ),

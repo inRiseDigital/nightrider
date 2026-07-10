@@ -1,7 +1,6 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 
 /// Decorative gradient + glow-blob backdrop shared by all auth screens.
 class AuthBackground extends StatelessWidget {
@@ -12,19 +11,19 @@ class AuthBackground extends StatelessWidget {
     return RepaintBoundary(
       child: Stack(
         children: [
-          // Pure black base
-          Container(color: const Color(0xFF000000)),
-          // Subtle pink radial glow top-left
+          // Pure #070707 base
+          Container(color: const Color(0xFF070707)),
+          // Subtle pink radial glow top-center
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
-                center: const Alignment(-0.6, -0.5),
-                radius: 1.0,
+                center: const Alignment(0.0, -0.75),
+                radius: 1.1,
                 colors: [
-                  AppTheme.primary.withValues(alpha: 0.14),
+                  const Color(0xFFFF3D73).withValues(alpha: 0.18),
                   Colors.transparent,
                 ],
-                stops: const [0.0, 0.65],
+                stops: const [0.0, 0.60],
               ),
             ),
           ),
@@ -32,22 +31,22 @@ class AuthBackground extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
-                center: const Alignment(0.7, 0.6),
+                center: const Alignment(0.8, 0.75),
                 radius: 0.9,
                 colors: [
-                  AppTheme.primaryLight.withValues(alpha: 0.10),
+                  const Color(0xFF62D6C8).withValues(alpha: 0.13),
                   Colors.transparent,
                 ],
-                stops: const [0.0, 0.7],
+                stops: const [0.0, 0.70],
               ),
             ),
           ),
           Positioned(
             top: -80,
-            left: -60,
+            left: -40,
             child: _GlowBlob(
               size: 220,
-              color: AppTheme.primary.withValues(alpha: 0.22),
+              color: const Color(0xFFFF3D73).withValues(alpha: 0.20),
             ),
           ),
           Positioned(
@@ -55,7 +54,7 @@ class AuthBackground extends StatelessWidget {
             right: -80,
             child: _GlowBlob(
               size: 240,
-              color: AppTheme.accent.withValues(alpha: 0.10),
+              color: const Color(0xFF62D6C8).withValues(alpha: 0.10),
             ),
           ),
           Positioned(
@@ -63,10 +62,10 @@ class AuthBackground extends StatelessWidget {
             left: 30,
             child: _GlowBlob(
               size: 200,
-              color: AppTheme.primaryLight.withValues(alpha: 0.12),
+              color: const Color(0xFF62D6C8).withValues(alpha: 0.08),
             ),
           ),
-          Container(color: Colors.black.withValues(alpha: 0.08)),
+          Container(color: Colors.black.withValues(alpha: 0.06)),
         ],
       ),
     );

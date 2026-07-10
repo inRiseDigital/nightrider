@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:nightride/components/marquee_text.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 
+/// Dark neon-retro search bar used at the top of the Map/Live screen.
+///
+/// Layout: [Search field] [Location button] [Grid button]
+/// Colors follow the Night Rite retro poster palette.
 class MapTopSearchBar extends StatelessWidget {
   const MapTopSearchBar({
     super.key,
@@ -19,97 +22,95 @@ class MapTopSearchBar extends StatelessWidget {
   final VoidCallback? onSearchTap;
   final String searchHint;
 
+  // ── Brand palette ─────────────────────────────────────────────────────────
+  static const _border     = Color(0xFF2A2A2A);
+  static const _neonLime   = Color(0xFFDFFF2F);
+  static const _hotPink    = Color(0xFFFF3D73);
+
   @override
   Widget build(BuildContext context) {
     final barHeight = AppResponsive.mapSearchBarHeight(context);
-    final radius = AppResponsive.radius(context, 14);
-    final iconSize = AppResponsive.icon(context, 20);
-    final hPad = AppResponsive.gap(context, 12);
+    final radius    = AppResponsive.radius(context, 14);
+    final iconSize  = AppResponsive.icon(context, 18);
+    final hPad      = AppResponsive.gap(context, 12);
+    final gap       = AppResponsive.gap(context, 8);
 
     final TextStyle hintStyle = TextStyle(
-      color: Colors.white.withValues(alpha: 0.45),
+      color: Colors.white.withValues(alpha: 0.40),
       fontSize: AppResponsive.font(context, 13),
       fontWeight: FontWeight.w500,
+      letterSpacing: 0.2,
     );
 
     return Row(
       children: [
+        // ── Search field ────────────────────────────────────────────────────
         Expanded(
-          child: Container(
+          child: _NeonContainer(
             height: barHeight,
-            decoration: BoxDecoration(
-              color: AppTheme.surface.withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(radius),
+            child: InkWell(
+              onTap: onSearchTap,
               borderRadius: BorderRadius.circular(radius),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: onSearchTap,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(radius),
-                      bottomLeft: Radius.circular(radius),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(width: hPad),
-                        Icon(
-                          Icons.search_rounded,
-                          color: Colors.white.withValues(alpha: 0.88),
-                          size: iconSize,
-                        ),
-                        SizedBox(width: AppResponsive.gap(context, 10)),
-                        Expanded(
-                          child: MarqueeText(
-                            text: searchHint,
-                            style: hintStyle,
-                          ),
-                        ),
-                      ],
+              splashColor: _neonLime.withValues(alpha: 0.08),
+              highlightColor: Colors.transparent,
+              child: Row(
+                children: [
+                  SizedBox(width: hPad),
+                  Icon(
+                    Icons.search_rounded,
+                    color: _neonLime,
+                    size: iconSize + 2,
+                  ),
+                  SizedBox(width: AppResponsive.gap(context, 9)),
+                  Expanded(
+                    child: MarqueeText(
+                      text: searchHint,
+                      style: hintStyle,
                     ),
                   ),
-                ),
-                Container(
-                  height: barHeight,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppResponsive.gap(context, 10),
+                  // Subtle neon-lime divider + mic icon at right
+                  Container(
+                    width: 1,
+                    height: barHeight * 0.5,
+                    color: _border,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(radius * 0.86),
-                      bottomLeft: Radius.circular(radius * 0.86),
-                      topRight: Radius.circular(radius),
-                      bottomRight: Radius.circular(radius),
-                    ),
+                  SizedBox(width: AppResponsive.gap(context, 10)),
+                  Icon(
+                    Icons.mic_none_rounded,
+                    color: Colors.white.withValues(alpha: 0.30),
+                    size: iconSize,
                   ),
-                  child: Row(
-                    children: [
-                      _TopTabIcon(
-                        icon: Icons.my_location_rounded,
-                        selected: selectedIndex == 0,
-                        onTap: () => onChanged(0),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                  SizedBox(width: hPad),
+                ],
+              ),
             ),
           ),
         ),
-        SizedBox(width: AppResponsive.gap(context, 10)),
-        _SquareIconButton(
+
+        SizedBox(width: gap),
+
+        // ── My-location button ──────────────────────────────────────────────
+        _NeonIconButton(
+          icon: Icons.my_location_rounded,
+          size: barHeight,
+          radius: radius,
+          iconSize: iconSize,
+          isActive: selectedIndex == 0,
+          activeColor: _neonLime,
+          onTap: () => onChanged(0),
+        ),
+
+        SizedBox(width: gap),
+
+        // ── Grid / list button ──────────────────────────────────────────────
+        _NeonIconButton(
           icon: Icons.grid_view_rounded,
           size: barHeight,
           radius: radius,
           iconSize: iconSize,
+          isActive: false,
+          activeColor: _hotPink,
           onTap: onGridTap ?? () {},
         ),
       ],
@@ -117,63 +118,64 @@ class MapTopSearchBar extends StatelessWidget {
   }
 }
 
-class _TopTabIcon extends StatelessWidget {
-  const _TopTabIcon({
-    required this.icon,
-    required this.selected,
-    required this.onTap,
+// ── Shared dark container with neon border ──────────────────────────────────
+class _NeonContainer extends StatelessWidget {
+  const _NeonContainer({
+    required this.height,
+    required this.borderRadius,
+    required this.child,
   });
 
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
+  final double height;
+  final BorderRadius borderRadius;
+  final Widget child;
+
+  static const _surface = Color(0xFF0F0F0F);
+  static const _border  = Color(0xFF2A2A2A);
 
   @override
   Widget build(BuildContext context) {
-    final size = AppResponsive.icon(context, 28);
-    final innerIcon = AppResponsive.icon(context, 18);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: selected
-                ? Colors.white.withValues(alpha: 0.22)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: borderRadius,
+        border: Border.all(color: _border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.55),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          child: Center(
-            child: Icon(
-              icon,
-              size: innerIcon,
-              color: Colors.white.withValues(alpha: selected ? 1.0 : 0.92),
-            ),
-          ),
-        ),
+        ],
       ),
+      child: child,
     );
   }
 }
 
-class _SquareIconButton extends StatelessWidget {
-  const _SquareIconButton({
+// ── Square icon button with optional neon active glow ──────────────────────
+class _NeonIconButton extends StatelessWidget {
+  const _NeonIconButton({
     required this.icon,
     required this.size,
     required this.radius,
     required this.iconSize,
+    required this.isActive,
+    required this.activeColor,
     required this.onTap,
   });
-  final IconData icon;
-  final double size;
-  final double radius;
-  final double iconSize;
+
+  final IconData  icon;
+  final double    size;
+  final double    radius;
+  final double    iconSize;
+  final bool      isActive;
+  final Color     activeColor;
   final VoidCallback onTap;
+
+  static const _surface = Color(0xFF0F0F0F);
+  static const _border  = Color(0xFF2A2A2A);
 
   @override
   Widget build(BuildContext context) {
@@ -182,17 +184,29 @@ class _SquareIconButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(radius),
-        child: Container(
+        splashColor: activeColor.withValues(alpha: 0.12),
+        highlightColor: Colors.transparent,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: AppTheme.surface.withValues(alpha: 0.95),
+            color: isActive
+                ? activeColor.withValues(alpha: 0.12)
+                : _surface,
             borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: isActive ? activeColor.withValues(alpha: 0.70) : _border,
+              width: isActive ? 1.5 : 1.0,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
+                color: isActive
+                    ? activeColor.withValues(alpha: 0.22)
+                    : Colors.black.withValues(alpha: 0.45),
+                blurRadius: isActive ? 14 : 18,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -200,7 +214,7 @@ class _SquareIconButton extends StatelessWidget {
           child: Icon(
             icon,
             size: iconSize,
-            color: Colors.white.withValues(alpha: 0.90),
+            color: isActive ? activeColor : Colors.white.withValues(alpha: 0.70),
           ),
         ),
       ),

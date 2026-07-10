@@ -13,6 +13,7 @@ from math import asin, cos, radians, sin, sqrt
 from langchain_core.tools import tool
 
 from party_agent.integrations import google_maps
+from party_agent.integrations import nominatim as nom
 
 log = logging.getLogger(__name__)
 
@@ -47,9 +48,7 @@ async def maps_find_nearby_parties(
         JSON list of up to 5 matching venues with name, address, rating, open_now.
     """
     try:
-        places = await google_maps.search_places(query, user_lat, user_lng, radius_meters)
-    except RuntimeError as exc:
-        return f"Maps search unavailable: {exc}"
+        places = await nom.search_venue(query, user_lat=user_lat, user_lng=user_lng, limit=5)
     except Exception as exc:
         log.exception("maps_find_nearby_parties failed")
         return f"Maps search failed: {exc}"
@@ -61,13 +60,10 @@ async def maps_find_nearby_parties(
         {
             "name": p["name"],
             "address": p["address"],
-            "rating": p.get("rating"),
-            "open_now": p.get("open_now"),
             "lat": p["lat"],
             "lng": p["lng"],
-            "place_id": p["place_id"],
         }
-        for p in places[:5]
+        for p in places
     ]
     return json.dumps(summary, ensure_ascii=False)
 
@@ -98,9 +94,7 @@ async def maps_get_event_travel_info(
         Structured line: "VenueName | 3.2 km | 12 mins | driving | <nav_url>"
     """
     try:
-        route = await google_maps.calculate_route(user_lat, user_lng, dest_lat, dest_lng, mode)
-    except RuntimeError as exc:
-        return f"Directions unavailable: {exc}"
+        route = await nom.calculate_route(user_lat, user_lng, dest_lat, dest_lng, mode)
     except Exception as exc:
         log.exception("maps_get_event_travel_info failed")
         return f"Directions failed: {exc}"
@@ -196,9 +190,7 @@ async def maps_check_walkability(
         Walkability verdict with real walking distance and duration.
     """
     try:
-        route = await google_maps.calculate_route(user_lat, user_lng, dest_lat, dest_lng, "walking")
-    except RuntimeError as exc:
-        return f"Walkability check unavailable: {exc}"
+        route = await nom.calculate_route(user_lat, user_lng, dest_lat, dest_lng, "walking")
     except Exception as exc:
         log.exception("maps_check_walkability failed")
         return f"Walkability check failed: {exc}"

@@ -2,12 +2,20 @@ import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/domain/rank_system.dart';
 import 'package:nightride/pages/badges_collection_page.dart';
 
-import '../../../../core/theme/app_theme.dart';
 import '../../domain/profile_models.dart';
+
+// ─── Palette ────────────────────────────────────────────────────────────────
+const _kBlack      = Color(0xFF070707);
+const _kNeonLime   = Color(0xFFDFFF2F);
+const _kCream      = Color(0xFFF3EAD6);
+const _kBorderGray = Color(0xFF333333);
+const _kWhite      = Color(0xFFFAFAFA);
+const _kCard       = Color(0xFF0F0F0F);
 
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
@@ -28,76 +36,115 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = state.data;
-    final sideImage = AppResponsive.profileSideImageSize(context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
+        // ── Avatar with neonLime ring ──
         _Avatar(url: d.avatarUrl, avatarBase64: avatarBase64),
         SizedBox(width: AppResponsive.profileHeaderGap(context)),
+
+        // ── Name / pronouns / badge / network ──
         Expanded(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              // USERNAME — bold Anton uppercase cream
               Text(
-                d.username,
+                d.username.toUpperCase(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white,
+                style: GoogleFonts.anton(
+                  color: _kCream,
                   fontSize: AppResponsive.profileUsernameFont(context),
-                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
                 ),
               ),
-              if (d.pronouns.isNotEmpty)
+
+              if (d.pronouns.isNotEmpty) ...[
+                const SizedBox(height: 2),
                 Text(
                   d.pronouns,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white60,
+                    color: _kWhite.withValues(alpha: 0.45),
                     fontSize: AppResponsive.profilePronounsFont(context),
+                    letterSpacing: 0.3,
                   ),
                 ),
-              SizedBox(height: AppResponsive.gap(context, 5)),
+              ],
+
+              SizedBox(height: AppResponsive.gap(context, 8)),
+
+              // RANK BADGE — neonLime pill, black text, emoji
               _RankBadge(points: d.rank),
-              SizedBox(height: AppResponsive.gap(context, 6)),
-              _StatText(label: 'Network', value: d.networkCount.toString()),
+
+              SizedBox(height: AppResponsive.gap(context, 8)),
+
+              // NETWORK count
+              Row(
+                children: [
+                  Text(
+                    'Network ',
+                    style: TextStyle(
+                      color: _kWhite.withValues(alpha: 0.45),
+                      fontSize: AppResponsive.profileNetworkFont(context),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  Flexible(
+                    child: Text(
+                      d.networkCount.toString(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _kWhite,
+                        fontSize: AppResponsive.profileNetworkFont(context),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
+
+        // ── Badges shortcut button ──
         GestureDetector(
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const BadgesCollectionPage()),
+            MaterialPageRoute(
+              builder: (context) => const BadgesCollectionPage(),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: sideImage,
-                height: sideImage,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppResponsive.radius(context, 16)),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: _kCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _kBorderGray, width: 1.5),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.military_tech_rounded,
+                  color: _kNeonLime,
+                  size: AppResponsive.icon(context, 22).clamp(18.0, 26.0),
                 ),
-                padding: EdgeInsets.all(AppResponsive.gap(context, 10)),
-                child: Image.network(
-                  'https://cdn-icons-png.flaticon.com/512/8644/8644445.png',
-                  color: Colors.pinkAccent,
+                const SizedBox(height: 4),
+                Text(
+                  'BADGES',
+                  style: GoogleFonts.anton(
+                    fontSize: AppResponsive.font(context, 9).clamp(8.0, 10.0),
+                    color: _kCream,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
-              SizedBox(height: AppResponsive.gap(context, 4)),
-              Container(
-                height: AppResponsive.gap(context, 6),
-                width: sideImage * 0.55,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -105,32 +152,7 @@ class ProfileHeader extends StatelessWidget {
   }
 }
 
-class _StatText extends StatelessWidget {
-  const _StatText({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = AppResponsive.profileNetworkFont(context);
-    return Row(
-      children: [
-        Text(
-          '$label ',
-          style: TextStyle(color: Colors.white60, fontSize: size),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
-    );
-  }
-}
+// ─── Avatar ─────────────────────────────────────────────────────────────────
 
 class _Avatar extends StatelessWidget {
   const _Avatar({required this.url, this.avatarBase64});
@@ -149,8 +171,9 @@ class _Avatar extends StatelessWidget {
       child = CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,
-        placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.06)),
-        errorWidget: (_, __, ___) => Icon(Icons.person_rounded, color: Colors.white38, size: fallbackIcon),
+        placeholder: (_, __) => Container(color: const Color(0xFF151515)),
+        errorWidget: (_, __, ___) =>
+            Icon(Icons.person_rounded, color: Colors.white38, size: fallbackIcon),
       );
     } else {
       child = Icon(Icons.person_rounded, color: Colors.white38, size: fallbackIcon);
@@ -159,91 +182,25 @@ class _Avatar extends StatelessWidget {
     return Container(
       width: s,
       height: s,
-      padding: EdgeInsets.all(3),
+      // Double ring effect: outer neonLime, slight inner gap via padding
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.65), width: 2),
+        border: Border.all(color: _kNeonLime, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: _kNeonLime.withValues(alpha: 0.30),
+            blurRadius: 14,
+            spreadRadius: 2,
+          ),
+        ],
       ),
+      padding: const EdgeInsets.all(3),
       child: ClipOval(child: child),
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({required this.value, required this.label});
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: AppResponsive.font(context, 15).clamp(13.0, 16.0),
-              fontWeight: FontWeight.w900,
-              color: Colors.white.withValues(alpha: 0.92),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: AppResponsive.font(context, 11.5).clamp(10.0, 12.5),
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.45),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.text, required this.onTap});
-  final String text;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppTheme.primary.withValues(alpha: 0.20),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.22)),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: AppResponsive.font(context, 12.8).clamp(11.0, 14.0),
-            fontWeight: FontWeight.w900,
-            color: Colors.white.withValues(alpha: 0.92),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// ─── Rank badge pill ─────────────────────────────────────────────────────────
 
 class _RankBadge extends StatelessWidget {
   const _RankBadge({required this.points});
@@ -253,58 +210,30 @@ class _RankBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tier = RankSystem.tierFor(points);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
-        color: tier.color.withValues(alpha: 0.12),
+        color: _kNeonLime,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: tier.color.withValues(alpha: 0.30)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(tier.emoji, style: TextStyle(fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0))),
-          const SizedBox(width: 4),
           Text(
-            tier.name,
+            tier.emoji,
             style: TextStyle(
-              color: tier.color,
+              fontSize: AppResponsive.font(context, 10).clamp(9.0, 12.0),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            tier.name.toUpperCase(),
+            style: GoogleFonts.anton(
+              color: _kBlack,
               fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
+              letterSpacing: 0.8,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GhostButton extends StatelessWidget {
-  const _GhostButton({required this.text, required this.onTap});
-  final String text;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: AppResponsive.font(context, 12.8).clamp(11.0, 14.0),
-            fontWeight: FontWeight.w900,
-            color: Colors.white.withValues(alpha: 0.78),
-          ),
-        ),
       ),
     );
   }

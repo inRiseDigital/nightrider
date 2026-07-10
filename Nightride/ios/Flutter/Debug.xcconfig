@@ -1,1 +1,5 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+
+// Google Maps SDK for iOS API key (read by Info.plist → AppDelegate).
+GOOGLE_MAPS_API_KEY = AIzaSyCEVJd4jHrz5TFxHTdLsrJ3c8GaFqtzY8w

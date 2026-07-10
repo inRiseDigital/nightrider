@@ -1,0 +1,45 @@
+workflows:
+  ios-testflight:
+    name: iOS TestFlight build
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: Codemagic Nightride
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.therisetechvillage.nightride
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    working_directory: Nightride
+    scripts:
+      - name: Pre-cache iOS artifacts
+        script: flutter precache --ios
+      - name: Install Flutter dependencies
+        script: flutter pub get
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --build-number=$(($BUILD_NUMBER + 100)) \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

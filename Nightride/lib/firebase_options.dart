@@ -7,6 +7,9 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return ios;
       default:
         return web;
     }
@@ -29,5 +32,14 @@ class DefaultFirebaseOptions {
     storageBucket: 'nightride-a9173.firebasestorage.app',
     messagingSenderId: '218660887469',
     appId: '1:218660887469:android:28c38d7a349bc81922df24',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCEVJd4jHrz5TFxHTdLsrJ3c8GaFqtzY8w',
+    projectId: 'nightride-a9173',
+    storageBucket: 'nightride-a9173.firebasestorage.app',
+    messagingSenderId: '218660887469',
+    appId: '1:218660887469:ios:b8f01140e713450822df24',
+    iosBundleId: 'com.therisetechvillage.nightride',
   );
 }

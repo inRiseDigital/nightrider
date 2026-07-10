@@ -1,6 +1,8 @@
 # Flutter/Dart
 .dart_tool/
 .packages
+.flutter-plugins
+.flutter-plugins-dependencies
 build/
 flutter_*.log
 *.g.dart

@@ -6,6 +6,8 @@ workflows:
     integrations:
       app_store_connect: Codemagic Nightride
     environment:
+      groups:
+        - nightride_config
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.therisetechvillage.nightride
@@ -25,6 +27,13 @@ workflows:
         script: flutter precache --ios
       - name: Install Flutter dependencies
         script: flutter pub get
+      - name: Write iOS Maps key xcconfig
+        script: |
+          cat > ios/Flutter/Release.xcconfig <<'EOF'
+          #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
+          #include "Generated.xcconfig"
+          EOF
+          echo "GOOGLE_MAPS_API_KEY = $GOOGLE_MAPS_API_KEY" >> ios/Flutter/Release.xcconfig
       - name: Install CocoaPods
         script: |
           cd ios
@@ -35,7 +44,8 @@ workflows:
         script: |
           flutter build ipa --release \
             --build-number=$(($BUILD_NUMBER + 100)) \
-            --dart-define=BACKEND_URL=https://5r5cqck5-8001.asse.devtunnels.ms \
+            --dart-define=BACKEND_URL=$BACKEND_URL \
+            --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY \
             --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa

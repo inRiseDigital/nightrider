@@ -2,4 +2,4 @@
 #include "Generated.xcconfig"
 
 // Google Maps SDK for iOS API key (read by Info.plist → AppDelegate).
-GOOGLE_MAPS_API_KEY = AIzaSyCEVJd4jHrz5TFxHTdLsrJ3c8GaFqtzY8w
+GOOGLE_MAPS_API_KEY = AIzaSyAU9psJRDieD_hhluJEDYKEey6efWn3X-8

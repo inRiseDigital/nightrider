@@ -6,6 +6,17 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.218660887469-1jp1engmlb0bsa9d4rrnk9qshi0eb9f3</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Nightride</string>
 	<key>CFBundleExecutable</key>
@@ -44,7 +55,19 @@
 	<key>GoogleMapsApiKey</key>
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to show your position on the map.</string>
+	<string>Nightride uses your location to show nearby events on the map and route you to venues.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Nightride uses your location to show nearby events on the map and route you to venues.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Nightride uses your location to show nearby events on the map and route you to venues.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Nightride uses the camera so you can take a profile photo or share photos from events.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Nightride needs photo library access to let you pick a profile photo or share event photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Nightride needs permission to save photos and screenshots to your library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Nightride uses the microphone when you record videos to share from events.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

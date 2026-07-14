@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:nightride/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -23,11 +24,21 @@ Future<void> main() async {
     systemNavigationBarColor: Color(0xFF000000),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
   try {
     await NotificationService.init();
     await NotificationService.requestPermission();
   } catch (_) {}
+
+  // Load .env for all platforms — provides BACKEND_URL, etc.
+  // Values gracefully fall back to --dart-define / built-in defaults if absent.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // .env missing — values fall back to --dart-define / built-in defaults.
+  }
 
   final prefs = await SharedPreferences.getInstance();
   final savedDark = prefs.getBool('dark_mode') ?? true;

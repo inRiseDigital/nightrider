@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from party_agent.core.observability import setup_observability
-from party_agent.api.routes import chat, health
+from party_agent.api.routes import chat, health, maps
 from party_agent.graph import build_graph
 from party_agent.integrations import scheduler
 from party_agent.memory.checkpointer import get_checkpointer
@@ -74,3 +74,4 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(chat.router)
+app.include_router(maps.router)

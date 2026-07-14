@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:nightride/core/responsive/app_responsive.dart';
 
@@ -15,6 +16,9 @@ class ProfileSectionCard extends StatelessWidget {
   final Widget child;
   final Widget? trailing;
 
+  static const _bg     = Color(0xFF0F0F0F);
+  static const _border = Color(0xFF333333);
+
   @override
   Widget build(BuildContext context) {
     final pad = AppResponsive.profileCardPadding(context);
@@ -22,9 +26,9 @@ class ProfileSectionCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(pad, pad - 2, pad, pad),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(18.r),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: _bg,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: _border, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,11 +40,10 @@ class ProfileSectionCard extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: GoogleFonts.anton(
                     fontSize: AppResponsive.profileCardTitleFont(context),
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white.withValues(alpha: 0.80),
-                    letterSpacing: 0.4,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),

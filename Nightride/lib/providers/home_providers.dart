@@ -26,13 +26,13 @@ class FeaturedCarouselIndexNotifier extends Notifier<int> {
 /// Dark mode UI toggle (UI only)
 final homeDarkToggleProvider = StateProvider<bool>((ref) => true);
 
-/// Accent color options shown in Appearance settings
+/// Accent color options shown in Appearance settings — Night Rite brand palette
 const List<Color> kAccentColors = [
-  Color(0xFF9F7AEA), // purple (default)
-  Color(0xFFED64A6), // pink
-  Color(0xFF448AFF), // blue
-  Color(0xFF64FFDA), // teal
-  Color(0xFFFFAB40), // orange
+  Color(0xFFdbdf57), // neon lime (brand default)
+  Color(0xFFf15991), // hot pink
+  Color(0xFF2ec4b6), // teal
+  Color(0xFF448AFF), // electric blue
+  Color(0xFFFFD700), // gold
 ];
 
 /// Index into kAccentColors for the selected accent
@@ -222,20 +222,32 @@ final userLocationProvider = StreamProvider<geo.Position?>((ref) async* {
   if (kIsWeb) { yield null; return; }
   final status = await Permission.locationWhenInUse.request();
   if (!status.isGranted) { yield null; return; }
+
+  // 1. Try last known position instantly (works on emulator if location was set)
   try {
-    final initial = await geo.Geolocator.getCurrentPosition(
-      locationSettings: const geo.LocationSettings(accuracy: geo.LocationAccuracy.medium),
-    );
-    yield initial;
+    final last = await geo.Geolocator.getLastKnownPosition();
+    if (last != null) yield last;
+  } catch (_) {}
+
+  // 2. Try a fresh fix — low accuracy + 15s timeout so emulator doesn't hang
+  try {
+    final fresh = await geo.Geolocator.getCurrentPosition(
+      locationSettings: const geo.LocationSettings(
+        accuracy: geo.LocationAccuracy.low,
+      ),
+    ).timeout(const Duration(seconds: 15));
+    yield fresh;
+  } catch (_) {}
+
+  // 3. Stream ongoing updates
+  try {
     yield* geo.Geolocator.getPositionStream(
       locationSettings: const geo.LocationSettings(
         accuracy: geo.LocationAccuracy.medium,
         distanceFilter: 100,
       ),
     );
-  } catch (_) {
-    yield null;
-  }
+  } catch (_) {}
 });
 
 double haversineKm(double lat1, double lng1, double lat2, double lng2) {

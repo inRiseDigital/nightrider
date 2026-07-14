@@ -1,10 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 
 /// Decorative gradient + glow-blob backdrop shared by all auth screens.
-/// Fully self-contained — uses no ScreenUtil scaling.
 class AuthBackground extends StatelessWidget {
   const AuthBackground({super.key});
 
@@ -13,54 +11,61 @@ class AuthBackground extends StatelessWidget {
     return RepaintBoundary(
       child: Stack(
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF4B3A6A), Color(0xFF251A3B), Color(0xFF0A0712)],
-                stops: [0.0, 0.55, 1.0],
-              ),
-            ),
-          ),
+          // Pure #070707 base
+          Container(color: const Color(0xFF070707)),
+          // Subtle pink radial glow top-center
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
-                center: const Alignment(0.15, -0.35),
-                radius: 1.15,
+                center: const Alignment(0.0, -0.75),
+                radius: 1.1,
                 colors: [
-                  AppTheme.primary.withValues(alpha: 0.12),
+                  const Color(0xFFFF3D73).withValues(alpha: 0.18),
                   Colors.transparent,
                 ],
-                stops: const [0.0, 0.7],
+                stops: const [0.0, 0.60],
+              ),
+            ),
+          ),
+          // Teal glow bottom-right
+          Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0.8, 0.75),
+                radius: 0.9,
+                colors: [
+                  const Color(0xFF62D6C8).withValues(alpha: 0.13),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.70],
               ),
             ),
           ),
           Positioned(
-            top: -90,
-            left: -70,
+            top: -80,
+            left: -40,
+            child: _GlowBlob(
+              size: 220,
+              color: const Color(0xFFFF3D73).withValues(alpha: 0.20),
+            ),
+          ),
+          Positioned(
+            top: 140,
+            right: -80,
             child: _GlowBlob(
               size: 240,
-              color: AppTheme.primary.withValues(alpha: 0.26),
+              color: const Color(0xFF62D6C8).withValues(alpha: 0.10),
             ),
           ),
           Positioned(
-            top: 120,
-            right: -90,
+            bottom: 240,
+            left: 30,
             child: _GlowBlob(
-              size: 260,
-              color: AppTheme.accent.withValues(alpha: 0.12),
+              size: 200,
+              color: const Color(0xFF62D6C8).withValues(alpha: 0.08),
             ),
           ),
-          Positioned(
-            bottom: 220,
-            left: 40,
-            child: _GlowBlob(
-              size: 210,
-              color: AppTheme.primaryLight.withValues(alpha: 0.14),
-            ),
-          ),
-          Container(color: Colors.black.withValues(alpha: 0.10)),
+          Container(color: Colors.black.withValues(alpha: 0.06)),
         ],
       ),
     );
@@ -75,7 +80,7 @@ class _GlowBlob extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 38, sigmaY: 38),
+      imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
       child: Container(
         width: size,
         height: size,

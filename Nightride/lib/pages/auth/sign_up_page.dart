@@ -1,16 +1,20 @@
 // lib/features/auth/presentation/pages/sign_up_page.dart
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:nightride/components/auth_process_scaffold.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/pages/onboard_questionnaire_page.dart';
 import 'package:nightride/services/auth_service.dart';
 
 import 'package:nightride/l10n/app_localizations.dart';
-import '../../../../../core/theme/app_theme.dart';
+
+// ── Palette ──────────────────────────────────────────────────────────────────
+const _kBlack = Color(0xFF070707);
+const _kCream = Color(0xFFF3EAD6);
+const _kNeonLime = Color(0xFFDFFF2F);
+const _kDarkGray = Color(0xFF151515);
+const _kBorderGray = Color(0xFF333333);
 
 class SignUpPage extends ConsumerStatefulWidget {
   const SignUpPage({super.key});
@@ -101,301 +105,186 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenW = MediaQuery.sizeOf(context).width;
-    final screenH = MediaQuery.sizeOf(context).height;
-    final requiredPanelPx = 600.0;
-    final basePanelPx = 0.63 * screenH;
-    final panelPx = math.min(
-      screenW > 600 ? 0.72 * screenH : 0.80 * screenH,
-      math.max(basePanelPx, requiredPanelPx),
-    );
-
-    final reservedGapDesignUnits = panelPx;
-    final topGap = screenW > 600 ? 16.0 : 88.0;
-
-    return AuthProcessScaffold(
-      title: 'Sign up',
-      subtitle: 'Create your account to get started',
-      titleTopGap: topGap,
-      reservedBottomGap: reservedGapDesignUnits,
-      bottomPanel: _SignUpBottomPanel(
-        panelHeightPx: panelPx,
-        emailController: _emailController,
-        passwordController: _passwordController,
-        confirmPasswordController: _confirmPasswordController,
-        isLoading: _isLoading,
-        onSignUp: _handleSignUp,
-        onGoogleSignUp: _handleGoogleSignUp,
-      ),
-    );
-  }
-}
-
-class _SignUpBottomPanel extends StatelessWidget {
-  final double panelHeightPx;
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final TextEditingController confirmPasswordController;
-  final bool isLoading;
-  final VoidCallback onSignUp;
-  final VoidCallback onGoogleSignUp;
-
-  const _SignUpBottomPanel({
-    required this.panelHeightPx,
-    required this.emailController,
-    required this.passwordController,
-    required this.confirmPasswordController,
-    required this.isLoading,
-    required this.onSignUp,
-    required this.onGoogleSignUp,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenW = MediaQuery.sizeOf(context).width;
-    return SizedBox(
-      height: panelHeightPx,
-      width: screenW,
-      child: Stack(
-        children: [
-          // Panel body
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B0816),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(48),
-                  topRight: Radius.circular(48),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withOpacity(0.22),
-                    blurRadius: 30,
-                    offset: const Offset(0, -10),
+    return Scaffold(
+      backgroundColor: _kBlack,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom -
+                  64,
+            ),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // ── Vinyl mascot ────────────────────────────────────────
+                  Image.asset(
+                    'assets/images/logo.png',
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.contain,
                   ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.55),
-                    blurRadius: 30,
-                    offset: const Offset(0, -6),
+
+                  const Gap(20),
+
+                  // ── JOIN THE RIDE heading ────────────────────────────────
+                  Text(
+                    'JOIN THE RIDE',
+                    style: GoogleFonts.anton(
+                      fontSize: AppResponsive.font(context, 38),
+                      color: _kCream,
+                      letterSpacing: 2.5,
+                      height: 1.05,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
+
+                  const Gap(6),
+
+                  // ── CREATE YOUR ACCOUNT subtext ──────────────────────────
+                  Text(
+                    'CREATE YOUR ACCOUNT',
+                    style: GoogleFonts.inter(
+                      fontSize: AppResponsive.font(context, 12),
+                      color: _kNeonLime,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 3.0,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const Gap(32),
+
+                  // ── Input fields ─────────────────────────────────────────
+                  _RetroInputField(
+                    controller: _emailController,
+                    icon: Icons.mail_outline_rounded,
+                    hint: AppLocalizations.of(context)!.email,
+                    isPassword: false,
+                  ),
+                  const Gap(14),
+                  _RetroInputField(
+                    controller: _passwordController,
+                    icon: Icons.lock_outline_rounded,
+                    hint: 'Enter New Password',
+                    isPassword: true,
+                  ),
+                  const Gap(14),
+                  _RetroInputField(
+                    controller: _confirmPasswordController,
+                    icon: Icons.lock_outline_rounded,
+                    hint: 'Confirm Password',
+                    isPassword: true,
+                  ),
+
+                  const Gap(24),
+
+                  // ── GET STARTED button ───────────────────────────────────
+                  _GetStartedButton(
+                    onPressed: _handleSignUp,
+                    isLoading: _isLoading,
+                  ),
+
+                  const Gap(20),
+
+                  // ── Divider ──────────────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(height: 1, color: _kBorderGray),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Text(
+                          'OR SIGN WITH',
+                          style: GoogleFonts.inter(
+                            fontSize: AppResponsive.font(context, 10),
+                            color: _kBorderGray,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.0,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(height: 1, color: _kBorderGray),
+                      ),
+                    ],
+                  ),
+
+                  const Gap(18),
+
+                  // ── Social icons ─────────────────────────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _RetroSocialIcon(
+                        kind: _SocialKind.google,
+                        onTap: _handleGoogleSignUp,
+                      ),
+                      const Gap(22),
+                      const _RetroSocialIcon(kind: _SocialKind.facebook),
+                      const Gap(22),
+                      const _RetroSocialIcon(kind: _SocialKind.apple),
+                    ],
+                  ),
+
+                  const Spacer(),
+
+                  const Gap(28),
+
+                  // ── Already have an account ──────────────────────────────
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Already have an account?  ',
+                            style: GoogleFonts.inter(
+                              fontSize: AppResponsive.font(context, 13.5),
+                              color: Colors.white.withValues(alpha: 0.50),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'LOG IN',
+                            style: GoogleFonts.inter(
+                              fontSize: AppResponsive.font(context, 13.5),
+                              color: _kNeonLime,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const Gap(16),
                 ],
               ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(48),
-                    topRight: Radius.circular(48),
-                  ),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x17B45BFF), // AppTheme.primary ~9% opacity
-                      Colors.transparent,
-                      Colors.transparent,
-                    ],
-                    stops: [0.0, 0.25, 1.0],
-                  ),
-                ),
-              ),
             ),
           ),
-
-          // Thin glowing top stroke
-          Positioned(
-            top: 0,
-            left: 22,
-            right: 22,
-            child: Container(
-              height: 2,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    AppTheme.primary.withOpacity(0.65),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Content — centered with max width for wide screens
-          Positioned(
-            top: 20,
-            left: 0,
-            right: 0,
-            bottom: 18,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width > 600
-                      ? (MediaQuery.sizeOf(context).width * 0.88).clamp(480.0, 640.0)
-                      : 480.0,
-                ),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: MediaQuery.sizeOf(context).width > 600 ? 16.0 : 22.0.clamp(0.0, 32.0),
-                  ),
-                  child: _PanelContent(
-                    emailController: emailController,
-                    passwordController: passwordController,
-                    confirmPasswordController: confirmPasswordController,
-                    isLoading: isLoading,
-                    onSignUp: onSignUp,
-                    onGoogleSignUp: onGoogleSignUp,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _PanelContent extends StatelessWidget {
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final TextEditingController confirmPasswordController;
-  final bool isLoading;
-  final VoidCallback onSignUp;
-  final VoidCallback onGoogleSignUp;
+// ── Retro Input Field ─────────────────────────────────────────────────────────
 
-  const _PanelContent({
-    required this.emailController,
-    required this.passwordController,
-    required this.confirmPasswordController,
-    required this.isLoading,
-    required this.onSignUp,
-    required this.onGoogleSignUp,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _InputField(
-          controller: emailController,
-          icon: Icons.mail_outline_rounded,
-          hint: AppLocalizations.of(context)!.email,
-          isPassword: false,
-        ),
-        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
-        _InputField(
-          controller: passwordController,
-          icon: Icons.lock_outline_rounded,
-          hint: 'Enter New Password',
-          isPassword: true,
-        ),
-        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
-        _InputField(
-          controller: confirmPasswordController,
-          icon: Icons.lock_outline_rounded,
-          hint: 'Confirm Password',
-          isPassword: true,
-        ),
-        Gap(AppResponsive.gap(context, 18).clamp(12, 24)),
-        _SignUpButton(onPressed: onSignUp, isLoading: isLoading),
-        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              "${AppLocalizations.of(context)!.alreadyHaveAccount} ",
-              style: TextStyle(
-                fontSize: AppResponsive.font(context, 13.5),
-                color: Colors.white.withOpacity(0.55),
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Text(
-                AppLocalizations.of(context)!.signIn,
-                style: TextStyle(
-                  fontSize: AppResponsive.font(context, 13.5),
-                  color: AppTheme.primaryLight.withOpacity(0.9),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
-
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: 1,
-                color: Colors.white.withOpacity(0.25),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'Or sign with',
-                style: TextStyle(
-                  fontSize: AppResponsive.font(context, 12.5),
-                  color: Colors.white.withOpacity(0.45),
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Container(
-                height: 1,
-                color: Colors.white.withOpacity(0.25),
-              ),
-            ),
-          ],
-        ),
-
-        Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _SocialIcon(kind: _SocialKind.google, onTap: onGoogleSignUp),
-            const Gap(22),
-            const _SocialIcon(kind: _SocialKind.facebook),
-            const Gap(22),
-            const _SocialIcon(kind: _SocialKind.apple),
-          ],
-        ),
-
-        Gap(AppResponsive.gap(context, 16).clamp(12, 22)),
-
-        GestureDetector(
-          onTap: () {},
-          child: Text(
-            AppLocalizations.of(context)!.continueAsGuest,
-            style: TextStyle(
-              fontSize: AppResponsive.font(context, 14),
-              color: AppTheme.primaryLight.withOpacity(0.9),
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InputField extends StatefulWidget {
+class _RetroInputField extends StatefulWidget {
   final TextEditingController controller;
   final IconData icon;
   final String hint;
   final bool isPassword;
 
-  const _InputField({
+  const _RetroInputField({
     required this.controller,
     required this.icon,
     required this.hint,
@@ -403,187 +292,200 @@ class _InputField extends StatefulWidget {
   });
 
   @override
-  State<_InputField> createState() => _InputFieldState();
+  State<_RetroInputField> createState() => _RetroInputFieldState();
 }
 
-class _InputFieldState extends State<_InputField> {
+class _RetroInputFieldState extends State<_RetroInputField> {
   bool _obscure = true;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final obscure = widget.isPassword ? _obscure : false;
 
-    return Container(
-      height: AppResponsive.gap(context, 64).clamp(54, 72),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        color: Colors.black.withOpacity(0.10),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primary.withOpacity(0.10),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+    return Focus(
+      onFocusChange: (hasFocus) => setState(() => _focused = hasFocus),
+      child: Container(
+        height: AppResponsive.gap(context, 58).clamp(52, 68),
+        decoration: BoxDecoration(
+          color: _kDarkGray,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _focused ? _kNeonLime : _kBorderGray,
+            width: _focused ? 1.8 : 1.2,
           ),
-        ],
-      ),
-      child: TextField(
-        controller: widget.controller,
-        keyboardType:
-            widget.isPassword
-                ? TextInputType.visiblePassword
-                : TextInputType.emailAddress,
-        obscureText: obscure,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.92),
-          fontSize: AppResponsive.font(context, 15),
+          boxShadow: _focused
+              ? [
+                  BoxShadow(
+                    color: _kNeonLime.withOpacity(0.12),
+                    blurRadius: 14,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
-        cursorColor: AppTheme.primaryLight,
-        decoration: InputDecoration(
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 18, right: 10),
-            child: Icon(
-              widget.icon,
-              color: AppTheme.primaryLight.withOpacity(0.85),
-              size: AppResponsive.icon(context, 22),
-            ),
-          ),
-          prefixIconConstraints: const BoxConstraints(
-            minWidth: 0,
-            minHeight: 0,
-          ),
-          hintText: widget.hint,
-          hintStyle: TextStyle(
-            color: AppTheme.primaryLight.withOpacity(0.45),
+        child: TextField(
+          controller: widget.controller,
+          keyboardType: widget.isPassword
+              ? TextInputType.visiblePassword
+              : TextInputType.emailAddress,
+          obscureText: obscure,
+          style: GoogleFonts.inter(
+            color: _kCream,
             fontSize: AppResponsive.font(context, 15),
             fontWeight: FontWeight.w400,
           ),
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: EdgeInsets.symmetric(
-            vertical: AppResponsive.gap(context, 18).clamp(14, 22),
-            horizontal: 18,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(26),
-            borderSide: BorderSide(
-              color: AppTheme.primary.withOpacity(0.55),
-              width: 1.2,
+          cursorColor: _kNeonLime,
+          decoration: InputDecoration(
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 10),
+              child: Icon(
+                widget.icon,
+                color: _focused ? _kNeonLime : _kBorderGray,
+                size: AppResponsive.icon(context, 20),
+              ),
             ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(26),
-            borderSide: const BorderSide(color: AppTheme.primary, width: 2),
-          ),
-          suffixIcon:
-              widget.isPassword
-                  ? Padding(
-                    padding: const EdgeInsets.only(right: 10),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 0,
+              minHeight: 0,
+            ),
+            hintText: widget.hint,
+            hintStyle: GoogleFonts.inter(
+              color: Colors.white.withValues(alpha: 0.28),
+              fontSize: AppResponsive.font(context, 14),
+              fontWeight: FontWeight.w400,
+            ),
+            filled: true,
+            fillColor: Colors.transparent,
+            contentPadding: EdgeInsets.symmetric(
+              vertical: AppResponsive.gap(context, 16).clamp(13, 20),
+              horizontal: 16,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            suffixIcon: widget.isPassword
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 8),
                     child: IconButton(
                       onPressed: () => setState(() => _obscure = !_obscure),
                       icon: Icon(
                         _obscure
                             ? Icons.visibility_off_rounded
                             : Icons.visibility_rounded,
-                        size: AppResponsive.icon(context, 20),
-                        color: AppTheme.primaryLight.withOpacity(0.55),
+                        size: AppResponsive.icon(context, 18),
+                        color: _focused
+                            ? _kNeonLime.withOpacity(0.70)
+                            : Colors.white.withOpacity(0.30),
                       ),
                     ),
                   )
-                  : null,
+                : null,
+          ),
         ),
       ),
     );
   }
 }
 
-class _SignUpButton extends StatelessWidget {
+// ── GET STARTED Button ────────────────────────────────────────────────────────
+
+class _GetStartedButton extends StatelessWidget {
   final VoidCallback onPressed;
   final bool isLoading;
 
-  const _SignUpButton({required this.onPressed, required this.isLoading});
+  const _GetStartedButton({required this.onPressed, required this.isLoading});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: AppResponsive.gap(context, 62).clamp(52, 70),
+      height: AppResponsive.gap(context, 58).clamp(52, 68),
       width: double.infinity,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primary.withOpacity(0.28),
-          foregroundColor: AppTheme.primaryLight.withOpacity(0.85),
+          backgroundColor: _kNeonLime,
+          foregroundColor: _kBlack,
+          disabledBackgroundColor: _kNeonLime.withValues(alpha: 0.45),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child:
-            isLoading
-                ? SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: const CircularProgressIndicator(
-                    color: AppTheme.primaryLight,
-                    strokeWidth: 2,
-                  ),
-                )
-                : Text(
-                  AppLocalizations.of(context)!.signUp,
-                  style: TextStyle(
-                    fontSize: AppResponsive.font(context, 18),
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2,
-                  ),
+        child: isLoading
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  color: _kBlack,
+                  strokeWidth: 2.5,
                 ),
+              )
+            : Text(
+                'GET STARTED',
+                style: GoogleFonts.anton(
+                  fontSize: AppResponsive.font(context, 17),
+                  color: _kBlack,
+                  letterSpacing: 2.5,
+                ),
+              ),
       ),
     );
   }
 }
+
+// ── Social Icons ──────────────────────────────────────────────────────────────
 
 enum _SocialKind { google, facebook, apple }
 
-class _SocialIcon extends StatelessWidget {
+class _RetroSocialIcon extends StatelessWidget {
   final _SocialKind kind;
   final VoidCallback? onTap;
 
-  const _SocialIcon({required this.kind, this.onTap});
+  const _RetroSocialIcon({required this.kind, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final size = AppResponsive.icon(context, 40);
+    final size = AppResponsive.icon(context, 48);
 
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
+      child: Container(
         width: size,
         height: size,
-        child: Center(child: _Logo(kind: kind, size: AppResponsive.icon(context, 32))),
+        decoration: BoxDecoration(
+          color: _kDarkGray,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _kBorderGray, width: 1.2),
+        ),
+        child: Center(
+          child: _SocialLogo(kind: kind, size: AppResponsive.icon(context, 24)),
+        ),
       ),
     );
   }
 }
 
-class _Logo extends StatelessWidget {
+class _SocialLogo extends StatelessWidget {
   final _SocialKind kind;
   final double size;
 
-  const _Logo({required this.kind, required this.size});
+  const _SocialLogo({required this.kind, required this.size});
 
   @override
   Widget build(BuildContext context) {
-    // Placeholder icons (layout stays exact).
-    // Replace with SVG/PNG assets later if you want exact logos.
     switch (kind) {
       case _SocialKind.google:
-        return Icon(
-          Icons.g_mobiledata_rounded,
-          size: size,
-          color: Colors.white,
-        );
+        return Icon(Icons.g_mobiledata_rounded, size: size, color: _kCream);
       case _SocialKind.facebook:
-        return Icon(Icons.facebook_rounded, size: size, color: Colors.white);
+        return Icon(Icons.facebook_rounded, size: size, color: _kCream);
       case _SocialKind.apple:
-        return Icon(Icons.apple, size: size, color: Colors.white);
+        return Icon(Icons.apple, size: size, color: _kCream);
     }
   }
 }

@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import 'package:nightride/core/responsive/app_dimensions.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
@@ -19,28 +21,40 @@ class HomeFeaturedCarousel extends ConsumerWidget {
     final int current = ref.watch(featuredCarouselIndexProvider);
     final featuredAsync = ref.watch(featuredEventsProvider);
     final carouselHeight = AppDimensions.featuredCarouselHeight(context);
+
     if (featuredAsync.isLoading) {
       return SizedBox(
         height: carouselHeight,
-        child: const Center(child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2)),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppTheme.neonLime,
+            strokeWidth: 2,
+          ),
+        ),
       );
     }
+
     final baseEvents = featuredAsync.asData?.value ?? [];
     final filtered = ref.watch(filteredFeaturedProvider);
-    final cat     = ref.watch(selectedCategoryProvider);
+    final cat = ref.watch(selectedCategoryProvider);
     final country = ref.watch(selectedCountryProvider);
 
-    // No real data at all → show dummy fallback
-    if (baseEvents.isEmpty) return _buildSlider(context, ref, current, kFeaturedEvents);
+    // No real data at all — show dummy fallback
+    if (baseEvents.isEmpty) {
+      return _buildSlider(context, ref, current, kFeaturedEvents);
+    }
 
-    // Filter active but nothing matches → show nothing (no dummy)
+    // Filter active but nothing matches — show empty state
     if (filtered.isEmpty && (cat != 'ALL' || country != 'ALL')) {
       return SizedBox(
         height: carouselHeight,
         child: Center(
           child: Text(
             'No events match this filter',
-            style: TextStyle(color: Colors.white38, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0)),
+            style: TextStyle(
+              color: AppTheme.cream.withValues(alpha: 0.4),
+              fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0),
+            ),
           ),
         ),
       );
@@ -50,53 +64,68 @@ class HomeFeaturedCarousel extends ConsumerWidget {
     return _buildSlider(context, ref, current, events);
   }
 
-  Widget _buildSlider(BuildContext context, WidgetRef ref, int current, List<FeaturedEvent> events) {
-    final sliderHeight = AppDimensions.featuredCarouselHeight(context) - 10;
+  Widget _buildSlider(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+    List<FeaturedEvent> events,
+  ) {
+    final sliderHeight =
+        AppDimensions.featuredCarouselHeight(context) - 10;
     return RepaintBoundary(
       child: Column(
         children: <Widget>[
           CarouselSlider(
             items: events
-                .map((FeaturedEvent e) => GestureDetector(
-                      onTap: e.id.isNotEmpty
-                          ? () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => EventDetailPage(id: e.id),
-                                ),
-                              )
-                          : null,
-                      child: _FeaturedHeroCard(event: e),
-                    ))
+                .map(
+                  (FeaturedEvent e) => GestureDetector(
+                    onTap: e.id.isNotEmpty
+                        ? () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => EventDetailPage(id: e.id),
+                              ),
+                            )
+                        : null,
+                    child: _FeaturedHeroCard(event: e),
+                  ),
+                )
                 .toList(),
             options: CarouselOptions(
               height: sliderHeight,
-              viewportFraction: AppResponsive.featuredViewportFraction(context),
+              viewportFraction:
+                  AppResponsive.featuredViewportFraction(context),
               enlargeCenterPage: true,
               enlargeStrategy: CenterPageEnlargeStrategy.zoom,
               autoPlay: true,
               autoPlayInterval: const Duration(seconds: 4),
-              autoPlayAnimationDuration: const Duration(milliseconds: 800),
+              autoPlayAnimationDuration:
+                  const Duration(milliseconds: 800),
               onPageChanged: (int index, CarouselPageChangedReason reason) {
-                ref.read(featuredCarouselIndexProvider.notifier).setIndex(index);
+                ref
+                    .read(featuredCarouselIndexProvider.notifier)
+                    .setIndex(index);
               },
             ),
           ),
-          SizedBox(height: AppResponsive.gap(context, 10)),
+          SizedBox(height: AppResponsive.gap(context, 12)),
+          // Retro dot indicators
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List<Widget>.generate(events.length, (int i) {
               final bool selected = i == current;
-              final dotH = AppResponsive.gap(context, 8).clamp(6.0, 10.0);
+              final dotH =
+                  AppResponsive.gap(context, 7).clamp(5.0, 9.0);
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOut,
-                margin: EdgeInsets.symmetric(horizontal: AppResponsive.gap(context, 4)),
-                width: selected ? dotH * 2.2 : dotH,
+                margin: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.gap(context, 3)),
+                width: selected ? dotH * 2.8 : dotH,
                 height: dotH,
                 decoration: BoxDecoration(
                   color: selected
-                      ? AppTheme.accent
-                      : Colors.white.withValues(alpha: 0.22),
+                      ? AppTheme.neonLime
+                      : AppTheme.borderGray,
                   borderRadius: BorderRadius.circular(999),
                 ),
               );
@@ -114,54 +143,59 @@ class _FeaturedHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardRadius = AppResponsive.radius(context, 22).clamp(18.0, 26.0);
+    final cardRadius =
+        AppResponsive.radius(context, 20).clamp(16.0, 24.0);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(cardRadius),
         child: Container(
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            color: AppTheme.darkGray,
             borderRadius: BorderRadius.circular(cardRadius),
+            border: Border.all(color: AppTheme.borderGray, width: 1),
             boxShadow: const <BoxShadow>[
               BoxShadow(
-                color: Color(0x73000000),
-                blurRadius: 26,
-                offset: Offset(0, 16),
+                color: Color(0x88000000),
+                blurRadius: 24,
+                offset: Offset(0, 14),
               ),
               BoxShadow(
-                color: Color(0x1A7B2FFF),
-                blurRadius: 30,
-                offset: Offset(0, 18),
+                color: Color(0x22FF3D73),
+                blurRadius: 28,
+                offset: Offset(0, 16),
               ),
             ],
           ),
           child: Stack(
             fit: StackFit.expand,
             children: <Widget>[
+              // Background image
               CachedNetworkImage(
                 imageUrl: event.imageUrl,
                 fit: BoxFit.cover,
-                placeholder:
-                    (_, __) =>
-                        Container(color: Colors.white.withValues(alpha: 0.06)),
-                errorWidget:
-                    (_, __, ___) => Container(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.broken_image_rounded,
-                        color: Colors.white.withValues(alpha: 0.55),
-                      ),
-                    ),
+                placeholder: (_, __) =>
+                    Container(color: AppTheme.darkGray),
+                errorWidget: (_, __, ___) => Container(
+                  color: AppTheme.darkGray,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.broken_image_rounded,
+                    color: AppTheme.borderGray,
+                    size: 32,
+                  ),
+                ),
               ),
+              // Cinematic gradient overlay
               const _CinematicOverlay(),
+              // Bottom text row
               Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _BottomFadeStrip(height: AppResponsive.gap(context, 96).clamp(80.0, 110.0)),
+                left: AppResponsive.gap(context, 16),
+                right: AppResponsive.gap(context, 16),
+                bottom: AppResponsive.gap(context, 16),
+                child: _FeaturedBottomRow(event: event),
               ),
+              // Top-right action button
               Positioned(
                 right: AppResponsive.gap(context, 12),
                 top: AppResponsive.gap(context, 12),
@@ -171,11 +205,19 @@ class _FeaturedHeroCard extends StatelessWidget {
                   onTap: () {},
                 ),
               ),
-              Positioned(
-                left: AppResponsive.gap(context, 16),
-                right: AppResponsive.gap(context, 16),
-                bottom: AppResponsive.gap(context, 14),
-                child: _FeaturedBottomRow(event: event),
+              // Hairline border
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(cardRadius),
+                      border: Border.all(
+                        color: AppTheme.borderGray,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -196,38 +238,12 @@ class _CinematicOverlay extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Colors.black.withValues(alpha: 0.08),
-            Colors.black.withValues(alpha: 0.10),
-            Colors.black.withValues(alpha: 0.45),
-            Colors.black.withValues(alpha: 0.86),
+            Colors.black.withValues(alpha: 0.05),
+            Colors.black.withValues(alpha: 0.12),
+            Colors.black.withValues(alpha: 0.55),
+            Colors.black.withValues(alpha: 0.90),
           ],
-          stops: const <double>[0.0, 0.48, 0.72, 1.0],
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomFadeStrip extends StatelessWidget {
-  const _BottomFadeStrip({required this.height});
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: <Color>[
-              Colors.black.withValues(alpha: 0.00),
-              Colors.black.withValues(alpha: 0.35),
-              Colors.black.withValues(alpha: 0.82),
-            ],
-            stops: const <double>[0.0, 0.45, 1.0],
-          ),
+          stops: const <double>[0.0, 0.42, 0.70, 1.0],
         ),
       ),
     );
@@ -240,7 +256,6 @@ class _FeaturedBottomRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final genreMaxW = AppResponsive.featuredGenreMaxWidth(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
@@ -249,77 +264,74 @@ class _FeaturedBottomRow extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                event.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.0),
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: AppResponsive.gap(context, 5)),
-              Text(
-                event.subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.5),
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.72),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(width: AppResponsive.gap(context, 10)),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: <Widget>[
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: genreMaxW),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppResponsive.gap(context, 12),
-                  vertical: AppResponsive.gap(context, 6),
-                ),
+              // Genre pill
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary,
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withValues(alpha: 0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+                  color: AppTheme.hotPink.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: AppTheme.hotPink.withValues(alpha: 0.5),
+                    width: 1,
+                  ),
                 ),
                 child: Text(
-                  event.badgeText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  event.badgeText.toUpperCase(),
                   style: TextStyle(
-                    fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.hotPink,
+                    letterSpacing: 1.2,
                   ),
                 ),
               ),
-            ),
-            SizedBox(height: AppResponsive.gap(context, 6)),
-            Text(
-              event.dateText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0),
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.72),
+              SizedBox(height: AppResponsive.gap(context, 6)),
+              // Event title in Anton
+              Text(
+                event.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.anton(
+                  fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0),
+                  fontWeight: FontWeight.w400,
+                  color: AppTheme.cream,
+                  letterSpacing: 0.8,
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: AppResponsive.gap(context, 4)),
+              // Subtitle + date
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      event.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize:
+                            AppResponsive.font(context, 12).clamp(10.5, 13.0),
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.teal,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    event.dateText,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize:
+                          AppResponsive.font(context, 11).clamp(10.0, 12.0),
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.cream.withValues(alpha: 0.6),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -327,7 +339,8 @@ class _FeaturedBottomRow extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.size, required this.icon, required this.onTap});
+  const _ActionButton(
+      {required this.size, required this.icon, required this.onTap});
   final double size;
   final IconData icon;
   final VoidCallback onTap;
@@ -336,20 +349,21 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.30),
-          borderRadius: BorderRadius.circular(AppResponsive.radius(context, 14)),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1),
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: AppTheme.borderGray.withValues(alpha: 0.6), width: 1),
         ),
         alignment: Alignment.center,
         child: Icon(
           icon,
           size: size * 0.5,
-          color: Colors.white.withValues(alpha: 0.92),
+          color: AppTheme.cream.withValues(alpha: 0.9),
         ),
       ),
     );

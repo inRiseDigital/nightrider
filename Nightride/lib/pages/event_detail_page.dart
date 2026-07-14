@@ -1,15 +1,33 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
 import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/services/auth_service.dart';
+import 'package:nightride/services/favourites_service.dart';
+
+// ── Palette ────────────────────────────────────────────────────────────────────
+class _P {
+  static const black     = Color(0xFF070707);
+  static const surface   = Color(0xFF0F0F0F);
+  static const darkGray  = Color(0xFF151515);
+  static const borderGray= Color(0xFF333333);
+  static const cream     = Color(0xFFF3EAD6);
+  static const neonLime  = Color(0xFFDFFF2F);
+  static const hotPink   = Color(0xFFFF3D73);
+  static const teal      = Color(0xFF62D6C8);
+  static const white     = Color(0xFFFAFAFA);
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────────
 
 class EventDetailPage extends ConsumerWidget {
   const EventDetailPage({super.key, required this.id});
@@ -21,7 +39,7 @@ class EventDetailPage extends ConsumerWidget {
     final async = ref.watch(eventDetailProvider(id));
 
     return Scaffold(
-      backgroundColor: AppTheme.scaffold,
+      backgroundColor: _P.black,
       body: async.when(
         loading: () => const _LoadingBody(),
         error: (_, __) => const _ErrorBody(),
@@ -34,586 +52,1002 @@ class EventDetailPage extends ConsumerWidget {
   }
 }
 
+// ── Loading ────────────────────────────────────────────────────────────────────
+
 class _LoadingBody extends StatelessWidget {
   const _LoadingBody();
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.scaffold,
-      appBar: AppBar(backgroundColor: AppTheme.scaffold),
-      body: const Center(
-        child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2),
+    return const Scaffold(
+      backgroundColor: _P.black,
+      body: Center(
+        child: CircularProgressIndicator(color: _P.neonLime, strokeWidth: 2),
       ),
     );
   }
 }
+
+// ── Error ──────────────────────────────────────────────────────────────────────
 
 class _ErrorBody extends StatelessWidget {
   const _ErrorBody();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.scaffold,
-      appBar: AppBar(
-        backgroundColor: AppTheme.scaffold,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+      backgroundColor: _P.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _CircleButton(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: _P.white, size: 18),
+                ),
+              ),
+            ),
+            const Expanded(
+              child: Center(
+                child: Text('Event not found',
+                    style: TextStyle(color: Colors.white54)),
+              ),
+            ),
+          ],
         ),
-      ),
-      body: Center(
-        child: Text(AppLocalizations.of(context)!.eventNotFound, style: const TextStyle(color: Colors.white70)),
       ),
     );
   }
 }
 
-class _DetailBody extends ConsumerWidget {
-  const _DetailBody({required this.data});
+// ── Detail body ───────────────────────────────────────────────────────────────
 
+class _DetailBody extends ConsumerStatefulWidget {
+  const _DetailBody({required this.data});
   final Map<String, dynamic> data;
 
-  String get _name => data['name'] as String? ?? '';
-  String get _coverImage => data['cover_image'] as String? ?? '';
-  String get _genre => data['genre'] as String? ?? 'Music';
-  String get _date => data['date'] as String? ?? '';
-  String get _startTime => data['start_time'] as String? ?? '';
-  String get _venueName => data['venue_name'] as String? ?? '';
-  String get _address => data['address'] as String? ?? '';
-  String get _city => data['city'] as String? ?? '';
-  String get _country => data['country'] as String? ?? '';
-  String get _priceHint => data['price_hint'] as String? ?? '';
-  String get _description => data['description'] as String? ?? '';
-  String get _ticketUrl => data['ticket_url'] as String? ?? '';
-  String get _language => data['language'] as String? ?? '';
+  @override
+  ConsumerState<_DetailBody> createState() => _DetailBodyState();
+}
+
+class _DetailBodyState extends ConsumerState<_DetailBody> {
+  // ── Field getters ─────────────────────────────────────────────────────────
+  String get _id          => widget.data['id'] as String? ?? '';
+  String get _name        => widget.data['name'] as String? ?? '';
+  String get _coverImage  => widget.data['cover_image'] as String? ?? '';
+  String get _genre       => widget.data['genre'] as String? ?? 'Music';
+  String get _date        => widget.data['date'] as String? ?? '';
+  String get _startTime   => widget.data['start_time'] as String? ?? '';
+  String get _venueName   => widget.data['venue_name'] as String? ?? '';
+  String get _address     => widget.data['address'] as String? ?? '';
+  String get _city        => widget.data['city'] as String? ?? '';
+  String get _country     => widget.data['country'] as String? ?? '';
+  String get _priceHint   => widget.data['price_hint'] as String? ?? '';
+  String get _description => widget.data['description'] as String? ?? '';
+  String get _ticketUrl   => widget.data['ticket_url'] as String? ?? '';
+  String get _language    => widget.data['language'] as String? ?? '';
+  double get _lat         => (widget.data['lat'] as num? ?? 0).toDouble();
+  double get _lng         => (widget.data['lng'] as num? ?? 0).toDouble();
+
   List<String> get _artists =>
-      (data['artists'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+      (widget.data['artists'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList() ??
+      [];
 
   List<Map<String, dynamic>> get _performers {
-    final raw = data['performers'] as List<dynamic>?;
+    final raw = widget.data['performers'] as List<dynamic>?;
     if (raw == null || raw.isEmpty) return [];
     return raw.whereType<Map>().map((p) => Map<String, dynamic>.from(p)).toList();
   }
 
   Map<String, dynamic> get _policies =>
-      (data['policies'] as Map<String, dynamic>?) ?? {};
-  double get _lat => (data['lat'] as num? ?? 0).toDouble();
-  double get _lng => (data['lng'] as num? ?? 0).toDouble();
+      (widget.data['policies'] as Map<String, dynamic>?) ?? {};
 
-  String _formatDateTime() {
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /// Returns e.g. "JUN 14" for the date badge circle
+  String _formatDayMonth() {
     if (_date.isEmpty) return '';
     final parts = _date.split('-');
-    if (parts.length < 3) return _date;
-    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (parts.length < 3) return _date.toUpperCase();
+    const months = [
+      '', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+    ];
     final m = int.tryParse(parts[1]) ?? 0;
     final d = int.tryParse(parts[2]) ?? 0;
     final monthName = (m > 0 && m <= 12) ? months[m] : '';
-    final year = parts[0];
-    final timeStr = _startTime.contains('T')
-        ? _startTime.split('T').last.substring(0, 5)
-        : '';
-    return '$monthName $d, $year${timeStr.isNotEmpty ? ' · $timeStr' : ''}';
+    return '$monthName $d';
+  }
+
+  /// Returns formatted time e.g. "9:30PM"
+  String _formatTime() {
+    if (_startTime.isEmpty) return '';
+    String t = _startTime.contains('T')
+        ? _startTime.split('T').last
+        : _startTime;
+    // trim to HH:MM
+    if (t.length >= 5) t = t.substring(0, 5);
+    // parse and convert to 12h
+    final colonIdx = t.indexOf(':');
+    if (colonIdx < 0) return t.toUpperCase();
+    final hh = int.tryParse(t.substring(0, colonIdx)) ?? 0;
+    final mm = t.substring(colonIdx + 1);
+    final ampm = hh >= 12 ? 'PM' : 'AM';
+    final hour12 = hh % 12 == 0 ? 12 : hh % 12;
+    return '$hour12:$mm$ampm';
   }
 
   Future<void> _openTickets() async {
     if (_ticketUrl.isEmpty) return;
     final uri = Uri.tryParse(_ticketUrl);
-    if (uri != null) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _share(BuildContext context) async {
+    final text = _ticketUrl.isNotEmpty ? '$_name\n$_ticketUrl' : _name;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: _P.surface,
+          content: Text('Link copied to clipboard',
+              style: TextStyle(color: _P.white)),
+        ),
+      );
     }
   }
 
+  Future<void> _toggleFavourite(bool isCurrentlyFav) async {
+    final svc = ref.read(favouritesServiceProvider);
+    final user = ref.read(authStateProvider).asData?.value;
+    if (user == null) return;
+    if (isCurrentlyFav) {
+      await svc.remove(user.uid, _id);
+    } else {
+      await svc.add(user.uid, {
+        ...widget.data,
+        'id': _id,
+      });
+    }
+    ref.invalidate(isFavouriteProvider(_id));
+    ref.invalidate(favouritesStreamProvider);
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    String mapToken = '';
-    try { mapToken = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? ''; } catch (_) {}
-    final String staticMapUrl = (mapToken.isNotEmpty && _lat != 0 && _lng != 0)
-        ? 'https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/'
-            'pin-l+9f7aea($_lng,$_lat)/$_lng,$_lat,14,0/600x260@2x'
-            '?access_token=$mapToken'
-        : '';
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final heroHeight = screenHeight * 0.42;
+    // cream card overlaps hero by ~80px
+    const cardOverlap = 80.0;
 
-    final locationLine = [_city, _country].where((s) => s.isNotEmpty).join(', ');
-    final addressLine = [_venueName, _address].where((s) => s.isNotEmpty).join(' · ');
+    final isFavAsync = ref.watch(isFavouriteProvider(_id));
+    final isFav = isFavAsync.asData?.value ?? false;
 
-    return Stack(
-      children: [
-        CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // ── Hero image ──────────────────────────────────────────────────
-            SliverAppBar(
-              expandedHeight: 360,
-              pinned: true,
-              stretch: true,
-              backgroundColor: AppTheme.scaffold,
-              leadingWidth: 70,
-              leading: Padding(
-                padding: const EdgeInsets.only(left: 14),
-                child: Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      height: 40,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+    final favsAll = ref.watch(favouritesStreamProvider).asData?.value ?? [];
+    final attendeeCount = widget.data['attendee_count'] as int?
+        ?? (favsAll.isNotEmpty ? favsAll.length : null);
+
+    const String mapsKey = String.fromEnvironment(
+      'GOOGLE_MAPS_API_KEY',
+      defaultValue: kGoogleMapsApiKey,
+    );
+    final String staticMapUrl =
+        (mapsKey.isNotEmpty &&
+                mapsKey != 'YOUR_GOOGLE_MAPS_API_KEY_HERE' &&
+                _lat != 0 &&
+                _lng != 0)
+            ? 'https://maps.googleapis.com/maps/api/staticmap'
+                '?center=$_lat,$_lng&zoom=14&size=600x260&scale=2'
+                '&markers=color:0x9f7aea%7C$_lat,$_lng'
+                '&style=feature:all%7Celement:geometry%7Ccolor:0x242f3e'
+                '&style=feature:water%7Celement:geometry%7Ccolor:0x17263c'
+                '&style=feature:road%7Celement:geometry%7Ccolor:0x38414e'
+                '&key=$mapsKey'
+            : '';
+
+    final locationLine =
+        [_city, _country].where((s) => s.isNotEmpty).join(', ');
+    final addressLine =
+        [_venueName, _address].where((s) => s.isNotEmpty).join(' · ');
+    final priceLabel = _priceHint.isNotEmpty ? _priceHint.toUpperCase() : 'FREE';
+    final dayMonth  = _formatDayMonth();
+    final timeStr   = _formatTime();
+
+    return Scaffold(
+      backgroundColor: _P.black,
+      body: Stack(
+        children: [
+          // ── Scrollable content ─────────────────────────────────────────────
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Hero image ───────────────────────────────────────────────
+                SizedBox(
+                  height: heroHeight,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _coverImage.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: _coverImage,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) =>
+                                  Container(color: _P.darkGray),
+                              errorWidget: (_, __, ___) =>
+                                  Container(color: _P.darkGray),
+                            )
+                          : Container(color: _P.darkGray),
+                      // Strong gradient toward bottom so cream card reads over it
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: [0.0, 0.40, 0.75, 1.0],
+                            colors: [
+                              Color(0x00070707),
+                              Color(0x15070707),
+                              Color(0xAA070707),
+                              Color(0xFF070707),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                stretchModes: const [StretchMode.zoomBackground],
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: _coverImage,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(color: AppTheme.surface),
-                      errorWidget: (_, __, ___) => Container(color: AppTheme.surface),
-                    ),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: const [0.0, 0.45, 0.75, 1.0],
-                          colors: [
-                            Colors.black.withValues(alpha: 0.35),
-                            Colors.transparent,
-                            AppTheme.scaffold.withValues(alpha: 0.7),
-                            AppTheme.scaffold,
-                          ],
-                        ),
+
+                // ── Cream ticket card — overlaps hero ────────────────────────
+                Transform.translate(
+                  offset: const Offset(0, -cardOverlap),
+                  child: Container(
+                    margin: EdgeInsets.zero,
+                    decoration: const BoxDecoration(
+                      color: _P.cream,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(32),
+                        topRight: Radius.circular(32),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── Content ─────────────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 130),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Genre badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        _genre.toUpperCase(),
-                        style: TextStyle(
-                          color: AppTheme.primaryLight,
-                          fontSize: AppResponsive.font(context, 10).clamp(8.5, 11.0),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                    ),
-                    const Gap(14),
-
-                    // Title
-                    Text(
-                      _name,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: AppResponsive.font(context, 26).clamp(22.0, 28.5),
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                      ),
-                    ),
-                    const Gap(20),
-
-                    // ── Info card ────────────────────────────────────────────
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                      ),
-                      child: Column(
-                        children: [
-                          // Date & time
-                          if (_formatDateTime().isNotEmpty) ...[
-                            _InfoRow(
-                              icon: Icons.calendar_month_rounded,
-                              iconColor: AppTheme.accent,
-                              text: _formatDateTime(),
-                            ),
-                            _Divider(),
-                          ],
-
-                          // Venue
-                          if (locationLine.isNotEmpty)
-                            _InfoRow(
-                              icon: Icons.location_on_rounded,
-                              iconColor: AppTheme.primary,
-                              text: locationLine,
-                              subText: addressLine.isNotEmpty ? addressLine : null,
-                            ),
-
-                          // Language
-                          if (_language.isNotEmpty) ...[
-                            _Divider(),
-                            _InfoRow(
-                              icon: Icons.language_rounded,
-                              iconColor: Colors.blueAccent,
-                              text: _language,
-                            ),
-                          ],
-
-                          // Price
-                          if (_priceHint.isNotEmpty) ...[
-                            _Divider(),
-                            _InfoRow(
-                              icon: Icons.local_activity_rounded,
-                              iconColor: Colors.greenAccent,
-                              text: _priceHint,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const Gap(26),
-
-                    // ── Performers ───────────────────────────────────────────
-                    if (_performers.isNotEmpty || _artists.isNotEmpty) ...[
-                      Text(
-                        AppLocalizations.of(context)!.performers,
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
-                      ),
-                      const Gap(12),
-                      // Rich performer cards (from new performers field)
-                      if (_performers.isNotEmpty)
-                        Column(
-                          children: _performers.map((p) {
-                            final name = p['name'] as String? ?? '';
-                            final type = p['type'] as String? ?? 'DJ';
-                            final bio = p['bio'] as String? ?? '';
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.04),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-                              ),
-                              child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Card main content ────────────────────────────────
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(22, 28, 22, 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ── Time badge + genre row ───────────────────
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.accent.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(12),
+                                  // Teal circle badge with date + time
+                                  if (dayMonth.isNotEmpty || timeStr.isNotEmpty)
+                                    _TimeBadge(
+                                      dayMonth: dayMonth,
+                                      time: timeStr,
                                     ),
-                                    child: Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 20).clamp(17.0, 22.0)),
-                                  ),
                                   const Gap(12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(name, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.5), fontWeight: FontWeight.w800)),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.primary.withValues(alpha: 0.2),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(type, style: TextStyle(color: AppTheme.primaryLight, fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0), fontWeight: FontWeight.w700)),
-                                            ),
-                                          ],
+                                  // Genre pill
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: _GenrePill(genre: _genre),
+                                  ),
+                                ],
+                              ),
+                              const Gap(16),
+
+                              // ── Event title ──────────────────────────────
+                              Text(
+                                _name.toUpperCase(),
+                                style: GoogleFonts.anton(
+                                  color: _P.black,
+                                  fontSize: AppResponsive.font(context, 38)
+                                      .clamp(30.0, 46.0),
+                                  height: 0.95,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const Gap(8),
+
+                              // ── Address line ─────────────────────────────
+                              if (addressLine.isNotEmpty ||
+                                  locationLine.isNotEmpty)
+                                Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 1),
+                                      child: Icon(Icons.location_on_rounded,
+                                          color: _P.hotPink, size: 16),
+                                    ),
+                                    const Gap(5),
+                                    Expanded(
+                                      child: Text(
+                                        [
+                                          if (addressLine.isNotEmpty)
+                                            addressLine,
+                                          if (locationLine.isNotEmpty)
+                                            locationLine,
+                                        ].join(' · '),
+                                        style: GoogleFonts.poppins(
+                                          color: _P.black
+                                              .withValues(alpha: 0.55),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.4,
                                         ),
-                                        if (bio.isNotEmpty) ...[
-                                          const Gap(4),
-                                          Text(bio, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0)), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                        ],
-                                      ],
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              const Gap(20),
+
+                              // ── Dashed separator ─────────────────────────
+                              _DashedDivider(
+                                  color: _P.black.withValues(alpha: 0.18)),
+                              const Gap(16),
+
+                              // ── People going section ─────────────────────
+                              if (attendeeCount != null &&
+                                  attendeeCount > 0) ...[
+                                Row(
+                                  children: [
+                                    Text(
+                                      'PEOPLE GOING',
+                                      style: GoogleFonts.poppins(
+                                        color: _P.black
+                                            .withValues(alpha: 0.40),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 2.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Gap(8),
+                                _PeopleGoingRow(count: attendeeCount),
+                                const Gap(16),
+                                _DashedDivider(
+                                    color: _P.black.withValues(alpha: 0.12)),
+                                const Gap(16),
+                              ],
+
+                              // ── Entry row ────────────────────────────────
+                              Row(
+                                children: [
+                                  Text(
+                                    'ENTRY',
+                                    style: GoogleFonts.poppins(
+                                      color: _P.black.withValues(alpha: 0.40),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 2.2,
+                                    ),
+                                  ),
+                                  const Gap(14),
+                                  Text(
+                                    priceLabel,
+                                    style: GoogleFonts.anton(
+                                      color: _P.black,
+                                      fontSize: 22,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ],
                               ),
-                            );
-                          }).toList(),
-                        )
-                      // Fallback: legacy plain artist name chips
-                      else
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: _artists.map((artist) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                              const Gap(14),
+
+                              // ── Language row ─────────────────────────────
+                              if (_language.isNotEmpty) ...[
+                                Row(
+                                  children: [
+                                    Icon(Icons.language_rounded,
+                                        color:
+                                            _P.black.withValues(alpha: 0.35),
+                                        size: 15),
+                                    const Gap(6),
+                                    Text(
+                                      _language.toUpperCase(),
+                                      style: GoogleFonts.poppins(
+                                        color:
+                                            _P.black.withValues(alpha: 0.50),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Gap(14),
+                              ],
+
+                              // ── Perforated tear line ──────────────────────
+                              _TicketTearLine(),
+                              const Gap(10),
+
+                              // ── Barcode strip ─────────────────────────────
+                              _BarcodeStrip(
+                                  color: _P.black.withValues(alpha: 0.50)),
+                              const Gap(4),
+                              Text(
+                                'ADMIT ONE  ·  NIGHT RITE',
+                                style: GoogleFonts.poppins(
+                                  color: _P.black.withValues(alpha: 0.28),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 2.4,
+                                ),
+                              ),
+                              const Gap(28),
+                            ],
+                          ),
+                        ),
+
+                        // ── Performers section ─────────────────────────────
+                        if (_performers.isNotEmpty || _artists.isNotEmpty) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.mic_rounded, color: AppTheme.accent, size: AppResponsive.icon(context, 13).clamp(11.0, 14.5)),
-                                const Gap(7),
-                                Text(artist, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5), fontWeight: FontWeight.w600)),
+                                Text(
+                                  AppLocalizations.of(context)!.performers
+                                      .toUpperCase(),
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const Gap(14),
+                                if (_performers.isNotEmpty)
+                                  Column(
+                                    children: _performers.map((p) {
+                                      final pName =
+                                          p['name'] as String? ?? '';
+                                      final type =
+                                          p['type'] as String? ?? 'DJ';
+                                      final bio =
+                                          p['bio'] as String? ?? '';
+                                      return Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: _P.black
+                                              .withValues(alpha: 0.06),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: _P.black
+                                                .withValues(alpha: 0.10),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 44,
+                                              height: 44,
+                                              decoration: BoxDecoration(
+                                                color: _P.hotPink
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: const Icon(
+                                                Icons.mic_rounded,
+                                                color: _P.hotPink,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const Gap(12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          pName,
+                                                          style: GoogleFonts
+                                                              .poppins(
+                                                            color: _P.black,
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.w800,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 3),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: _P.teal
+                                                              .withValues(
+                                                                  alpha: 0.22),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(6),
+                                                        ),
+                                                        child: Text(
+                                                          type.toUpperCase(),
+                                                          style:
+                                                              GoogleFonts.poppins(
+                                                            color: const Color(
+                                                                0xFF006B62),
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  if (bio.isNotEmpty) ...[
+                                                    const Gap(4),
+                                                    Text(
+                                                      bio,
+                                                      style: GoogleFonts.poppins(
+                                                        color: _P.black
+                                                            .withValues(
+                                                                alpha: 0.50),
+                                                        fontSize: 12,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  )
+                                else
+                                  Wrap(
+                                    spacing: 10,
+                                    runSpacing: 10,
+                                    children: _artists
+                                        .map((artist) => Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 9),
+                                              decoration: BoxDecoration(
+                                                color: _P.black
+                                                    .withValues(alpha: 0.06),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: _P.black
+                                                      .withValues(alpha: 0.10),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.mic_rounded,
+                                                      color: _P.hotPink,
+                                                      size: 13),
+                                                  const Gap(7),
+                                                  Text(
+                                                    artist,
+                                                    style: GoogleFonts.poppins(
+                                                      color: _P.black,
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ))
+                                        .toList(),
+                                  ),
+                                const Gap(22),
                               ],
                             ),
-                          )).toList(),
-                        ),
-                      const Gap(26),
-                    ],
+                          ),
+                        ],
 
-                    // ── Event Policies ───────────────────────────────────────
-                    if (_policies.isNotEmpty) ...[
-                      Text(
-                        'Event Policies',
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
-                      ),
-                      const Gap(12),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-                        ),
-                        child: Column(
-                          children: [
-                            if ((_policies['age_restriction'] as int? ?? 0) > 0) ...[
-                              _PolicyRow(icon: Icons.person_outline_rounded, iconColor: Colors.orangeAccent, label: 'Age Restriction', value: '${_policies['age_restriction']}+ only'),
-                              _DividerThin(),
-                            ],
-                            if ((_policies['refund_policy'] as String? ?? '').isNotEmpty) ...[
-                              _PolicyRow(icon: Icons.receipt_long_rounded, iconColor: Colors.blueAccent, label: 'Refund Policy', value: _policies['refund_policy'] as String),
-                              _DividerThin(),
-                            ],
-                            _PolicyRow(
-                              icon: Icons.loop_rounded,
-                              iconColor: _policies['re_entry_allowed'] == true ? Colors.greenAccent : Colors.redAccent,
-                              label: 'Re-entry',
-                              value: _policies['re_entry_allowed'] == true ? 'Allowed' : 'Not allowed',
-                            ),
-                            _DividerThin(),
-                            _PolicyRow(
-                              icon: Icons.accessible_rounded,
-                              iconColor: _policies['wheelchair_accessible'] == true ? Colors.greenAccent : Colors.white38,
-                              label: 'Wheelchair Access',
-                              value: _policies['wheelchair_accessible'] == true ? 'Accessible' : 'Not specified',
-                            ),
-                            _DividerThin(),
-                            _PolicyRow(
-                              icon: Icons.pets_rounded,
-                              iconColor: _policies['allow_pets'] == true ? Colors.greenAccent : Colors.white38,
-                              label: 'Pets',
-                              value: _policies['allow_pets'] == true ? 'Allowed' : 'Not allowed',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Gap(26),
-                    ],
-
-                    // ── Description ──────────────────────────────────────────
-                    if (_description.isNotEmpty) ...[
-                      Text(
-                        AppLocalizations.of(context)!.aboutThisEvent,
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
-                      ),
-                      const Gap(12),
-                      Text(
-                        _description,
-                        style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), height: 1.65),
-                      ),
-                      const Gap(26),
-                    ],
-
-                    // ── Map preview ──────────────────────────────────────────
-                    if (_lat != 0 && _lng != 0) ...[
-                      Text(
-                        AppLocalizations.of(context)!.location,
-                        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18).clamp(15.0, 20.0), fontWeight: FontWeight.w900),
-                      ),
-                      const Gap(12),
-                      GestureDetector(
-                        onTap: () {
-                          ref.read(mapFocusProvider.notifier).state =
-                              MapFocus(_lat, _lng, label: _name);
-                          ref.read(appNavProvider.notifier).setIndex(1);
-                          Navigator.of(context).popUntil((route) => route.isFirst);
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Stack(
-                            children: [
-                              SizedBox(
-                                height: 190,
-                                width: double.infinity,
-                                child: staticMapUrl.isNotEmpty
-                                    ? Image.network(
-                                        staticMapUrl,
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (_, child, prog) => prog == null
-                                            ? child
-                                            : Container(
-                                                color: AppTheme.surface,
-                                                child: const Center(child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 2)),
-                                              ),
-                                        errorBuilder: (_, __, ___) => _MapFallback(locationLine: locationLine),
-                                      )
-                                    : _MapFallback(locationLine: locationLine),
-                              ),
-                              // "Open in Maps" overlay pill
-                              Positioned(
-                                bottom: 10,
-                                right: 10,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.65),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                        // ── Event policies ─────────────────────────────────
+                        if (_policies.isNotEmpty) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'EVENT POLICIES',
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                ),
+                                const Gap(14),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: _P.black.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: _P.black.withValues(alpha: 0.08),
+                                    ),
+                                  ),
+                                  child: Column(
                                     children: [
-                                      Icon(Icons.open_in_new_rounded, color: Colors.white, size: AppResponsive.icon(context, 12).clamp(10.0, 13.5)),
-                                      const Gap(5),
-                                      Text(AppLocalizations.of(context)!.openInMaps, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 11).clamp(9.5, 12.0), fontWeight: FontWeight.w700)),
+                                      if ((_policies['age_restriction']
+                                                  as int? ??
+                                              0) >
+                                          0) ...[
+                                        _PolicyRow(
+                                          icon: Icons.person_outline_rounded,
+                                          iconColor: Colors.orangeAccent,
+                                          label: 'Age Restriction',
+                                          value:
+                                              '${_policies['age_restriction']}+ only',
+                                        ),
+                                        _PolicyDivider(),
+                                      ],
+                                      if ((_policies['refund_policy']
+                                                  as String? ??
+                                              '')
+                                          .isNotEmpty) ...[
+                                        _PolicyRow(
+                                          icon: Icons.receipt_long_rounded,
+                                          iconColor: Colors.blue,
+                                          label: 'Refund Policy',
+                                          value: _policies['refund_policy']
+                                              as String,
+                                        ),
+                                        _PolicyDivider(),
+                                      ],
+                                      _PolicyRow(
+                                        icon: Icons.loop_rounded,
+                                        iconColor:
+                                            _policies['re_entry_allowed'] ==
+                                                    true
+                                                ? Colors.green
+                                                : Colors.redAccent,
+                                        label: 'Re-entry',
+                                        value:
+                                            _policies['re_entry_allowed'] ==
+                                                    true
+                                                ? 'Allowed'
+                                                : 'Not allowed',
+                                      ),
+                                      _PolicyDivider(),
+                                      _PolicyRow(
+                                        icon: Icons.accessible_rounded,
+                                        iconColor:
+                                            _policies['wheelchair_accessible'] ==
+                                                    true
+                                                ? Colors.green
+                                                : Colors.black38,
+                                        label: 'Wheelchair Access',
+                                        value:
+                                            _policies['wheelchair_accessible'] ==
+                                                    true
+                                                ? 'Accessible'
+                                                : 'Not specified',
+                                      ),
+                                      _PolicyDivider(),
+                                      _PolicyRow(
+                                        icon: Icons.pets_rounded,
+                                        iconColor:
+                                            _policies['allow_pets'] == true
+                                                ? Colors.green
+                                                : Colors.black38,
+                                        label: 'Pets',
+                                        value: _policies['allow_pets'] == true
+                                            ? 'Allowed'
+                                            : 'Not allowed',
+                                      ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ],
+                                const Gap(22),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+                        ],
 
-        // ── Bottom action bar ────────────────────────────────────────────────
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
-            decoration: BoxDecoration(
-              color: AppTheme.surface.withValues(alpha: 0.97),
-              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.07))),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.55), blurRadius: 22, offset: const Offset(0, -6)),
-              ],
-            ),
-            child: Row(
-              children: [
-                if (_priceHint.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(AppLocalizations.of(context)!.price, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0))),
-                        Text(_priceHint, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 16).clamp(14.0, 17.5), fontWeight: FontWeight.w900)),
+                        // ── About / description ────────────────────────────
+                        if (_description.isNotEmpty) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppLocalizations.of(context)!.aboutThisEvent
+                                      .toUpperCase(),
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const Gap(12),
+                                Text(
+                                  _description,
+                                  style: GoogleFonts.poppins(
+                                    color: _P.black.withValues(alpha: 0.60),
+                                    fontSize: AppResponsive.font(context, 14)
+                                        .clamp(12.0, 15.0),
+                                    height: 1.65,
+                                  ),
+                                ),
+                                const Gap(22),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // ── Map ────────────────────────────────────────────
+                        if (_lat != 0 && _lng != 0) ...[
+                          _SectionDivider(),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(22, 22, 22, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppLocalizations.of(context)!.location
+                                      .toUpperCase(),
+                                  style: GoogleFonts.anton(
+                                    color: _P.black,
+                                    fontSize: AppResponsive.font(context, 18)
+                                        .clamp(15.0, 20.0),
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const Gap(12),
+                                GestureDetector(
+                                  onTap: () {
+                                    ref.read(mapFocusProvider.notifier).state =
+                                        MapFocus(_lat, _lng, label: _name);
+                                    ref
+                                        .read(appNavProvider.notifier)
+                                        .setIndex(0);
+                                    Navigator.of(context)
+                                        .popUntil((route) => route.isFirst);
+                                  },
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Stack(
+                                      children: [
+                                        SizedBox(
+                                          height: 190,
+                                          width: double.infinity,
+                                          child: staticMapUrl.isNotEmpty
+                                              ? Image.network(
+                                                  staticMapUrl,
+                                                  fit: BoxFit.cover,
+                                                  loadingBuilder:
+                                                      (_, child, prog) =>
+                                                          prog == null
+                                                              ? child
+                                                              : Container(
+                                                                  color: _P
+                                                                      .darkGray,
+                                                                  child:
+                                                                      const Center(
+                                                                    child: CircularProgressIndicator(
+                                                                        color: _P
+                                                                            .teal,
+                                                                        strokeWidth:
+                                                                            2),
+                                                                  ),
+                                                                ),
+                                                  errorBuilder: (_, __, ___) =>
+                                                      _MapFallback(
+                                                          locationLine:
+                                                              locationLine),
+                                                )
+                                              : _MapFallback(
+                                                  locationLine: locationLine),
+                                        ),
+                                        Positioned(
+                                          bottom: 10,
+                                          right: 10,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: _P.black
+                                                  .withValues(alpha: 0.72),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              border: Border.all(
+                                                  color: _P.white
+                                                      .withValues(alpha: 0.15)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                    Icons.open_in_new_rounded,
+                                                    color: _P.white,
+                                                    size: 12),
+                                                const Gap(5),
+                                                Text(
+                                                  AppLocalizations.of(context)!
+                                                      .openInMaps,
+                                                  style: GoogleFonts.poppins(
+                                                    color: _P.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const Gap(22),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // Bottom spacing for action bar
+                        const SizedBox(height: 124),
                       ],
                     ),
                   ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: _openTickets,
-                    child: Container(
-                      height: 54,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [AppTheme.primary, AppTheme.accentPurple]),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6)),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.open_in_new_rounded, color: Colors.white, size: AppResponsive.icon(context, 16).clamp(14.0, 17.5)),
-                          const Gap(8),
-                          Text(
-                            AppLocalizations.of(context)!.getTickets,
-                            style: TextStyle(fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.2),
-                          ),
-                        ],
-                      ),
-                    ),
+                ),
+
+                // Collapse the overlap offset so scroll doesn't over-extend
+                const SizedBox(height: 0 - cardOverlap),
+              ],
+            ),
+          ),
+
+          // ── Back button — top left ─────────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 16,
+            child: _CircleButton(
+              onTap: () => Navigator.of(context).pop(),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: _P.white, size: 18),
+            ),
+          ),
+
+          // ── Share + Favourite — top right ──────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            right: 16,
+            child: Column(
+              children: [
+                _CircleButton(
+                  onTap: () => _share(context),
+                  child: const Icon(Icons.ios_share_rounded,
+                      color: _P.white, size: 18),
+                ),
+                const Gap(8),
+                _CircleButton(
+                  onTap: () => _toggleFavourite(isFav),
+                  child: Icon(
+                    isFav
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFav ? _P.hotPink : _P.white,
+                    size: 18,
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.iconColor, required this.text, this.subText});
-  final IconData icon;
-  final Color iconColor;
-  final String text;
-  final String? subText;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 18).clamp(15.0, 20.0)),
-          ),
-          const Gap(12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Gap(2),
-                Text(text, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14).clamp(12.0, 15.0), fontWeight: FontWeight.bold)),
-                if (subText != null && subText!.isNotEmpty) ...[
-                  const Gap(3),
-                  Text(subText!, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12).clamp(10.5, 13.0)), maxLines: 2, overflow: TextOverflow.ellipsis),
+          // ── Bottom action bar — I'M GOING ──────────────────────────────────
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(
+                20, 16, 20,
+                MediaQuery.of(context).padding.bottom + 20,
+              ),
+              decoration: BoxDecoration(
+                color: _P.black.withValues(alpha: 0.97),
+                border: Border(
+                  top: BorderSide(
+                    color: _P.borderGray.withValues(alpha: 0.5),
+                  ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _P.black.withValues(alpha: 0.70),
+                    blurRadius: 24,
+                    offset: const Offset(0, -8),
+                  ),
                 ],
-              ],
+              ),
+              child: GestureDetector(
+                onTap: _ticketUrl.isNotEmpty
+                    ? _openTickets
+                    : () => _toggleFavourite(isFav),
+                child: Container(
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: _P.neonLime,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _P.neonLime.withValues(alpha: 0.35),
+                        blurRadius: 22,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isFav
+                            ? Icons.check_circle_rounded
+                            : Icons.local_activity_rounded,
+                        color: _P.black,
+                        size: 22,
+                      ),
+                      const Gap(10),
+                      Text(
+                        _ticketUrl.isNotEmpty
+                            ? AppLocalizations.of(context)!.getTickets
+                                .toUpperCase()
+                            : "I'M GOING",
+                        style: GoogleFonts.anton(
+                          color: _P.black,
+                          fontSize: AppResponsive.font(context, 17)
+                              .clamp(15.0, 19.0),
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -622,19 +1056,349 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _Divider extends StatelessWidget {
-  const _Divider();
+// ── Time badge (teal circle with day/month + time) ────────────────────────────
+
+class _TimeBadge extends StatelessWidget {
+  const _TimeBadge({required this.dayMonth, required this.time});
+  final String dayMonth;
+  final String time;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: const BoxDecoration(
+        color: _P.teal,
+        shape: BoxShape.circle,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (dayMonth.isNotEmpty)
+            Text(
+              dayMonth,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                color: _P.black,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                letterSpacing: 0.5,
+              ),
+            ),
+          if (time.isNotEmpty) ...[
+            const SizedBox(height: 1),
+            Text(
+              time,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anton(
+                color: _P.black,
+                fontSize: 14,
+                height: 1.1,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
+// ── Genre pill ────────────────────────────────────────────────────────────────
+
+class _GenrePill extends StatelessWidget {
+  const _GenrePill({required this.genre});
+  final String genre;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: _P.hotPink,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        genre.toUpperCase(),
+        style: GoogleFonts.poppins(
+          color: _P.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.6,
+        ),
+      ),
+    );
+  }
+}
+
+// ── People going row ──────────────────────────────────────────────────────────
+
+class _PeopleGoingRow extends StatelessWidget {
+  const _PeopleGoingRow({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarColors = [
+      _P.hotPink,
+      _P.teal,
+      _P.neonLime,
+      const Color(0xFFFF8C42),
+    ];
+    final shown = count.clamp(0, 4);
+    const avatarSize = 32.0;
+    const overlap = 22.0;
+    final stackWidth = shown * overlap + (avatarSize - overlap);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: stackWidth.clamp(avatarSize, double.infinity),
+          height: avatarSize,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: List.generate(shown, (i) {
+              return Positioned(
+                left: i * overlap,
+                child: Container(
+                  width: avatarSize,
+                  height: avatarSize,
+                  decoration: BoxDecoration(
+                    color: avatarColors[i % avatarColors.length]
+                        .withValues(alpha: 0.88),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _P.cream, width: 2.5),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.person_rounded,
+                        color: _P.black.withValues(alpha: 0.65), size: 15),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const Gap(12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$count GOING',
+              style: GoogleFonts.anton(
+                color: _P.black,
+                fontSize: 18,
+                letterSpacing: 0.5,
+              ),
+            ),
+            Text(
+              'are attending this event',
+              style: GoogleFonts.poppins(
+                color: _P.black.withValues(alpha: 0.42),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Circle button ─────────────────────────────────────────────────────────────
+
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({required this.onTap, required this.child});
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: _P.surface.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          border: Border.all(color: _P.borderGray.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: _P.black.withValues(alpha: 0.55),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
+// ── Dashed divider ────────────────────────────────────────────────────────────
+
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider({this.color = const Color(0x28000000)});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+        painter: _DashedLinePainter(color: color),
+        child: const SizedBox(height: 1, width: double.infinity),
+      );
+}
+
+// ── Ticket perforated tear line ───────────────────────────────────────────────
+
+class _TicketTearLine extends StatelessWidget {
+  const _TicketTearLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 11,
+            child: CustomPaint(
+              painter: _DashedLinePainter(
+                color: _P.black.withValues(alpha: 0.20),
+                dashWidth: 7,
+                gapWidth: 5,
+              ),
+              child: const SizedBox(height: 1),
+            ),
+          ),
+          // Left notch circle (black, punched out)
+          Positioned(
+            left: -22,
+            top: 2,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                  color: _P.black, shape: BoxShape.circle),
+            ),
+          ),
+          // Right notch circle (black, punched out)
+          Positioned(
+            right: -22,
+            top: 2,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                  color: _P.black, shape: BoxShape.circle),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Section divider ───────────────────────────────────────────────────────────
+
+class _SectionDivider extends StatelessWidget {
+  const _SectionDivider();
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 1,
+        color: _P.black.withValues(alpha: 0.10),
+      );
+}
+
+// ── Barcode strip ─────────────────────────────────────────────────────────────
+
+class _BarcodeStrip extends StatelessWidget {
+  const _BarcodeStrip({this.color = Colors.black});
+  final Color color;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 40,
+        width: double.infinity,
+        child: CustomPaint(painter: _BarcodePainter(color: color)),
+      );
+}
+
+// ── Painters ──────────────────────────────────────────────────────────────────
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  final double dashWidth;
+  final double gapWidth;
+  const _DashedLinePainter({
+    required this.color,
+    this.dashWidth = 5.0,
+    this.gapWidth = 4.0,
+  });
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    double x = 0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth, 0), p);
+      x += dashWidth + gapWidth;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLinePainter old) =>
+      old.color != color ||
+      old.dashWidth != dashWidth ||
+      old.gapWidth != gapWidth;
+}
+
+class _BarcodePainter extends CustomPainter {
+  const _BarcodePainter({this.color = Colors.black});
+  final Color color;
+  static const _pat = [
+    3, 1, 4, 1, 5, 2, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 2,
+    1, 2, 1, 3, 1, 2, 2, 1, 3, 1, 2, 3, 1, 2, 1, 1, 3
+  ];
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = _pat.fold<int>(0, (a, b) => a + b);
+    final unit = size.width / total;
+    final p = Paint()..color = color;
+    double x = 0;
+    bool bar = true;
+    for (final u in _pat) {
+      if (bar) {
+        canvas.drawRect(
+          Rect.fromLTWH(x, size.height * 0.05, u * unit, size.height * 0.90),
+          p,
+        );
+      }
+      x += u * unit;
+      bar = !bar;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BarcodePainter old) => old.color != color;
+}
+
+// ── Policy row ────────────────────────────────────────────────────────────────
+
 class _PolicyRow extends StatelessWidget {
-  const _PolicyRow({required this.icon, required this.iconColor, required this.label, required this.value});
+  const _PolicyRow({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+  });
   final IconData icon;
   final Color iconColor;
   final String label;
@@ -648,24 +1412,51 @@ class _PolicyRow extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
-            child: Icon(icon, color: iconColor, size: AppResponsive.icon(context, 16).clamp(13.0, 18.0)),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, color: iconColor, size: 16),
           ),
           const Gap(12),
-          Expanded(child: Text(label, style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0)))),
-          Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0), fontWeight: FontWeight.w700))),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: _P.black.withValues(alpha: 0.55),
+                fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0),
+              ),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                color: _P.black,
+                fontSize: AppResponsive.font(context, 13).clamp(11.5, 14.0),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _DividerThin extends StatelessWidget {
-  const _DividerThin();
+class _PolicyDivider extends StatelessWidget {
+  const _PolicyDivider();
   @override
-  Widget build(BuildContext context) =>
-      Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Divider(color: Colors.white.withValues(alpha: 0.05), height: 1));
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Divider(
+            color: _P.black.withValues(alpha: 0.08), height: 1),
+      );
 }
+
+// ── Map fallback ──────────────────────────────────────────────────────────────
 
 class _MapFallback extends StatelessWidget {
   const _MapFallback({required this.locationLine});
@@ -674,13 +1465,19 @@ class _MapFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 190,
-      color: AppTheme.surface,
+      color: _P.darkGray,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.map_rounded, color: AppTheme.primary, size: AppResponsive.icon(context, 36).clamp(28.0, 40.0)),
+          const Icon(Icons.map_rounded, color: _P.teal, size: 36),
           const Gap(8),
-          Text(locationLine, style: TextStyle(color: Colors.white60, fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5))),
+          Text(
+            locationLine,
+            style: GoogleFonts.poppins(
+              color: _P.white.withValues(alpha: 0.55),
+              fontSize: AppResponsive.font(context, 13).clamp(11.0, 14.5),
+            ),
+          ),
         ],
       ),
     );

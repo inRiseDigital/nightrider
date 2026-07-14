@@ -64,4 +64,8 @@ HARD RULES
 - Never invent a badge, streak, point total, or level — only echo the tool.
 - Always pass user_id from state to every tool call.
 - Leaderboards across users are NOT live yet — if asked, say so honestly.
+- NEVER name competitor platforms — do not mention Eventbrite, Resident Advisor,
+  RA, Bandsintown, Ticketmaster, Songkick, Dice, Skiddle, or any similar app by
+  name. Night Rite is the platform. If users need to check for lineups, direct
+  them to the venue's own Instagram or website.
 """ + _spec("agent4_gamification.md", "FULL BADGE & GAMIFICATION SPEC")

@@ -1,13 +1,72 @@
+// lib/pages/clubs_page.dart
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/live_hub_dummy_data.dart';
 import 'package:nightride/domain/live_hub_models.dart';
 import 'package:nightride/providers/live_hub_providers.dart';
+
+// ── Palette ─────────────────────────────────────────────────────────────────
+class _P {
+  static const bg      = Color(0xFF070707);
+  static const surface = Color(0xFF0F0F0F);
+  static const card    = Color(0xFF0D0D0D);
+  static const dark    = Color(0xFF111111);
+  static const border  = Color(0xFF252525);
+  static const cream   = Color(0xFFF3EAD6);
+  static const lime    = Color(0xFFDFFF2F);
+  static const pink    = Color(0xFFFF3D73);
+  static const teal    = Color(0xFF62D6C8);
+  static const amber   = Color(0xFFFBBF24);
+  static const white   = Color(0xFFFAFAFA);
+}
+
+// ── Status / crowd helpers ───────────────────────────────────────────────────
+Color _statusColor(ClubStatus s) => switch (s) {
+      ClubStatus.open    => _P.lime,
+      ClubStatus.closed  => const Color(0xFF444444),
+      ClubStatus.vipOnly => _P.teal,
+      ClubStatus.soldOut => _P.pink,
+    };
+
+String _statusLabel(ClubStatus s) => switch (s) {
+      ClubStatus.open    => 'OPEN',
+      ClubStatus.closed  => 'CLOSED',
+      ClubStatus.vipOnly => 'VIP ONLY',
+      ClubStatus.soldOut => 'SOLD OUT',
+    };
+
+Color _crowdColor(CrowdLevel c) => switch (c) {
+      CrowdLevel.empty    => const Color(0xFF444444),
+      CrowdLevel.quiet    => _P.teal,
+      CrowdLevel.moderate => _P.amber,
+      CrowdLevel.busy     => _P.lime,
+      CrowdLevel.packed   => _P.pink,
+    };
+
+String _crowdLabel(CrowdLevel c) => switch (c) {
+      CrowdLevel.empty    => 'EMPTY',
+      CrowdLevel.quiet    => 'QUIET',
+      CrowdLevel.moderate => 'MODERATE',
+      CrowdLevel.busy     => 'BUSY',
+      CrowdLevel.packed   => 'PACKED',
+    };
+
+String _queueLabel(QueueStatus q) => switch (q) {
+      QueueStatus.noQueue  => 'No queue',
+      QueueStatus.short    => '~10 min',
+      QueueStatus.moderate => '~30 min',
+      QueueStatus.long     => '45+ min',
+      QueueStatus.closed   => 'Closed',
+    };
+
+// ════════════════════════════════════════════════════════════════════════════
+// ClubsPage
+// ════════════════════════════════════════════════════════════════════════════
 
 class ClubsPage extends ConsumerStatefulWidget {
   const ClubsPage({super.key});
@@ -17,10 +76,12 @@ class ClubsPage extends ConsumerStatefulWidget {
 }
 
 class _ClubsPageState extends ConsumerState<ClubsPage>
-    with SingleTickerProviderStateMixin {
-  ClubStatus? _filter; // null = ALL
+    with TickerProviderStateMixin {
+  ClubStatus? _filter;
 
   late final AnimationController _pulse;
+  late final AnimationController _dotPulse;
+  late final AnimationController _scanline;
 
   @override
   void initState() {
@@ -29,65 +90,73 @@ class _ClubsPageState extends ConsumerState<ClubsPage>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+    _dotPulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _scanline = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat();
   }
 
   @override
   void dispose() {
     _pulse.dispose();
+    _dotPulse.dispose();
+    _scanline.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(clubUpdatesProvider);
+    final async       = ref.watch(clubUpdatesProvider);
     final firestoreClubs = async.asData?.value ?? [];
-    final all = firestoreClubs.isNotEmpty ? firestoreClubs : kClubUpdates;
-
-    final clubs = _filter == null
+    final all         = firestoreClubs.isNotEmpty ? firestoreClubs : kClubUpdates;
+    final clubs       = _filter == null
         ? all
         : all.where((c) => c.status == _filter).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF07070F),
+      backgroundColor: _P.bg,
       body: Stack(
         children: [
-          // ── Background glows ─────────────────────────────────────────────
+          // Background glow blobs
           const Positioned.fill(child: _Background()),
 
-          // ── Content ──────────────────────────────────────────────────────
+          // Scan-line overlay
+          Positioned.fill(
+            child: _ScanlineOverlay(controller: _scanline),
+          ),
+
           SafeArea(
             bottom: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top bar
-                _TopBar(pulse: _pulse),
+                _TopBar(pulse: _pulse, dotPulse: _dotPulse),
                 const SizedBox(height: 16),
-
-                // Filter chips
                 _FilterRow(
                   selected: _filter,
                   onSelected: (f) => setState(() => _filter = f),
                 ),
-                const SizedBox(height: 16),
-
-                // Club list
+                const SizedBox(height: 14),
                 Expanded(
                   child: clubs.isEmpty
                       ? const _EmptyState()
                       : ListView.separated(
                           physics: const BouncingScrollPhysics(),
                           padding: EdgeInsets.fromLTRB(
-                            16,
-                            0,
-                            16,
-                            MediaQuery.viewPaddingOf(context).bottom + 32,
+                            16, 0, 16,
+                            MediaQuery.viewPaddingOf(context).bottom + 40,
                           ),
                           itemCount: clubs.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (ctx, i) =>
-                              _ClubCard(club: clubs[i]),
+                              const SizedBox(height: 14),
+                          itemBuilder: (ctx, i) => _ClubCard(
+                            club: clubs[i],
+                            pulse: _pulse,
+                          ),
                         ),
                 ),
               ],
@@ -99,7 +168,7 @@ class _ClubsPageState extends ConsumerState<ClubsPage>
   }
 }
 
-// ── Background ────────────────────────────────────────────────────────────────
+// ── Background glow blobs ─────────────────────────────────────────────────
 
 class _Background extends StatelessWidget {
   const _Background();
@@ -108,45 +177,22 @@ class _Background extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Base gradient
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF0D0D1F), Color(0xFF07070F)],
-            ),
-          ),
-        ),
-        // Green top glow (clubs = live = green)
+        Container(color: _P.bg),
         Positioned(
-          top: -120,
-          left: -60,
-          child: _Blob(
-            size: 380,
-            color: const Color(0xFF4ADE80).withValues(alpha: 0.13),
-          ),
+          top: -120, left: -80,
+          child: _Blob(size: 360,
+              color: _P.lime.withValues(alpha: 0.05)),
         ),
-        // Purple mid glow
         Positioned(
-          top: 200,
-          right: -100,
-          child: _Blob(
-            size: 300,
-            color: AppTheme.primary.withValues(alpha: 0.14),
-          ),
+          top: 240, right: -100,
+          child: _Blob(size: 300,
+              color: _P.pink.withValues(alpha: 0.06)),
         ),
-        // Teal bottom glow
         Positioned(
-          bottom: 80,
-          left: -80,
-          child: _Blob(
-            size: 260,
-            color: const Color(0xFF06B6D4).withValues(alpha: 0.08),
-          ),
+          bottom: 40, left: -60,
+          child: _Blob(size: 260,
+              color: _P.teal.withValues(alpha: 0.04)),
         ),
-        // Subtle noise overlay
-        Container(color: Colors.black.withValues(alpha: 0.08)),
       ],
     );
   }
@@ -160,7 +206,7 @@ class _Blob extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+      imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
       child: Container(
         width: size,
         height: size,
@@ -170,79 +216,155 @@ class _Blob extends StatelessWidget {
   }
 }
 
-// ── Top bar ───────────────────────────────────────────────────────────────────
+// ── Scan-line overlay ─────────────────────────────────────────────────────
+
+class _ScanlineOverlay extends StatelessWidget {
+  final AnimationController controller;
+  const _ScanlineOverlay({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) => IgnorePointer(
+        child: CustomPaint(
+          painter: _ScanlinePainter(controller.value),
+          size: Size.infinite,
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanlinePainter extends CustomPainter {
+  final double progress;
+  _ScanlinePainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height * progress;
+    final sweepPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.transparent,
+          const Color(0xFFDFFF2F).withValues(alpha: 0.022),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, y - 50, size.width, 100));
+    canvas.drawRect(
+        Rect.fromLTWH(0, y - 50, size.width, 100), sweepPaint);
+
+    final linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.010)
+      ..strokeWidth = 0.5;
+    for (double ly = 0; ly < size.height; ly += 4) {
+      canvas.drawLine(
+          Offset(0, ly), Offset(size.width, ly), linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScanlinePainter old) => old.progress != progress;
+}
+
+// ── Top bar ───────────────────────────────────────────────────────────────
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.pulse});
+  const _TopBar({required this.pulse, required this.dotPulse});
   final Animation<double> pulse;
+  final Animation<double> dotPulse;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Row(
         children: [
           // Back button
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: Colors.white, size: 20),
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: _P.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _P.border, width: 1),
+              ),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: _P.white, size: 16),
+            ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 12),
 
-          // Pulsing green dot
+          // Pulsing red dot (retro-nightlife feel — red not lime)
           AnimatedBuilder(
-            animation: pulse,
-            builder: (_, __) {
-              final v = pulse.value;
-              return Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF4ADE80),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF4ADE80)
-                          .withValues(alpha: 0.3 + 0.5 * v),
-                      blurRadius: 6 + 8 * v,
-                    ),
-                  ],
-                ),
-              );
-            },
+            animation: dotPulse,
+            builder: (_, __) => Container(
+              width: 10, height: 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _P.pink,
+                boxShadow: [
+                  BoxShadow(
+                    color: _P.pink.withValues(
+                        alpha: 0.25 + 0.55 * dotPulse.value),
+                    blurRadius: 5 + 10 * dotPulse.value,
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(width: 10),
 
           // Title
-          const Text(
-            'Clubs Right Now',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.4,
+          Text(
+            'CLUBS',
+            style: GoogleFonts.anton(
+              color: _P.cream,
+              fontSize: 28,
+              letterSpacing: 2,
             ),
           ),
           const Spacer(),
 
           // LIVE badge
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF4ADE80).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(99),
-              border: Border.all(
-                  color: const Color(0xFF4ADE80).withValues(alpha: 0.35)),
-            ),
-            child: const Text(
-              'LIVE',
-              style: TextStyle(
-                color: Color(0xFF4ADE80),
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.4,
+          AnimatedBuilder(
+            animation: dotPulse,
+            builder: (_, __) => Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: _P.pink.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(
+                    color: _P.pink.withValues(alpha: 0.5), width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6, height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _P.pink,
+                      boxShadow: [
+                        BoxShadow(
+                          color: _P.pink.withValues(
+                              alpha: 0.3 + 0.5 * dotPulse.value),
+                          blurRadius: 4 + 5 * dotPulse.value,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text('LIVE',
+                      style: GoogleFonts.anton(
+                          color: _P.pink,
+                          fontSize: 11,
+                          letterSpacing: 1.5)),
+                ],
               ),
             ),
           ),
@@ -252,7 +374,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ── Filter row ────────────────────────────────────────────────────────────────
+// ── Filter row ────────────────────────────────────────────────────────────
 
 class _FilterRow extends StatelessWidget {
   const _FilterRow({required this.selected, required this.onSelected});
@@ -260,17 +382,17 @@ class _FilterRow extends StatelessWidget {
   final ValueChanged<ClubStatus?> onSelected;
 
   static const _items = <(String, ClubStatus?, Color)>[
-    ('ALL', null, Color(0xFFA78BFA)),
-    ('OPEN', ClubStatus.open, Color(0xFF4ADE80)),
-    ('VIP ONLY', ClubStatus.vipOnly, Color(0xFFE879F9)),
-    ('SOLD OUT', ClubStatus.soldOut, Color(0xFFFF6B6B)),
-    ('CLOSED', ClubStatus.closed, Color(0xFF94A3B8)),
+    ('ALL',      null,                _P.lime),
+    ('PACKED',   ClubStatus.open,     _P.pink),
+    ('BUSY',     ClubStatus.vipOnly,  _P.lime),
+    ('QUIET',    ClubStatus.soldOut,  _P.teal),
+    ('CLOSED',   ClubStatus.closed,   Color(0xFF555555)),
   ];
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 34,
+      height: 36,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -284,27 +406,26 @@ class _FilterRow extends StatelessWidget {
             onTap: () => onSelected(status),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 color: active
-                    ? color.withValues(alpha: 0.18)
-                    : Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(99),
+                    ? color.withValues(alpha: 0.12)
+                    : _P.surface,
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: active
                       ? color.withValues(alpha: 0.6)
-                      : Colors.white.withValues(alpha: 0.10),
+                      : _P.border,
                   width: active ? 1.5 : 1,
                 ),
               ),
               child: Text(
                 label,
-                style: TextStyle(
-                  color: active ? color : Colors.white54,
+                style: GoogleFonts.anton(
+                  color: active ? color : Colors.white30,
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.4,
+                  letterSpacing: 1.2,
                 ),
               ),
             ),
@@ -315,59 +436,14 @@ class _FilterRow extends StatelessWidget {
   }
 }
 
-// ── Club card ─────────────────────────────────────────────────────────────────
+// ── Club card (sticker style) ─────────────────────────────────────────────
 
 class _ClubCard extends StatelessWidget {
-  const _ClubCard({required this.club});
+  const _ClubCard({required this.club, required this.pulse});
   final ClubUpdate club;
+  final Animation<double> pulse;
 
-  static Color _statusColor(ClubStatus s) {
-    switch (s) {
-      case ClubStatus.open:     return const Color(0xFF4ADE80);
-      case ClubStatus.closed:   return const Color(0xFF94A3B8);
-      case ClubStatus.vipOnly:  return const Color(0xFFE879F9);
-      case ClubStatus.soldOut:  return const Color(0xFFFF6B6B);
-    }
-  }
-
-  static String _statusLabel(ClubStatus s) {
-    switch (s) {
-      case ClubStatus.open:     return 'OPEN';
-      case ClubStatus.closed:   return 'CLOSED';
-      case ClubStatus.vipOnly:  return 'VIP ONLY';
-      case ClubStatus.soldOut:  return 'SOLD OUT';
-    }
-  }
-
-  static Color _crowdColor(CrowdLevel c) {
-    switch (c) {
-      case CrowdLevel.empty:    return const Color(0xFF94A3B8);
-      case CrowdLevel.quiet:    return const Color(0xFF4ADE80);
-      case CrowdLevel.moderate: return const Color(0xFFFBBF24);
-      case CrowdLevel.busy:     return const Color(0xFFF97316);
-      case CrowdLevel.packed:   return const Color(0xFFEF4444);
-    }
-  }
-
-  static String _crowdLabel(CrowdLevel c) {
-    switch (c) {
-      case CrowdLevel.empty:    return 'EMPTY';
-      case CrowdLevel.quiet:    return 'QUIET';
-      case CrowdLevel.moderate: return 'MODERATE';
-      case CrowdLevel.busy:     return 'BUSY';
-      case CrowdLevel.packed:   return 'PACKED';
-    }
-  }
-
-  static String _queueLabel(QueueStatus q) {
-    switch (q) {
-      case QueueStatus.noQueue:  return 'No queue';
-      case QueueStatus.short:    return '~10 min';
-      case QueueStatus.moderate: return '~30 min';
-      case QueueStatus.long:     return '45+ min';
-      case QueueStatus.closed:   return 'Closed';
-    }
-  }
+  bool get _isLive => club.status == ClubStatus.open;
 
   @override
   Widget build(BuildContext context) {
@@ -376,198 +452,251 @@ class _ClubCard extends StatelessWidget {
     final cc = _crowdColor(club.crowdLevel);
     final cl = _crowdLabel(club.crowdLevel);
     final ql = _queueLabel(club.queueStatus);
+    final filled = club.crowdLevel.index + 1;
+    final total  = CrowdLevel.values.length;
 
     return GestureDetector(
       onTap: () => _ClubDetailSheet.show(context, club),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          height: 170,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Photo background
-              club.imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: club.imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) =>
-                          Container(color: sc.withValues(alpha: 0.08)),
-                      errorWidget: (_, __, ___) =>
-                          Container(color: sc.withValues(alpha: 0.08)),
-                    )
-                  : Container(color: sc.withValues(alpha: 0.08)),
-
-              // Gradient overlay
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.20),
-                      Colors.black.withValues(alpha: 0.82),
-                    ],
-                    stops: const [0.2, 1.0],
-                  ),
-                ),
-              ),
-
-              // Left status accent bar
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                child: Container(
-                  width: 3.5,
-                  decoration: BoxDecoration(
-                    color: sc,
-                    boxShadow: [
+      child: AnimatedBuilder(
+        animation: pulse,
+        builder: (_, child) {
+          final glowAlpha =
+              _isLive ? (0.14 + 0.20 * pulse.value) : 0.0;
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: _isLive
+                  ? [
                       BoxShadow(
-                        color: sc.withValues(alpha: 0.6),
-                        blurRadius: 8,
+                        color: sc.withValues(alpha: glowAlpha),
+                        blurRadius: 14 + 10 * pulse.value,
+                        spreadRadius: 0,
+                      )
+                    ]
+                  : null,
+            ),
+            child: child,
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: _P.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _P.border, width: 1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image section
+              SizedBox(
+                height: 140,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    club.imageUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: club.imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                                color: sc.withValues(alpha: 0.06)),
+                            errorWidget: (_, __, ___) => Container(
+                                color: sc.withValues(alpha: 0.06)),
+                          )
+                        : Container(
+                            color: sc.withValues(alpha: 0.06)),
+
+                    // Gradient
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x22000000),
+                            Color(0xF2070707),
+                          ],
+                          stops: [0.1, 1.0],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+
+                    // Left accent bar
+                    Positioned(
+                      left: 0, top: 0, bottom: 0,
+                      child: Container(width: 3, color: sc),
+                    ),
+
+                    // Status sticker (top-left)
+                    Positioned(
+                      top: 10, left: 14,
+                      child: _StickerBadge(
+                          label: sl, color: sc, dot: true),
+                    ),
+
+                    // LIVE badge + timestamp (top-right)
+                    Positioned(
+                      top: 10, right: 12,
+                      child: Row(
+                        children: [
+                          _StickerBadge(
+                              label: 'LIVE', color: _P.pink),
+                          const SizedBox(width: 6),
+                          Text(club.lastUpdated,
+                              style: const TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
+
+                    // Club name + location (bottom)
+                    Positioned(
+                      bottom: 10, left: 14, right: 14,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              club.clubName.toUpperCase(),
+                              style: GoogleFonts.anton(
+                                  color: _P.white,
+                                  fontSize: 20,
+                                  letterSpacing: 1),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${club.city} · ${club.country}'.toUpperCase(),
+                            style: const TextStyle(
+                                color: Colors.white38,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              // Content
-              Positioned(
-                left: 16,
-                right: 16,
-                top: 14,
-                bottom: 14,
+              // Body section
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Status + time
+                    // Badges row
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 9, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: sc.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(
-                                color: sc.withValues(alpha: 0.50), width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                    shape: BoxShape.circle, color: sc),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(sl,
-                                  style: TextStyle(
-                                      color: sc,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.6)),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          club.lastUpdated,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.40),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const Spacer(),
-
-                    // Club name
-                    Text(
-                      club.clubName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-
-                    // City · Country
-                    Text(
-                      '${club.city} · ${club.country}',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.55),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Info pills row
-                    Row(
-                      children: [
-                        // Crowd
-                        _Pill(
-                          label: cl,
-                          color: cc,
-                          icon: Icons.people_rounded,
-                        ),
-                        const SizedBox(width: 6),
-                        // Queue
-                        _Pill(
-                          label: ql,
-                          color: Colors.white54,
-                          icon: Icons.linear_scale_rounded,
-                        ),
+                        _Pill(label: cl, color: cc,
+                            icon: Icons.people_rounded),
+                        const SizedBox(width: 7),
+                        _Pill(label: ql, color: Colors.white38,
+                            icon: Icons.linear_scale_rounded),
                         if (club.tonightDj != null) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 7),
                           Expanded(
                             child: _Pill(
                               label: club.tonightDj!,
-                              color: const Color(0xFFDD6BFF),
+                              color: _P.teal,
                               icon: Icons.headphones_rounded,
                               expand: true,
                             ),
                           ),
                         ],
                         const Spacer(),
-                        // Arrow
                         Icon(
                           Icons.arrow_forward_ios_rounded,
-                          color: Colors.white.withValues(alpha: 0.35),
-                          size: 13,
+                          color: Colors.white.withValues(alpha: 0.18),
+                          size: 12,
+                        ),
+                      ],
+                    ),
+
+                    // Crowd bar
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text('CROWD',
+                            style: GoogleFonts.anton(
+                                color: Colors.white24,
+                                fontSize: 9,
+                                letterSpacing: 1.2)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Row(
+                            children: List.generate(
+                              total,
+                              (i) => Expanded(
+                                child: Container(
+                                  height: 4,
+                                  margin: const EdgeInsets.only(
+                                      right: 3),
+                                  decoration: BoxDecoration(
+                                    color: i < filled
+                                        ? cc
+                                        : Colors.white
+                                            .withValues(alpha: 0.06),
+                                    borderRadius:
+                                        BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-
-              // Border overlay
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: sc.withValues(alpha: 0.18),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Pill / tag helpers ────────────────────────────────────────────────────
+
+class _StickerBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool dot;
+  const _StickerBadge(
+      {required this.label, required this.color, this.dot = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(5),
+        border:
+            Border.all(color: color.withValues(alpha: 0.55), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (dot) ...[
+            Container(
+              width: 5, height: 5,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle, color: color),
+            ),
+            const SizedBox(width: 5),
+          ],
+          Text(label,
+              style: GoogleFonts.anton(
+                  color: color, fontSize: 9, letterSpacing: 0.8)),
+        ],
       ),
     );
   }
@@ -587,49 +716,43 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget content = Row(
-      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 10),
-        const SizedBox(width: 4),
-        expand
-            ? Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              )
-            : Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-      ],
-    );
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(99),
-        border:
-            Border.all(color: color.withValues(alpha: 0.25), width: 0.8),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(
+            color: color.withValues(alpha: 0.26), width: 0.8),
       ),
-      child: content,
+      child: Row(
+        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 10),
+          const SizedBox(width: 4),
+          expand
+              ? Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800),
+                  ),
+                )
+              : Text(label,
+                  style: TextStyle(
+                      color: color,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800)),
+        ],
+      ),
     );
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
+// ── Empty state ───────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -641,14 +764,14 @@ class _EmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.nightlife_rounded,
-              color: Colors.white.withValues(alpha: 0.15), size: 56),
+              color: Colors.white.withValues(alpha: 0.08), size: 56),
           const SizedBox(height: 16),
           Text(
-            'No clubs match this filter',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.35),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
+            'NO CLUBS MATCH THIS FILTER',
+            style: GoogleFonts.anton(
+              color: Colors.white.withValues(alpha: 0.18),
+              fontSize: 14,
+              letterSpacing: 1.5,
             ),
           ),
         ],
@@ -657,7 +780,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ── Club detail bottom sheet ──────────────────────────────────────────────────
+// ── Club detail bottom sheet ──────────────────────────────────────────────
 
 class _ClubDetailSheet extends StatelessWidget {
   const _ClubDetailSheet({required this.club});
@@ -672,89 +795,45 @@ class _ClubDetailSheet extends StatelessWidget {
     );
   }
 
-  static Color _sc(ClubStatus s) {
-    switch (s) {
-      case ClubStatus.open:     return const Color(0xFF4ADE80);
-      case ClubStatus.closed:   return const Color(0xFF94A3B8);
-      case ClubStatus.vipOnly:  return const Color(0xFFE879F9);
-      case ClubStatus.soldOut:  return const Color(0xFFFF6B6B);
-    }
-  }
-
-  static String _sl(ClubStatus s) {
-    switch (s) {
-      case ClubStatus.open:     return 'OPEN';
-      case ClubStatus.closed:   return 'CLOSED';
-      case ClubStatus.vipOnly:  return 'VIP ONLY';
-      case ClubStatus.soldOut:  return 'SOLD OUT';
-    }
-  }
-
-  static Color _cc(CrowdLevel c) {
-    switch (c) {
-      case CrowdLevel.empty:    return const Color(0xFF94A3B8);
-      case CrowdLevel.quiet:    return const Color(0xFF4ADE80);
-      case CrowdLevel.moderate: return const Color(0xFFFBBF24);
-      case CrowdLevel.busy:     return const Color(0xFFF97316);
-      case CrowdLevel.packed:   return const Color(0xFFEF4444);
-    }
-  }
-
-  static String _cl(CrowdLevel c) {
-    switch (c) {
-      case CrowdLevel.empty:    return 'Empty';
-      case CrowdLevel.quiet:    return 'Quiet';
-      case CrowdLevel.moderate: return 'Moderate';
-      case CrowdLevel.busy:     return 'Busy';
-      case CrowdLevel.packed:   return 'Packed';
-    }
-  }
-
-  static String _ql(QueueStatus q) {
-    switch (q) {
-      case QueueStatus.noQueue:  return 'No queue';
-      case QueueStatus.short:    return 'Short (~10 min)';
-      case QueueStatus.moderate: return 'Moderate (~30 min)';
-      case QueueStatus.long:     return 'Long (45+ min)';
-      case QueueStatus.closed:   return 'Closed';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final sc = _sc(club.status);
-    final sl = _sl(club.status);
-    final cc = _cc(club.crowdLevel);
-    final cl = _cl(club.crowdLevel);
-    final ql = _ql(club.queueStatus);
+    final sc     = _statusColor(club.status);
+    final sl     = _statusLabel(club.status);
+    final cc     = _crowdColor(club.crowdLevel);
+    final cl     = _crowdLabel(club.crowdLevel);
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF10101C),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: _P.surface,
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          top: BorderSide(color: sc.withValues(alpha: 0.4), width: 1.5),
+          left: BorderSide(color: _P.border, width: 1),
+          right: BorderSide(color: _P.border, width: 1),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
+          // Drag handle
           Container(
-            width: 40,
-            height: 4,
+            width: 36, height: 3,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(99),
-            ),
+                color: _P.border,
+                borderRadius: BorderRadius.circular(99)),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
           // Photo header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(12),
               child: SizedBox(
-                height: 168,
+                height: 160,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -763,10 +842,13 @@ class _ClubDetailSheet extends StatelessWidget {
                         imageUrl: club.imageUrl,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) =>
-                            Container(color: sc.withValues(alpha: 0.12)),
+                            Container(
+                                color:
+                                    sc.withValues(alpha: 0.08)),
                       )
                     else
-                      Container(color: sc.withValues(alpha: 0.12)),
+                      Container(
+                          color: sc.withValues(alpha: 0.08)),
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -774,67 +856,40 @@ class _ClubDetailSheet extends StatelessWidget {
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withValues(alpha: 0.88),
+                            Colors.black.withValues(alpha: 0.92),
                           ],
                         ),
                       ),
                     ),
                     Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 14,
+                      left: 0, top: 0, bottom: 0,
+                      child: Container(width: 3, color: sc),
+                    ),
+                    Positioned(
+                      left: 14, right: 14, bottom: 12,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: sc.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(99),
-                              border: Border.all(
-                                  color: sc.withValues(alpha: 0.55)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                      shape: BoxShape.circle, color: sc),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(sl,
-                                    style: TextStyle(
-                                        color: sc,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+                          _StickerBadge(
+                              label: sl, color: sc, dot: true),
+                          const SizedBox(height: 6),
                           Text(
-                            club.clubName,
+                            club.clubName.toUpperCase(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: GoogleFonts.anton(
+                              color: _P.white,
                               fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
+                              letterSpacing: 1,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '${club.city} · ${club.country}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 13,
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -846,11 +901,11 @@ class _ClubDetailSheet extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
           // Info rows
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
                 _InfoRow(
@@ -861,20 +916,22 @@ class _ClubDetailSheet extends StatelessWidget {
                 _InfoRow(
                     icon: Icons.linear_scale_rounded,
                     label: 'Queue',
-                    value: ql),
+                    value: _queueLabel(club.queueStatus)),
                 if (club.tonightDj != null)
                   _InfoRow(
                       icon: Icons.headphones_rounded,
                       label: "Tonight's DJ",
                       value: club.tonightDj!,
-                      valueColor: const Color(0xFFDD6BFF)),
+                      valueColor: _P.teal),
                 _InfoRow(
                     icon: Icons.confirmation_number_rounded,
                     label: 'Tickets',
-                    value: club.ticketsAvailable ? 'Available' : 'Sold Out',
+                    value: club.ticketsAvailable
+                        ? 'Available'
+                        : 'Sold Out',
                     valueColor: club.ticketsAvailable
-                        ? const Color(0xFF4ADE80)
-                        : const Color(0xFFFF6B6B)),
+                        ? _P.lime
+                        : _P.pink),
                 _InfoRow(
                     icon: Icons.table_bar_rounded,
                     label: 'Tables',
@@ -882,14 +939,14 @@ class _ClubDetailSheet extends StatelessWidget {
                         ? 'Available'
                         : 'Not Available',
                     valueColor: club.tablesAvailable
-                        ? const Color(0xFF4ADE80)
-                        : Colors.white54),
+                        ? _P.lime
+                        : Colors.white38),
                 if (club.offer != null)
                   _InfoRow(
                       icon: Icons.local_offer_rounded,
                       label: 'Offer',
                       value: club.offer!,
-                      valueColor: const Color(0xFFFFAA3E)),
+                      valueColor: _P.lime),
                 _InfoRow(
                     icon: Icons.schedule_rounded,
                     label: 'Last Updated',
@@ -898,7 +955,7 @@ class _ClubDetailSheet extends StatelessWidget {
             ),
           ),
 
-          SizedBox(height: 24 + bottom),
+          SizedBox(height: 20 + bottom),
         ],
       ),
     );
@@ -924,30 +981,28 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 36, height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
+              color: _P.dark,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _P.border, width: 1),
             ),
-            child: Icon(icon,
-                size: 17,
-                color: Colors.white.withValues(alpha: 0.55)),
+            child: Icon(icon, size: 16, color: Colors.white30),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500)),
-                const SizedBox(height: 1),
+                Text(label.toUpperCase(),
+                    style: GoogleFonts.anton(
+                        color: Colors.white30,
+                        fontSize: 9,
+                        letterSpacing: 1)),
+                const SizedBox(height: 2),
                 Text(value,
                     style: TextStyle(
-                        color: valueColor ?? Colors.white,
+                        color: valueColor ?? _P.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w700)),
               ],

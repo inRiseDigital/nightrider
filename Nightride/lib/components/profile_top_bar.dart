@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:nightride/core/responsive/app_responsive.dart';
 import '../../domain/profile_models.dart';
@@ -19,24 +20,21 @@ class ProfileTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const Color cream = Color(0xFFF3EAD6);
+    const Color neonLime = Color(0xFFDFFF2F);
+
     return Row(
       children: <Widget>[
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'My Profile',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: AppResponsive.profilePageTitleFont(context),
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white.withValues(alpha: 0.95),
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
+          child: Text(
+            'MY PROFILE',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.anton(
+              fontSize: AppResponsive.profilePageTitleFont(context),
+              color: cream,
+              letterSpacing: 1.2,
+            ),
           ),
         ),
         if (isEditing)
@@ -46,11 +44,11 @@ class ProfileTopBar extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Text(
-                'Cancel',
-                style: TextStyle(
+                'CANCEL',
+                style: GoogleFonts.anton(
                   fontSize: AppResponsive.font(context, 12.5).clamp(11.0, 13.5),
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white.withValues(alpha: 0.75),
+                  color: neonLime,
+                  letterSpacing: 0.8,
                 ),
               ),
             ),
@@ -63,8 +61,8 @@ class ProfileTopBar extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               child: Icon(
                 Icons.more_vert_rounded,
-                size: AppResponsive.icon(context, 18).clamp(15.0, 20.0),
-                color: Colors.white.withValues(alpha: 0.8),
+                size: AppResponsive.icon(context, 20).clamp(16.0, 22.0),
+                color: const Color(0xFFFAFAFA),
               ),
             ),
           ),

@@ -1,14 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/material.dart';
+import 'package:nightride/core/config/maps_config.dart';
 import 'package:gap/gap.dart';
 import 'package:nightride/components/category_chips_row.dart';
-import 'package:nightride/components/venue_card.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/map_dummy_data.dart';
-import 'package:nightride/pages/venue_details_page.dart';
 
 class VenueSearchSheet extends StatefulWidget {
   const VenueSearchSheet({super.key, this.onVenueSelect, this.initialVenues = kBottomCards});
@@ -50,22 +48,25 @@ class _VenueSearchSheetState extends State<VenueSearchSheet> {
       _isAllActive = false;
     });
 
-    String token = '';
-    try { token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? ''; } catch (_) {}
+    const String mapsKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY', defaultValue: kGoogleMapsApiKey);
     final Uri uri = Uri.parse(
-      'https://api.mapbox.com/geocoding/v5/mapbox.places/$query.json?country=lk&proximity=79.8500,7.2200&types=poi,address,place,locality,neighborhood&limit=100&access_token=$token',
+      'https://maps.googleapis.com/maps/api/place/textsearch/json'
+      '?query=${Uri.encodeComponent(query)}'
+      '&location=7.2200,79.8500&radius=50000&key=$mapsKey',
     );
 
     try {
       final http.Response response = await http.get(uri);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List features = data['features'] as List;
+        final List results_ = data['results'] as List? ?? [];
 
-        final List<MapBottomCardData> results = features.map((f) {
-          final center = f['center'] as List;
-          final String name = f['text'] ?? 'Unknown Place';
-          final String address = f['place_name'] ?? '';
+        final List<MapBottomCardData> results = results_.map((f) {
+          final loc = f['geometry']?['location'] ?? {};
+          final double lat = (loc['lat'] ?? 0).toDouble();
+          final double lng = (loc['lng'] ?? 0).toDouble();
+          final String name = f['name'] ?? 'Unknown Place';
+          final String address = f['formatted_address'] ?? '';
           return MapBottomCardData(
             title: name,
             subtitle: 'Points of Interest',
@@ -75,8 +76,8 @@ class _VenueSearchSheetState extends State<VenueSearchSheet> {
             distanceKm: 0.0,
             openText: 'Open Now',
             priceHint: 'Free',
-            lat: center[1].toDouble(),
-            lng: center[0].toDouble(),
+            lat: lat,
+            lng: lng,
           );
         }).toList();
 

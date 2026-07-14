@@ -13,10 +13,11 @@ class AppNavNotifier extends Notifier<int> {
 }
 
 class MapFocus {
-  const MapFocus(this.lat, this.lng, {this.label = ''});
+  const MapFocus(this.lat, this.lng, {this.label = '', this.placeId});
   final double lat;
   final double lng;
   final String label;
+  final String? placeId;
 }
 
 final mapFocusProvider = StateProvider<MapFocus?>((ref) => null);

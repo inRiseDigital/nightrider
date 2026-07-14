@@ -1,16 +1,15 @@
 // lib/main.dart
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:nightride/firebase_options.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-// Mapbox exports its own `Size` class — hide it so Flutter's Size is used by ScreenUtilInit.
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
-
+import 'package:flutter_glass_morphism/flutter_glass_morphism.dart';
 import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/splash_page.dart';
@@ -19,6 +18,12 @@ import 'package:nightride/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Color(0xFF000000),
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   }
@@ -27,27 +32,25 @@ Future<void> main() async {
     await NotificationService.requestPermission();
   } catch (_) {}
 
-  // Load .env for all platforms — provides BACKEND_URL, MAPBOX_ACCESS_TOKEN, etc.
+  // Load .env for all platforms — provides BACKEND_URL, etc.
+  // Values gracefully fall back to --dart-define / built-in defaults if absent.
   try {
     await dotenv.load(fileName: '.env');
   } catch (_) {
     // .env missing — values fall back to --dart-define / built-in defaults.
   }
 
-  if (!kIsWeb) {
-    // Primary source: --dart-define=MAPBOX_ACCESS_TOKEN=pk.xxx at build time.
-    // Fallback for local dev: .env file.
-    const String dartDefineToken = String.fromEnvironment('MAPBOX_ACCESS_TOKEN');
-    String token = dartDefineToken;
-    try {
-      token = dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dartDefineToken;
-    } catch (_) {}
-    if (token.isNotEmpty) {
-      MapboxOptions.setAccessToken(token);
-    }
-  }
+  final prefs = await SharedPreferences.getInstance();
+  final savedDark = prefs.getBool('dark_mode') ?? true;
+  final savedAccent = prefs.getInt('accent_index') ?? 0;
 
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(ProviderScope(
+    overrides: [
+      homeDarkToggleProvider.overrideWith((ref) => savedDark),
+      accentColorIndexProvider.overrideWith((ref) => savedAccent),
+    ],
+    child: const MyApp(),
+  ));
 }
 
 Locale _toLocale(HomeLanguage lang) {
@@ -76,21 +79,25 @@ class MyApp extends ConsumerWidget {
     final HomeLanguage lang = ref.watch(homeLanguageProvider);
     final Color accent = kAccentColors[ref.watch(accentColorIndexProvider)];
 
+    // Persist preference changes
+    ref.listen(homeDarkToggleProvider, (_, next) {
+      SharedPreferences.getInstance()
+          .then((p) => p.setBool('dark_mode', next));
+    });
+    ref.listen(accentColorIndexProvider, (_, next) {
+      SharedPreferences.getInstance()
+          .then((p) => p.setInt('accent_index', next));
+    });
+
     // Prevent ScreenUtil .w from over-inflating on foldables/tablets.
-    // On phones (≤390 dp) the design size stays 390×844 — no change.
-    // On wide devices (e.g. Honor Magic V3 unfolded ~719–821 dp) the design
-    // width is capped at 480 dp so .w values grow at most ~23% instead of ~85%.
-    // AppResponsive still receives the real screen width via MaterialApp's
-    // own MediaQuery, so all adaptive layout helpers remain correct.
     final view = WidgetsBinding.instance.platformDispatcher.views.first;
     final physW = view.physicalSize.width / view.devicePixelRatio;
-    // Phones/small tablets (≤600dp): cap at 480 → max 25% growth.
-    // Large tablets/foldables (>600dp): cap at 720 → max ~14% growth on V3 unfolded.
     final suDesignWidth = physW > 600
         ? physW.clamp(600.0, 720.0)
         : physW.clamp(390.0, 480.0);
 
-    return ScreenUtilInit(
+    return GlassMorphismThemeProvider(
+      child: ScreenUtilInit(
       designSize: Size(suDesignWidth, 844),
       minTextAdapt: true,
       splitScreenMode: true,
@@ -116,6 +123,6 @@ class MyApp extends ConsumerWidget {
           home: const SplashScreen(),
         );
       },
-    );
+    ));
   }
 }

@@ -23,14 +23,19 @@ class ProfileController extends Notifier<ProfileState> {
   @override
   ProfileState build() {
     // Watch auth state directly so this provider rebuilds on every sign-in/out
-    ref.watch(authStateProvider);
+    final user = ref.watch(authStateProvider).asData?.value;
     // Watch live Firestore data and merge it into state
     final docAsync = ref.watch(userProfileDocProvider);
     final firestoreData = docAsync.asData?.value;
 
-    final ProfileData data = firestoreData != null
-        ? UserProfileService.fromMap(firestoreData)
-        : kDummyProfile;
+    final ProfileData data;
+    if (firestoreData != null) {
+      data = UserProfileService.fromMap(firestoreData);
+    } else if (user == null || user.isAnonymous) {
+      data = guestProfile(user?.uid);
+    } else {
+      data = kDummyProfile;
+    }
 
     return ProfileState(
       mode: ProfileMode.view,

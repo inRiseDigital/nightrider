@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:nightride/core/responsive/auth_dimensions.dart';
-import 'package:nightride/core/theme/app_theme.dart';
 
 /// Inline "Don't have an account? Sign Up"-style prompt + tappable link,
 /// centered horizontally. Reused on Sign In / Sign Up / Forgot Password.
@@ -27,7 +26,7 @@ class AuthFooterLinks extends StatelessWidget {
           '$prompt ',
           style: TextStyle(
             fontSize: fontSize,
-            color: Colors.white.withValues(alpha: 0.55),
+            color: const Color(0xFFFAFAFA),
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -37,8 +36,8 @@ class AuthFooterLinks extends StatelessWidget {
             linkText,
             style: TextStyle(
               fontSize: fontSize,
-              color: AppTheme.primaryLight.withValues(alpha: 0.9),
-              fontWeight: FontWeight.w600,
+              color: const Color(0xFFDFFF2F),
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

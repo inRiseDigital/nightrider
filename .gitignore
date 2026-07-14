@@ -31,6 +31,9 @@ yarn-error.log*
 # (each Flutter sub-project has its own .gitignore — this is the root catch-all)
 *.dart_tool/
 .dart_tool/
+# Generated, machine-specific plugin registries (do not check into version control)
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
 
 # ── IDEs ──────────────────────────────────────────────────────────────────────
 .vscode/settings.json
@@ -40,3 +43,10 @@ yarn-error.log*
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Temp / scratch folders ────────────────────────────────────────────────────
+_nightrider_agent_tmp/
+_nightrider_agent_tmp
+
+# ── Backup folders (contains a stale copy of the project + build artifacts) ────
+_cleanup_backup_2026-05-17/

@@ -466,86 +466,90 @@ class _EmptyState extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Mascot / logo with pink glow ring
-            Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _kPink.withValues(alpha: 0.18),
-                    blurRadius: 40,
-                    spreadRadius: 10,
-                  ),
-                ],
-              ),
-              child: Image.asset(
-                'assets/images/logo.png',
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Mascot / logo with pink glow ring
+              Container(
                 width: 140,
                 height: 140,
-                fit: BoxFit.contain,
-                color: _kWhite.withValues(alpha: 0.30),
-                colorBlendMode: BlendMode.modulate,
-              ),
-            ),
-            const Gap(28),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.anton(
-                fontSize: 28,
-                color: _kCream,
-                letterSpacing: 2.0,
-                height: 1.15,
-              ),
-            ),
-            if (showExplore) ...[
-              const Gap(10),
-              Text(
-                'TAP THE HEART ON ANY EVENT OR PLACE TO SAVE IT HERE',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.anton(
-                  fontSize: 11,
-                  color: _kWhite.withValues(alpha: 0.38),
-                  letterSpacing: 1.2,
-                  height: 1.5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kPink.withValues(alpha: 0.18),
+                      blurRadius: 40,
+                      spreadRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 140,
+                  height: 140,
+                  fit: BoxFit.contain,
+                  color: _kWhite.withValues(alpha: 0.30),
+                  colorBlendMode: BlendMode.modulate,
                 ),
               ),
-              const Gap(32),
-              GestureDetector(
-                onTap: () => ref.read(appNavProvider.notifier).setIndex(1),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 15),
-                  decoration: BoxDecoration(
-                    color: _kLime,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _kLime.withValues(alpha: 0.35),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+              const Gap(28),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.anton(
+                  fontSize: 28,
+                  color: _kCream,
+                  letterSpacing: 2.0,
+                  height: 1.15,
+                ),
+              ),
+              if (showExplore) ...[
+                const Gap(10),
+                Text(
+                  'TAP THE HEART ON ANY EVENT OR PLACE TO SAVE IT HERE',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.anton(
+                    fontSize: 11,
+                    color: _kWhite.withValues(alpha: 0.38),
+                    letterSpacing: 1.2,
+                    height: 1.5,
                   ),
-                  child: Text(
-                    'EXPLORE EVENTS',
-                    style: GoogleFonts.anton(
-                      fontSize: 14,
-                      color: Colors.black,
-                      letterSpacing: 2.5,
-                      height: 1.1,
+                ),
+                const Gap(32),
+                GestureDetector(
+                  onTap: () => ref.read(appNavProvider.notifier).setIndex(1),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 36, vertical: 15),
+                    decoration: BoxDecoration(
+                      color: _kLime,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _kLime.withValues(alpha: 0.35),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      'EXPLORE EVENTS',
+                      style: GoogleFonts.anton(
+                        fontSize: 14,
+                        color: Colors.black,
+                        letterSpacing: 2.5,
+                        height: 1.1,
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -560,69 +564,72 @@ class _PeopleComingSoon extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icon with teal glow
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: _kTeal.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: _kTeal.withValues(alpha: 0.30),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _kTeal.withValues(alpha: 0.15),
-                    blurRadius: 30,
-                    spreadRadius: 5,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Icon with teal glow
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: _kTeal.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _kTeal.withValues(alpha: 0.30),
+                    width: 1.5,
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kTeal.withValues(alpha: 0.15),
+                      blurRadius: 30,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.people_rounded,
+                  color: _kTeal,
+                  size: 44,
+                ),
               ),
-              child: const Icon(
-                Icons.people_rounded,
-                color: _kTeal,
-                size: 44,
+              const Gap(28),
+              Text(
+                'YOUR CREW',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.anton(
+                  fontSize: 30,
+                  color: _kCream,
+                  letterSpacing: 2.5,
+                  height: 1.0,
+                ),
               ),
-            ),
-            const Gap(28),
-            Text(
-              'YOUR CREW',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.anton(
-                fontSize: 30,
-                color: _kCream,
-                letterSpacing: 2.5,
-                height: 1.0,
+              const Gap(6),
+              Text(
+                'COMING SOON',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.anton(
+                  fontSize: 16,
+                  color: _kLime,
+                  letterSpacing: 3.5,
+                  height: 1.1,
+                ),
               ),
-            ),
-            const Gap(6),
-            Text(
-              'COMING SOON',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.anton(
-                fontSize: 16,
-                color: _kLime,
-                letterSpacing: 3.5,
-                height: 1.1,
+              const Gap(20),
+              Text(
+                'Friends & crew features are in the works.\nYour squad is almost here.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _kWhite.withValues(alpha: 0.40),
+                  height: 1.65,
+                ),
               ),
-            ),
-            const Gap(20),
-            Text(
-              'Friends & crew features are in the works.\nYour squad is almost here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: _kWhite.withValues(alpha: 0.40),
-                height: 1.65,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

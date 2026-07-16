@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
@@ -62,6 +63,7 @@ class VenueDetailsPage extends ConsumerWidget {
             : '';
 
     final screenH = MediaQuery.of(context).size.height;
+    final bool hasCoords = data.lat != 0 && data.lng != 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -488,7 +490,19 @@ class VenueDetailsPage extends ConsumerWidget {
                     Expanded(
                       child: _CtaButton(
                         label: 'GET DIRECTIONS',
-                        onTap: () {},
+                        enabled: hasCoords,
+                        onTap: () {
+                          // Uri.https percent-encodes the comma in the
+                          // destination (, -> %2C) so Maps receives a valid
+                          // "lat,lng" instead of a mangled address.
+                          final uri =
+                              Uri.https('www.google.com', '/maps/dir/', {
+                            'api': '1',
+                            'destination': '${data.lat},${data.lng}',
+                          });
+                          launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
+                        },
                       ),
                     ),
                   ],
@@ -573,32 +587,39 @@ class _Pill extends StatelessWidget {
 }
 
 class _CtaButton extends StatelessWidget {
-  const _CtaButton({required this.label, required this.onTap});
+  const _CtaButton({
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+  });
   final String label;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       child: Container(
         height: 54,
         decoration: BoxDecoration(
-          color: _neonLime,
+          color: enabled ? _neonLime : _black.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: _neonLime.withValues(alpha: 0.38),
-              blurRadius: 20,
-              offset: const Offset(0, 5),
-            ),
-          ],
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: _neonLime.withValues(alpha: 0.38),
+                    blurRadius: 20,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
         ),
         child: Center(
           child: Text(
             label,
             style: GoogleFonts.anton(
-              color: _black,
+              color: enabled ? _black : _black.withValues(alpha: 0.35),
               fontSize: AppResponsive.font(context, 15).clamp(13.0, 17.0),
               letterSpacing: 1.8,
             ),

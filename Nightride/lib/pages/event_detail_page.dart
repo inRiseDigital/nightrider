@@ -934,9 +934,6 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                     ),
                   ),
                 ),
-
-                // Collapse the overlap offset so scroll doesn't over-extend
-                const SizedBox(height: 0 - cardOverlap),
               ],
             ),
           ),

@@ -9,9 +9,10 @@ import traceback
 from typing import AsyncGenerator
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from party_agent.api.auth import require_verified_user
 from party_agent.api.schemas import ChatRequest, ChatResponse, StreamChatRequest
 from party_agent.core.llm import TRACKER
 from party_agent.core.suggestions import generate_suggestions
@@ -52,10 +53,16 @@ async def _reverse_geocode(lat: float, lon: float) -> str:
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(req: ChatRequest, request: Request) -> ChatResponse:
+async def chat(
+    req: ChatRequest,
+    request: Request,
+    user: dict = Depends(require_verified_user),
+) -> ChatResponse:
     # Graph is built once during the app's lifespan and stashed on app.state
     # so the async Postgres checkpointer pool stays alive across requests.
     graph = request.app.state.graph
+    # Trust the verified token's uid over the client-supplied user_id.
+    user_id = user.get("uid") or req.user_id
     # Build message with location context injected so agents can use it
     message_content = req.message
     if req.gps and not _is_placeholder_gps(req.gps.latitude, req.gps.longitude):
@@ -68,7 +75,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     # already prepended to message_content above, so the agents still see it.
     state_input: dict = {
         "messages": [("user", message_content)],
-        "user_id": req.user_id,
+        "user_id": user_id,
     }
     if req.city is not None:
         state_input["city"] = req.city
@@ -76,7 +83,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     try:
         result = await graph.ainvoke(
             state_input,
-            config={"configurable": {"thread_id": req.thread_id, "user_id": req.user_id}},
+            config={"configurable": {"thread_id": req.thread_id, "user_id": user_id}},
         )
     except Exception as exc:
         tb = traceback.format_exc()
@@ -104,9 +111,19 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
 
 
 @router.post("/stream")
-async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResponse:
-    """SSE endpoint consumed by the Flutter app. Streams tokens as they arrive."""
+async def chat_stream(
+    req: StreamChatRequest,
+    request: Request,
+    user: dict = Depends(require_verified_user),
+) -> StreamingResponse:
+    """SSE endpoint consumed by the Flutter app. Streams tokens as they arrive.
+
+    The email-verified gate (``require_verified_user``) runs before the response
+    body, so an unverified caller gets a real 403 status — not a streamed error.
+    """
     graph = request.app.state.graph
+    # Trust the verified token's uid over the client-supplied user_id.
+    user_id = user.get("uid") or req.user_id
 
     async def _generate() -> AsyncGenerator[str, None]:
         message_content = req.message
@@ -115,10 +132,10 @@ async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResp
             address = await _reverse_geocode(req.latitude, req.longitude)
             message_content = f"[User location: {address}] {req.message}"
 
-        thread_id = req.thread_id or req.user_id
+        thread_id = req.thread_id or user_id
         state_input: dict = {
             "messages": [("user", message_content)],
-            "user_id": req.user_id,
+            "user_id": user_id,
         }
 
         # Send a status event so the app shows "Thinking..." immediately
@@ -142,7 +159,7 @@ async def chat_stream(req: StreamChatRequest, request: Request) -> StreamingResp
         try:
             async for event in graph.astream_events(
                 state_input,
-                config={"configurable": {"thread_id": thread_id, "user_id": req.user_id}},
+                config={"configurable": {"thread_id": thread_id, "user_id": user_id}},
                 version="v2",
             ):
                 ev_type = event.get("event")

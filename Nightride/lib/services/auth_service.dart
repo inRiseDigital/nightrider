@@ -37,6 +37,39 @@ final authServiceProvider = Provider<AuthService>((ref) {
   );
 });
 
+/// Whether the signed-in user's email is verified.
+///
+/// Seeded from the current user (Google sign-ins are already verified, so the
+/// chat gate never shows for them). A manual [User.reload] does NOT fire
+/// [FirebaseAuth.authStateChanges], so this notifier — not [authStateProvider] —
+/// is what drives the reactive chat gate → input swap once the user verifies.
+final emailVerifiedProvider =
+    NotifierProvider<EmailVerificationNotifier, bool>(EmailVerificationNotifier.new);
+
+class EmailVerificationNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    // Re-seed whenever auth state changes (login/logout).
+    final user = ref.watch(authStateProvider).asData?.value;
+    return user?.emailVerified ?? false;
+  }
+
+  /// Reloads the user from the server, refreshes the ID-token claim if now
+  /// verified, and updates state. Returns the fresh verified flag.
+  Future<bool> refresh() async {
+    final verified = await ref.read(authServiceProvider).reloadAndCheckVerified();
+    state = verified;
+    return verified;
+  }
+
+  /// (Re)sends the verification email.
+  Future<void> resend() => ref.read(authServiceProvider).sendVerificationEmail();
+
+  /// Forces the gate back on — e.g. the backend rejected a message with
+  /// EMAIL_NOT_VERIFIED while the client still believed it was verified.
+  void markUnverified() => state = false;
+}
+
 class AuthService {
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
@@ -74,11 +107,38 @@ class AuthService {
       if (cred.user != null) {
         await _profileService.createIfAbsent(cred.user!, role: 'user');
         await _flushOnboardingAnswers(cred.user!.uid);
+        // Fire the verification email immediately. Best-effort: a send failure
+        // (e.g. too-many-requests) must never block account creation — the user
+        // can resend from the chat gate.
+        try {
+          await cred.user!.sendEmailVerification();
+        } catch (_) {}
       }
       return cred;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     }
+  }
+
+  /// Reloads the current user from the server and returns the fresh
+  /// [User.emailVerified]. If it flipped to true, force-refreshes the ID token
+  /// so the `email_verified` claim that the backend and Firestore rules read is
+  /// no longer stale (it otherwise lags by up to an hour).
+  Future<bool> reloadAndCheckVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    final refreshed = _auth.currentUser;
+    final verified = refreshed?.emailVerified ?? false;
+    if (verified) {
+      await refreshed!.getIdToken(true);
+    }
+    return verified;
+  }
+
+  /// (Re)sends the verification email to the current user.
+  Future<void> sendVerificationEmail() async {
+    await _auth.currentUser?.sendEmailVerification();
   }
 
   /// After sign-up, flush onboarding answers that were stored in SharedPreferences.

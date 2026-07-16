@@ -14,6 +14,8 @@ import '../data/models/chat_session.dart';
 import '../data/services/chat_service.dart' show ChatService, ChatStreamHandle;
 import '../data/services/chat_history_service.dart';
 import '../providers/app_nav_provider.dart';
+import '../services/auth_service.dart';
+import '../components/chat/chat_verification_gate.dart';
 import 'venue_search_detail_page.dart';
 
 // ── Brand palette ─────────────────────────────────────────────────────────────
@@ -26,14 +28,14 @@ const _kBorderGray = Color(0xFF333333);
 const _kMuted    = Color(0xFF9EAFA0);
 const _kWhite    = Color(0xFFfafafa);
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   final ChatService _chatService = ChatService();
@@ -288,6 +290,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _handleSend({String? text}) async {
     String messageText = text ?? _controller.text.trim();
     if (messageText.isEmpty || _isLoading) return;
+    // Defense-in-depth: the input is hidden behind the gate when unverified,
+    // but never send if the client believes the email isn't verified. The
+    // backend is the real boundary — see ChatService 403 handling below.
+    if (!ref.read(emailVerifiedProvider)) return;
 
     final isLocationRequest = messageText.toLowerCase().contains('location') ||
         messageText.toLowerCase().contains('near me') ||
@@ -318,6 +324,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _scrollToBottom();
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    // ID token proves email_verified to the backend; refreshed on verify.
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
     final handle = _chatService.streamMessage(
       messageText,
       historySnapshot,
@@ -325,6 +333,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       longitude: _userLongitude,
       userId: uid,
       threadId: _currentSessionId ?? uid,
+      idToken: idToken,
     );
     _streamHandle = handle;
 
@@ -370,7 +379,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             setState(() => _suggestions = suggestions);
           }
         } else if (type == 'error') {
-          if (assistantMsg == null) {
+          // Backend rejected the message because the email isn't verified
+          // (the token claim was stale, or verification was revoked). Flip the
+          // gate back on and drop the optimistic user bubble.
+          if (event['code'] == 'EMAIL_NOT_VERIFIED') {
+            ref.read(emailVerifiedProvider.notifier).markUnverified();
+            setState(() {
+              if (_messages.isNotEmpty && _messages.last.role == 'user') {
+                _messages.removeLast();
+              }
+            });
+          } else if (assistantMsg == null) {
             setState(() {
               _messages.add(ChatMessage(
                 content: "Sorry, I'm having trouble connecting right now.",
@@ -615,7 +634,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               // "LOCK IT IN" CTA — shown after AI has produced a plan
               if (_messages.isNotEmpty && !_isLoading && _isViewingLive && _hasPlan)
                 _buildLockItInBar(),
-              _buildInputArea(),
+              // Soft gate: unverified users see a "verify your email" panel in
+              // place of the input. Verified (incl. Google) users chat as normal.
+              ref.watch(emailVerifiedProvider)
+                  ? _buildInputArea()
+                  : const ChatVerificationGate(),
             ],
           ),
         ),

@@ -51,9 +51,12 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
-      // Chat history — owner only
+      // Chat history — owner reads; writes require a verified email so the AI
+      // chat (which persists sessions here) is gated to verified users only.
       match /chat_sessions/{sessionId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if request.auth != null && request.auth.uid == uid
+          && request.auth.token.email_verified == true;
       }
     }
 

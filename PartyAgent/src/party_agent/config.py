@@ -62,6 +62,18 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # --- Auth (Firebase ID-token verification on the chat endpoints) ---
+    # When True, /chat and /chat/stream require a valid Firebase ID token whose
+    # `email_verified` claim is true. Set AUTH_ENFORCED=false for local dev
+    # without a service account. Fails closed: if enforced but firebase-admin
+    # can't initialise, requests get 503 rather than being let through.
+    auth_enforced: bool = Field(default=True, alias="AUTH_ENFORCED")
+    # Path to the Firebase service-account JSON. Falls back to Application
+    # Default Credentials (GOOGLE_APPLICATION_CREDENTIALS / metadata) if unset.
+    firebase_service_account: str = Field(
+        default="firebase_service_account.json", alias="FIREBASE_SERVICE_ACCOUNT"
+    )
+
     # --- Model picks (override per-environment if you want) ---
     router_model: str = "claude-haiku-4-5-20251001"
     specialist_model: str = "claude-sonnet-4-6"

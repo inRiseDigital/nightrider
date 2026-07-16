@@ -50,6 +50,7 @@ class ChatService {
     double? longitude,
     String? userId,
     String? threadId,
+    String? idToken,
   }) {
     final client = http.Client();
     final stream = _streamImpl(
@@ -59,6 +60,7 @@ class ChatService {
       longitude: longitude,
       userId: userId,
       threadId: threadId,
+      idToken: idToken,
     );
     return ChatStreamHandle(stream, client);
   }
@@ -70,6 +72,7 @@ class ChatService {
     double? longitude,
     String? userId,
     String? threadId,
+    String? idToken,
   }) async* {
     try {
       final body = <String, dynamic>{
@@ -84,11 +87,26 @@ class ChatService {
       final request = http.Request('POST', Uri.parse('$_baseUrl/chat/stream'));
       request.headers['Content-Type'] = 'application/json';
       if (_apiKey.isNotEmpty) request.headers['X-API-Key'] = _apiKey;
+      // Firebase ID token — the backend verifies this and checks the
+      // `email_verified` claim before touching the LLM.
+      if (idToken != null && idToken.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $idToken';
+      }
       request.body = jsonEncode(body);
 
       final streamedResponse = await client.send(request);
 
       if (streamedResponse.statusCode != 200) {
+        // The backend rejects unverified users with 403 + detail
+        // "EMAIL_NOT_VERIFIED". Surface a typed code so the UI can route to the
+        // verification gate instead of showing a generic connection error.
+        if (streamedResponse.statusCode == 403) {
+          final respBody = await streamedResponse.stream.bytesToString();
+          if (respBody.contains('EMAIL_NOT_VERIFIED')) {
+            yield {'type': 'error', 'code': 'EMAIL_NOT_VERIFIED'};
+            return;
+          }
+        }
         yield {'type': 'error', 'text': 'Server error: ${streamedResponse.statusCode}'};
         return;
       }

@@ -22,6 +22,9 @@ pydantic-settings>=2.5.0
 googlemaps>=4.10.0
 httpx>=0.27.0
 
+# --- Firebase (ID-token verification for the chat email-verified gate) ---
+firebase-admin>=6.5.0
+
 # --- Web crawl fallback (worldwide off-platform events) ---
 # Crawl4AI is optional at runtime — the agent runs without it, only the
 # live-crawl fallback path is disabled. Install only on environments that

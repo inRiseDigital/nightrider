@@ -154,8 +154,7 @@ class _MapPageState extends ConsumerState<MapPage> {
       if (focus == null) return;
       final destName = focus.label.isNotEmpty ? focus.label : 'Destination';
       _resolveAndStorePlaceId(destName, focus.lat, focus.lng);
-      _dropRedPin(focus.lat, focus.lng);
-      _drawRouteToFocus(focus.lat, focus.lng, destName: destName);
+      _focusSingleLocation(focus);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(mapFocusProvider.notifier).state = null;
       });
@@ -509,8 +508,10 @@ class _MapPageState extends ConsumerState<MapPage> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: AppResponsive.bottomNavHeight(context) +
-                  MediaQuery.viewPaddingOf(context).bottom,
+              // Body already sits above the nav bar (shell Scaffold has no
+              // extendBody), so anchor the sheet flush to the bottom instead
+              // of adding the nav-bar height again and leaving a map gap.
+              bottom: 0,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.sizeOf(context).height * 0.76,
@@ -626,59 +627,53 @@ class _MapPageState extends ConsumerState<MapPage> {
     // no-op: place ID resolution removed (Google Places replaced by OpenMapService)
   }
 
-  void _dropRedPin(double lat, double lng) {
+  /// Opens the map on a single selected location: clears every other marker
+  /// and any route, drops one pin, zooms in tightly so only that place is in
+  /// view (no bounds-fit that would zoom out to show all markers), and shows
+  /// the place detail sheet for it.
+  void _focusSingleLocation(MapFocus focus) {
     const markerId = MarkerId('focused_pin');
+    // Prefer a matching event from the pool (richer data); otherwise build a
+    // card from the fields carried on the focus itself.
+    final matched = _currentEvents.where((e) =>
+        (e.lat - focus.lat).abs() < 1e-6 &&
+        (e.lng - focus.lng).abs() < 1e-6);
+    final MapBottomCardData card = matched.isNotEmpty
+        ? matched.first
+        : MapBottomCardData(
+            id: focus.id,
+            placeId: focus.placeId,
+            title: focus.label.isNotEmpty ? focus.label : 'Selected location',
+            subtitle: focus.subtitle,
+            locationLine: focus.locationLine,
+            imageUrl: focus.imageUrl,
+            tags: focus.tags,
+            distanceKm: 0,
+            openText: '',
+            priceHint: focus.priceHint,
+            lat: focus.lat,
+            lng: focus.lng,
+          );
     setState(() {
+      _polylines.clear();
+      _routeInfo = null;
+      _markers.removeWhere((m) => m.markerId.value.startsWith('event_'));
       if (_searchedVenueMarkerId != null) {
         _markers.removeWhere((m) => m.markerId == _searchedVenueMarkerId);
       }
+      // Keep event markers from being re-added on the next build.
+      _eventMarkersAdded = true;
       _searchedVenueMarkerId = markerId;
       _markers.add(Marker(
         markerId: markerId,
-        position: LatLng(lat, lng),
+        position: LatLng(focus.lat, focus.lng),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       ));
+      _selectedVenue = card;
     });
-  }
-
-  Future<void> _drawRouteToFocus(double destLat, double destLng,
-      {String destName = 'Destination'}) async {
-    try {
-      final geo.Position position = _cachedPosition ??
-          await geo.Geolocator.getLastKnownPosition() ??
-          await geo.Geolocator.getCurrentPosition(
-            locationSettings: const geo.LocationSettings(
-                accuracy: geo.LocationAccuracy.low),
-          ).timeout(const Duration(seconds: 8));
-
-      _routeOrigin     = LatLng(position.latitude, position.longitude);
-      _routeDest       = LatLng(destLat, destLng);
-      _pendingDestName = destName;
-
-      _addOriginMarker(position.latitude, position.longitude);
-      await _fetchAndDrawRoute(
-          position.latitude, position.longitude, destLat, destLng);
-      _fetchAllModeTimes(
-          position.latitude, position.longitude, destLat, destLng);
-
-      final sw = LatLng(
-        position.latitude < destLat ? position.latitude : destLat,
-        position.longitude < destLng ? position.longitude : destLng,
-      );
-      final ne = LatLng(
-        position.latitude > destLat ? position.latitude : destLat,
-        position.longitude > destLng ? position.longitude : destLng,
-      );
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLngBounds(
-            LatLngBounds(southwest: sw, northeast: ne), 100),
-      );
-    } catch (e) {
-      _pendingDestName = null;
-      _mapController?.animateCamera(CameraUpdate.newCameraPosition(
-        CameraPosition(target: LatLng(destLat, destLng), zoom: 14.0),
-      ));
-    }
+    _mapController?.animateCamera(CameraUpdate.newCameraPosition(
+      CameraPosition(target: LatLng(focus.lat, focus.lng), zoom: 16.0),
+    ));
   }
 
   void _addEventMarkers(List<MapBottomCardData> events) {

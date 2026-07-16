@@ -94,9 +94,11 @@ class ChatService {
       }
 
       // Parse SSE: each event is separated by \n\n, lines start with "data: "
+      // Decode through utf8.decoder (a stateful stream transformer) so a
+      // multi-byte char split across TCP packets is buffered, not mis-decoded.
       String leftover = '';
-      await for (final bytes in streamedResponse.stream) {
-        final chunk = leftover + utf8.decode(bytes);
+      await for (final decoded in streamedResponse.stream.transform(utf8.decoder)) {
+        final chunk = leftover + decoded;
         final parts = chunk.split('\n\n');
         leftover = parts.removeLast(); // may be an incomplete event
         for (final part in parts) {

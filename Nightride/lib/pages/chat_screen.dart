@@ -194,7 +194,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         "Weekend schedule",
       ];
     });
-    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _loadSession(ChatSession session) async {
@@ -411,6 +410,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         setState(() => _typingMessageId = null);
       }
     });
+  }
+
+  /// Substring that never cuts through a UTF-16 surrogate pair (e.g. emoji).
+  /// A lone surrogate is malformed UTF-16 and crashes TextSpan layout, so when
+  /// the boundary falls between a pair's halves we back off until the low half
+  /// arrives on the next tick.
+  static String _safeSubstring(String s, int length) {
+    int end = length.clamp(0, s.length);
+    if (end > 0 && end < s.length) {
+      final unit = s.codeUnitAt(end - 1);
+      if (unit >= 0xD800 && unit <= 0xDBFF) end -= 1; // high surrogate at cut
+    }
+    return s.substring(0, end);
   }
 
   String _stripHtml(String html) {
@@ -684,7 +696,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _startNewChat,
+                  onPressed: () {
+                    Navigator.of(context).pop(); // close the drawer
+                    _startNewChat();
+                  },
                   icon: const Icon(Icons.add_rounded, size: 18, color: _kBlack),
                   label: Text(
                     'NEW CHAT',
@@ -1021,10 +1036,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // AI message: cream/dark speech-bubble style card
   Widget _buildAssistantBubble(ChatMessage message) {
     final isTyping = message.id == _typingMessageId;
-    final visibleContent = isTyping
-        ? message.content
-            .substring(0, _typedLength.clamp(0, message.content.length))
-        : message.content;
+    final visibleContent =
+        isTyping ? _safeSubstring(message.content, _typedLength) : message.content;
     final cleaned   = _linkifyVenues(_stripHtml(visibleContent));
     final allImages = _extractImages(cleaned);
 

@@ -197,16 +197,17 @@ class VenueDetailsPage extends ConsumerWidget {
 
                 // ── Cream ticket card ────────────────────────────────────────
                 SliverToBoxAdapter(
-                  child: Container(
-                    margin: EdgeInsets.only(top: -(screenH * 0.055)),
-                    decoration: const BoxDecoration(
-                      color: _cream,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(28),
-                        topRight: Radius.circular(28),
+                  child: Transform.translate(
+                    offset: Offset(0, -(screenH * 0.055)),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: _cream,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(28),
+                          topRight: Radius.circular(28),
+                        ),
                       ),
-                    ),
-                    child: Column(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ── Ticket notch tear-off ──────────────────────────
@@ -445,6 +446,7 @@ class VenueDetailsPage extends ConsumerWidget {
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],

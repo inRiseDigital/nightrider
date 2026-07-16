@@ -840,7 +840,16 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                                 GestureDetector(
                                   onTap: () {
                                     ref.read(mapFocusProvider.notifier).state =
-                                        MapFocus(_lat, _lng, label: _name);
+                                        MapFocus(
+                                      _lat,
+                                      _lng,
+                                      label: _name,
+                                      id: _id,
+                                      subtitle: _genre,
+                                      locationLine: locationLine,
+                                      imageUrl: _coverImage,
+                                      priceHint: _priceHint,
+                                    );
                                     ref
                                         .read(appNavProvider.notifier)
                                         .setIndex(0);
@@ -934,9 +943,6 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                     ),
                   ),
                 ),
-
-                // Collapse the overlap offset so scroll doesn't over-extend
-                const SizedBox(height: 0 - cardOverlap),
               ],
             ),
           ),

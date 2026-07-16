@@ -39,7 +39,7 @@ class AppBottomNavBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 64,
+          height: 42,
           child: Row(
             children: List.generate(_kNavIcons.length, (i) {
               final bool active = i == currentIndex;
@@ -52,17 +52,17 @@ class AppBottomNavBar extends StatelessWidget {
                     children: [
                       Icon(
                         _kNavIcons[i],
-                        size: 26,
+                        size: 20,
                         color: active
                             ? Theme.of(context).colorScheme.primary
                             : Colors.white54,
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 2),
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
                         curve: Curves.easeOutCubic,
-                        width: active ? 6 : 0,
-                        height: active ? 6 : 0,
+                        width: active ? 4 : 0,
+                        height: active ? 4 : 0,
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primary,
                           shape: BoxShape.circle,

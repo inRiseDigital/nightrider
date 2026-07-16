@@ -93,7 +93,7 @@ class _GoogleMapsPlaceSheetState extends State<GoogleMapsPlaceSheet> {
               _buildOverview(),
               _buildBottomBar(),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 6),
           ],
         ),
       ),
@@ -113,9 +113,9 @@ class _GoogleMapsPlaceSheetState extends State<GoogleMapsPlaceSheet> {
           // Drag handle
           Center(
             child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 10, bottom: 16),
+              width: 32,
+              height: 3,
+              margin: const EdgeInsets.only(top: 4, bottom: 5),
               decoration: BoxDecoration(
                 color: _border,
                 borderRadius: BorderRadius.circular(2),
@@ -129,10 +129,10 @@ class _GoogleMapsPlaceSheetState extends State<GoogleMapsPlaceSheet> {
                 child: Text(
                   d?.name ?? widget.venue.title,
                   style: GoogleFonts.anton(
-                    fontSize: 22,
+                    fontSize: 18,
                     color: _cream,
                     letterSpacing: 0.5,
-                    height: 1.15,
+                    height: 1.1,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -150,7 +150,7 @@ class _GoogleMapsPlaceSheetState extends State<GoogleMapsPlaceSheet> {
               _iconCircle(Icons.close_rounded, _white, widget.onClose),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           Row(
             children: [
               // Type label
@@ -171,7 +171,7 @@ class _GoogleMapsPlaceSheetState extends State<GoogleMapsPlaceSheet> {
               ],
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
         ],
       ),
     );
@@ -181,7 +181,7 @@ class _GoogleMapsPlaceSheetState extends State<GoogleMapsPlaceSheet> {
 
   Widget _buildActionPills() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -239,7 +239,7 @@ class _GoogleMapsPlaceSheetState extends State<GoogleMapsPlaceSheet> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(999),

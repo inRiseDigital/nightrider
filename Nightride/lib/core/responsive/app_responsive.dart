@@ -236,10 +236,10 @@ class AppResponsive {
   // ── Bottom-nav (used by ResponsiveBottomNav-style code) ────────────────
   static double bottomNavHeight(BuildContext c) {
     final w = width(c);
-    if (w < 360) return 60;
-    if (w < 600) return 64;
-    if (w < 840) return 64;
-    return 70;
+    if (w < 360) return 40;
+    if (w < 600) return 42;
+    if (w < 840) return 42;
+    return 48;
   }
 
   // ── Home header (language + notification buttons) ─────────────────────

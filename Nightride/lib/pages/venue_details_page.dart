@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
@@ -62,6 +63,7 @@ class VenueDetailsPage extends ConsumerWidget {
             : '';
 
     final screenH = MediaQuery.of(context).size.height;
+    final bool hasCoords = data.lat != 0 && data.lng != 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -70,20 +72,16 @@ class VenueDetailsPage extends ConsumerWidget {
         body: Stack(
           children: [
             // ── Scrollable body ─────────────────────────────────────────────
-            CustomScrollView(
+            SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              slivers: [
-                // ── Hero image ──────────────────────────────────────────────
-                SliverAppBar(
-                  expandedHeight: screenH * 0.44,
-                  pinned: true,
-                  stretch: true,
-                  backgroundColor: _black,
-                  elevation: 0,
-                  automaticallyImplyLeading: false,
-                  flexibleSpace: FlexibleSpaceBar(
-                    stretchModes: const [StretchMode.zoomBackground],
-                    background: Stack(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Hero image ──────────────────────────────────────────────
+                  SizedBox(
+                    height: screenH * 0.44,
+                    width: double.infinity,
+                    child: Stack(
                       fit: StackFit.expand,
                       children: [
                         // Hero image
@@ -113,62 +111,6 @@ class VenueDetailsPage extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        // Back button
-                        SafeArea(
-                          child: Align(
-                            alignment: Alignment.topLeft,
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 16, top: 8),
-                              child: _GlassIconButton(
-                                onTap: () => Navigator.of(context).pop(),
-                                child: const Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    color: _white,
-                                    size: 18),
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Favourite button
-                        SafeArea(
-                          child: Align(
-                            alignment: Alignment.topRight,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 16, top: 8),
-                              child: _GlassIconButton(
-                                onTap: () async {
-                                  final user =
-                                      ref.read(authStateProvider).asData?.value;
-                                  if (user == null) return;
-                                  final svc =
-                                      ref.read(favouritesServiceProvider);
-                                  if (liked) {
-                                    await svc.remove(user.uid, data.id);
-                                  } else {
-                                    await svc.add(user.uid, {
-                                      'id': data.id,
-                                      'name': data.title,
-                                      'title': data.title,
-                                      'cover_image': data.imageUrl,
-                                      'city': data.locationLine,
-                                      'date': data.openText,
-                                      'genre': data.subtitle,
-                                      'lat': data.lat,
-                                      'lng': data.lng,
-                                    });
-                                  }
-                                },
-                                child: Icon(
-                                  liked
-                                      ? Icons.favorite_rounded
-                                      : Icons.favorite_border_rounded,
-                                  color: liked ? _hotPink : _white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                         // Retro VENUE label on hero
                         Positioned(
                           bottom: 72,
@@ -193,20 +135,19 @@ class VenueDetailsPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                ),
 
-                // ── Cream ticket card ────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: Container(
-                    margin: EdgeInsets.only(top: -(screenH * 0.055)),
-                    decoration: const BoxDecoration(
-                      color: _cream,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(28),
-                        topRight: Radius.circular(28),
+                  // ── Cream ticket card ────────────────────────────────────────
+                  Transform.translate(
+                    offset: Offset(0, -(screenH * 0.055)),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: _cream,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(28),
+                          topRight: Radius.circular(28),
+                        ),
                       ),
-                    ),
-                    child: Column(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ── Ticket notch tear-off ──────────────────────────
@@ -446,8 +387,55 @@ class VenueDetailsPage extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Back button — top left (always visible) ──────────────────────
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              child: _GlassIconButton(
+                onTap: () => Navigator.of(context).pop(),
+                child: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: _white, size: 18),
+              ),
+            ),
+
+            // ── Favourite button — top right (always visible) ────────────────
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              right: 16,
+              child: _GlassIconButton(
+                onTap: () async {
+                  final user = ref.read(authStateProvider).asData?.value;
+                  if (user == null) return;
+                  final svc = ref.read(favouritesServiceProvider);
+                  if (liked) {
+                    await svc.remove(user.uid, data.id);
+                  } else {
+                    await svc.add(user.uid, {
+                      'id': data.id,
+                      'name': data.title,
+                      'title': data.title,
+                      'cover_image': data.imageUrl,
+                      'city': data.locationLine,
+                      'date': data.openText,
+                      'genre': data.subtitle,
+                      'lat': data.lat,
+                      'lng': data.lng,
+                    });
+                  }
+                },
+                child: Icon(
+                  liked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: liked ? _hotPink : _white,
+                  size: 20,
                 ),
-              ],
+              ),
             ),
 
             // ── Bottom action bar ────────────────────────────────────────────
@@ -502,7 +490,19 @@ class VenueDetailsPage extends ConsumerWidget {
                     Expanded(
                       child: _CtaButton(
                         label: 'GET DIRECTIONS',
-                        onTap: () {},
+                        enabled: hasCoords,
+                        onTap: () {
+                          // Uri.https percent-encodes the comma in the
+                          // destination (, -> %2C) so Maps receives a valid
+                          // "lat,lng" instead of a mangled address.
+                          final uri =
+                              Uri.https('www.google.com', '/maps/dir/', {
+                            'api': '1',
+                            'destination': '${data.lat},${data.lng}',
+                          });
+                          launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
+                        },
                       ),
                     ),
                   ],
@@ -587,32 +587,39 @@ class _Pill extends StatelessWidget {
 }
 
 class _CtaButton extends StatelessWidget {
-  const _CtaButton({required this.label, required this.onTap});
+  const _CtaButton({
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+  });
   final String label;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       child: Container(
         height: 54,
         decoration: BoxDecoration(
-          color: _neonLime,
+          color: enabled ? _neonLime : _black.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: _neonLime.withValues(alpha: 0.38),
-              blurRadius: 20,
-              offset: const Offset(0, 5),
-            ),
-          ],
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: _neonLime.withValues(alpha: 0.38),
+                    blurRadius: 20,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
         ),
         child: Center(
           child: Text(
             label,
             style: GoogleFonts.anton(
-              color: _black,
+              color: enabled ? _black : _black.withValues(alpha: 0.35),
               fontSize: AppResponsive.font(context, 15).clamp(13.0, 17.0),
               letterSpacing: 1.8,
             ),

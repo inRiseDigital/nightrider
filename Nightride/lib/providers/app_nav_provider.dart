@@ -13,11 +13,31 @@ class AppNavNotifier extends Notifier<int> {
 }
 
 class MapFocus {
-  const MapFocus(this.lat, this.lng, {this.label = '', this.placeId});
+  const MapFocus(
+    this.lat,
+    this.lng, {
+    this.label = '',
+    this.placeId,
+    this.id = '',
+    this.subtitle = '',
+    this.locationLine = '',
+    this.imageUrl = '',
+    this.tags = const <String>[],
+    this.priceHint = '',
+  });
   final double lat;
   final double lng;
   final String label;
   final String? placeId;
+
+  // Optional detail fields so the map can show a place sheet for the focused
+  // location without having to re-fetch it from the events pool.
+  final String id;
+  final String subtitle;
+  final String locationLine;
+  final String imageUrl;
+  final List<String> tags;
+  final String priceHint;
 }
 
 final mapFocusProvider = StateProvider<MapFocus?>((ref) => null);

@@ -70,20 +70,16 @@ class VenueDetailsPage extends ConsumerWidget {
         body: Stack(
           children: [
             // ── Scrollable body ─────────────────────────────────────────────
-            CustomScrollView(
+            SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              slivers: [
-                // ── Hero image ──────────────────────────────────────────────
-                SliverAppBar(
-                  expandedHeight: screenH * 0.44,
-                  pinned: true,
-                  stretch: true,
-                  backgroundColor: _black,
-                  elevation: 0,
-                  automaticallyImplyLeading: false,
-                  flexibleSpace: FlexibleSpaceBar(
-                    stretchModes: const [StretchMode.zoomBackground],
-                    background: Stack(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Hero image ──────────────────────────────────────────────
+                  SizedBox(
+                    height: screenH * 0.44,
+                    width: double.infinity,
+                    child: Stack(
                       fit: StackFit.expand,
                       children: [
                         // Hero image
@@ -113,62 +109,6 @@ class VenueDetailsPage extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        // Back button
-                        SafeArea(
-                          child: Align(
-                            alignment: Alignment.topLeft,
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 16, top: 8),
-                              child: _GlassIconButton(
-                                onTap: () => Navigator.of(context).pop(),
-                                child: const Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    color: _white,
-                                    size: 18),
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Favourite button
-                        SafeArea(
-                          child: Align(
-                            alignment: Alignment.topRight,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 16, top: 8),
-                              child: _GlassIconButton(
-                                onTap: () async {
-                                  final user =
-                                      ref.read(authStateProvider).asData?.value;
-                                  if (user == null) return;
-                                  final svc =
-                                      ref.read(favouritesServiceProvider);
-                                  if (liked) {
-                                    await svc.remove(user.uid, data.id);
-                                  } else {
-                                    await svc.add(user.uid, {
-                                      'id': data.id,
-                                      'name': data.title,
-                                      'title': data.title,
-                                      'cover_image': data.imageUrl,
-                                      'city': data.locationLine,
-                                      'date': data.openText,
-                                      'genre': data.subtitle,
-                                      'lat': data.lat,
-                                      'lng': data.lng,
-                                    });
-                                  }
-                                },
-                                child: Icon(
-                                  liked
-                                      ? Icons.favorite_rounded
-                                      : Icons.favorite_border_rounded,
-                                  color: liked ? _hotPink : _white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                         // Retro VENUE label on hero
                         Positioned(
                           bottom: 72,
@@ -193,11 +133,9 @@ class VenueDetailsPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                ),
 
-                // ── Cream ticket card ────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: Transform.translate(
+                  // ── Cream ticket card ────────────────────────────────────────
+                  Transform.translate(
                     offset: Offset(0, -(screenH * 0.055)),
                     child: Container(
                       decoration: const BoxDecoration(
@@ -448,8 +386,54 @@ class VenueDetailsPage extends ConsumerWidget {
                     ),
                   ),
                   ),
+                ],
+              ),
+            ),
+
+            // ── Back button — top left (always visible) ──────────────────────
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              child: _GlassIconButton(
+                onTap: () => Navigator.of(context).pop(),
+                child: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: _white, size: 18),
+              ),
+            ),
+
+            // ── Favourite button — top right (always visible) ────────────────
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              right: 16,
+              child: _GlassIconButton(
+                onTap: () async {
+                  final user = ref.read(authStateProvider).asData?.value;
+                  if (user == null) return;
+                  final svc = ref.read(favouritesServiceProvider);
+                  if (liked) {
+                    await svc.remove(user.uid, data.id);
+                  } else {
+                    await svc.add(user.uid, {
+                      'id': data.id,
+                      'name': data.title,
+                      'title': data.title,
+                      'cover_image': data.imageUrl,
+                      'city': data.locationLine,
+                      'date': data.openText,
+                      'genre': data.subtitle,
+                      'lat': data.lat,
+                      'lng': data.lng,
+                    });
+                  }
+                },
+                child: Icon(
+                  liked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: liked ? _hotPink : _white,
+                  size: 20,
                 ),
-              ],
+              ),
             ),
 
             // ── Bottom action bar ────────────────────────────────────────────

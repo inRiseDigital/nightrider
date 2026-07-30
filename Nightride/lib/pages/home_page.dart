@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:nightride/components/home_drawer.dart';
 import 'package:nightride/components/home_featured_carousel.dart';
 import 'package:nightride/pages/category_detail_page.dart';
 import 'package:nightride/components/home_location_row.dart';
@@ -54,6 +55,7 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
+      drawer: const HomeDrawer(),
       body: SafeArea(
         bottom: false,
         child: ScrollConfiguration(
@@ -80,33 +82,26 @@ class HomePage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Top bar ─────────────────────────────────────────────
-                  ResponsivePagePadding(
-                    child: HomeTopBar(username: username),
+                  // ── Top bar — hamburger + bell ──────────────────────────
+                  const ResponsivePagePadding(
+                    child: HomeTopBar(),
                   ),
                   SizedBox(
-                      height: AppResponsive.gap(context, 20)),
+                      height: AppResponsive.gap(context, 18)),
 
-                  // ── Hero headline ───────────────────────────────────────
+                  // ── Hero speech bubble + disco ball + mascot ────────────
                   ResponsivePagePadding(
-                    child: _HeroHeadline(
-                      onAiTap: () =>
+                    child: _HeroBubble(displayName: username),
+                  ),
+                  SizedBox(height: AppResponsive.gap(context, 22)),
+
+                  // ── AI Plan My Night highlighter stripe ─────────────────
+                  ResponsivePagePadding(
+                    child: _AiPlanStripe(
+                      onTap: () =>
                           ref.read(appNavProvider.notifier).setIndex(2),
                     ),
                   ),
-                  SizedBox(height: AppResponsive.gap(context, 8)),
-
-                  // ── Location row (conditional) ──────────────────────────
-                  if (locationLabel.isNotEmpty) ...[
-                    ResponsivePagePadding(
-                      child: HomeLocationRow(country: locationLabel),
-                    ),
-                    SizedBox(height: AppResponsive.gap(context, 24)),
-                  ] else
-                    SizedBox(height: AppResponsive.gap(context, 20)),
-
-                  // ── Featured carousel — full-bleed ──────────────────────
-                  const HomeFeaturedCarousel(),
                   SizedBox(height: AppResponsive.gap(context, 28)),
 
                   // ── LIVE RIGHT NOW stat cards ───────────────────────────
@@ -156,6 +151,18 @@ class HomePage extends ConsumerWidget {
                     ),
                     child: const HomeTrendingList(),
                   ),
+                  SizedBox(height: AppResponsive.gap(context, 28)),
+
+                  // ── Location row (conditional) ──────────────────────────
+                  if (locationLabel.isNotEmpty) ...[
+                    ResponsivePagePadding(
+                      child: HomeLocationRow(country: locationLabel),
+                    ),
+                    SizedBox(height: AppResponsive.gap(context, 20)),
+                  ],
+
+                  // ── Featured carousel — full-bleed ──────────────────────
+                  const HomeFeaturedCarousel(),
                 ],
               ),
             ),
@@ -166,102 +173,305 @@ class HomePage extends ConsumerWidget {
   }
 }
 
-// ── Hero headline block ───────────────────────────────────────────────────────
+// ── Hero speech bubble ────────────────────────────────────────────────────────
+//
+// Bordered "comic bubble" holding the greeting + headline, with a disco-ball
+// placeholder (art asset to be swapped in later) floating top-right and the
+// vinyl mascot perched on its bottom-right corner.
 
-class _HeroHeadline extends StatelessWidget {
-  const _HeroHeadline({required this.onAiTap});
-  final VoidCallback onAiTap;
+class _HeroBubble extends StatelessWidget {
+  const _HeroBubble({required this.displayName});
+  final String displayName;
 
   @override
   Widget build(BuildContext context) {
-    final titleFontSize =
-        AppResponsive.font(context, 34).clamp(26.0, 42.0);
+    final greeting = displayName.isEmpty ? 'THERE' : displayName.toUpperCase();
+    final titleFontSize = AppResponsive.font(context, 30).clamp(24.0, 38.0);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        // ── Text + button (left) ──────────────────────────────────────
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      // Reserve room below the bubble for the tail + mascot overlap.
+      padding: const EdgeInsets.only(bottom: 26, top: 6),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 18, 100, 24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppTheme.cream, width: 2.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'HEY $greeting!',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.anton(
+                        fontSize: AppResponsive.font(context, 16)
+                            .clamp(14.0, 18.0),
+                        fontWeight: FontWeight.w400,
+                        color: AppTheme.neonLime,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Transform.rotate(
+                      angle: 0.35,
+                      child: Icon(Icons.bolt_rounded,
+                          color: AppTheme.hotPink, size: 16),
+                    ),
+                  ],
+                ),
+                SizedBox(height: AppResponsive.gap(context, 10)),
+                Text(
+                  'WHERE ARE WE GOING',
+                  style: GoogleFonts.anton(
+                    fontSize: titleFontSize,
+                    fontWeight: FontWeight.w400,
+                    color: AppTheme.cream,
+                    letterSpacing: 1.0,
+                    height: 1.1,
+                  ),
+                ),
+                Text(
+                  'TONIGHT?',
+                  style: GoogleFonts.anton(
+                    fontSize: titleFontSize * 1.05,
+                    fontWeight: FontWeight.w400,
+                    color: AppTheme.hotPink,
+                    letterSpacing: 1.0,
+                    height: 1.05,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Speech-bubble tail
+          const Positioned(
+            left: 30,
+            bottom: -12,
+            child: _BubbleTail(),
+          ),
+          // Disco ball + sparkles — top right, hanging above the bubble
+          const Positioned(
+            right: 8,
+            top: -34,
+            child: _DiscoBallPlaceholder(),
+          ),
+          // Vinyl mascot — bottom right, overlapping the bubble corner
+          const Positioned(
+            right: -8,
+            bottom: -26,
+            child: _AnimatedMascot(
+              assetPath: 'assets/images/vinyl_mascot_3.png',
+              size: 96,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BubbleTail extends StatelessWidget {
+  const _BubbleTail();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(22, 16),
+      painter: _BubbleTailPainter(),
+    );
+  }
+}
+
+class _BubbleTailPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fill = Paint()
+      ..color = AppTheme.background
+      ..style = PaintingStyle.fill;
+    final stroke = Paint()
+      ..color = AppTheme.cream
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width * 0.45, size.height)
+      ..lineTo(size.width, 0);
+
+    canvas.drawPath(path, fill);
+    canvas.drawLine(Offset(0, 0), Offset(size.width * 0.45, size.height),
+        stroke);
+    canvas.drawLine(Offset(size.width, 0), Offset(size.width * 0.45, size.height),
+        stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) => false;
+}
+
+// ── Disco ball placeholder ────────────────────────────────────────────────────
+//
+// Simple painted mirror-ball stand-in for the illustrated asset the user will
+// drop in later; decorated with a few scattered sparkle marks like the mock.
+
+class _DiscoBallPlaceholder extends StatelessWidget {
+  const _DiscoBallPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 96,
+      height: 96,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          const Positioned(top: 26, right: -2, child: _Sparkle(color: AppTheme.cream, size: 9)),
+          const Positioned(top: 4, right: 20, child: _Sparkle(color: AppTheme.hotPink, size: 7)),
+          const Positioned(bottom: 6, left: -6, child: _Sparkle(color: AppTheme.teal, size: 8)),
+          const Positioned(bottom: 22, right: -10, child: _Sparkle(color: AppTheme.neonLime, size: 7)),
+          Center(
+            child: CustomPaint(
+              size: const Size(56, 70),
+              painter: _DiscoBallPainter(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiscoBallPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ballRadius = size.width / 2;
+    final ballCenter = Offset(size.width / 2, size.height - ballRadius);
+
+    final chain = Paint()
+      ..color = AppTheme.cream.withValues(alpha: 0.7)
+      ..strokeWidth = 1.5;
+    canvas.drawLine(
+      Offset(size.width / 2, 0),
+      Offset(size.width / 2, size.height - ballRadius * 2 + 4),
+      chain,
+    );
+
+    final ballFill = Paint()
+      ..color = AppTheme.cream.withValues(alpha: 0.12)
+      ..style = PaintingStyle.fill;
+    final ballStroke = Paint()
+      ..color = AppTheme.cream
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+    canvas.drawCircle(ballCenter, ballRadius, ballFill);
+    canvas.drawCircle(ballCenter, ballRadius, ballStroke);
+
+    // Facet grid — a few latitude/longitude arcs to read as a mirror ball.
+    final facet = Paint()
+      ..color = AppTheme.cream.withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    for (final f in [0.35, 0.65, 1.0]) {
+      canvas.drawOval(
+        Rect.fromCenter(
+            center: ballCenter,
+            width: ballRadius * 2 * f,
+            height: ballRadius * 2),
+        facet,
+      );
+    }
+    for (final dy in [-0.45, 0.0, 0.45]) {
+      canvas.drawLine(
+        Offset(ballCenter.dx - ballRadius, ballCenter.dy + ballRadius * dy),
+        Offset(ballCenter.dx + ballRadius, ballCenter.dy + ballRadius * dy),
+        facet,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DiscoBallPainter oldDelegate) => false;
+}
+
+class _Sparkle extends StatelessWidget {
+  const _Sparkle({required this.color, required this.size});
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '✦',
+      style: TextStyle(
+        color: color,
+        fontSize: size,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+  }
+}
+
+// ── AI Plan My Night — highlighter stripe CTA ────────────────────────────────
+
+class _AiPlanStripe extends StatelessWidget {
+  const _AiPlanStripe({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Transform.rotate(
+        angle: -0.015,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppTheme.neonLime,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.neonLime.withValues(alpha: 0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // "WHERE ARE WE GOING" line — cream
-              Text(
-                'WHERE ARE WE GOING',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.anton(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.w400,
-                  color: AppTheme.cream,
-                  letterSpacing: 1.2,
-                  height: 1.1,
+              const Text(
+                '✦',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              // "TONIGHT?" line — hotPink accent
+              const SizedBox(width: 10),
               Text(
-                'TONIGHT?',
+                'AI PLAN MY NIGHT',
                 style: GoogleFonts.anton(
-                  fontSize: titleFontSize * 1.06,
+                  fontSize: AppResponsive.font(context, 16).clamp(14.0, 18.0),
                   fontWeight: FontWeight.w400,
-                  color: AppTheme.hotPink,
-                  letterSpacing: 1.2,
-                  height: 1.05,
-                ),
-              ),
-              SizedBox(height: AppResponsive.gap(context, 18)),
-              // AI plan button
-              GestureDetector(
-                onTap: onAiTap,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 13),
-                  decoration: BoxDecoration(
-                    color: AppTheme.neonLime,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.neonLime.withValues(alpha: 0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        '✦',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'AI PLAN MY NIGHT',
-                        style: GoogleFonts.anton(
-                          fontSize: AppResponsive.font(context, 15)
-                              .clamp(13.0, 17.0),
-                          fontWeight: FontWeight.w400,
-                          color: Colors.black,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
+                  color: Colors.black,
+                  letterSpacing: 1.5,
                 ),
               ),
             ],
           ),
         ),
-        // ── Vinyl mascot (right, animated) ───────────────────────────
-        const _AnimatedMascot(
-          assetPath: 'assets/images/vinyl_mascot_3.png',
-          size: 110,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -335,7 +545,7 @@ class _ExploreCat {
 }
 
 const _kExploreCats = <_ExploreCat>[
-  _ExploreCat('TECHNO',     'TECHNO', Icons.language,               Color(0xFF6D28D9)),
+  _ExploreCat('TECHNO',     'TECHNO', Icons.language,               AppTheme.teal),
   _ExploreCat('HOUSE',      'HOUSE',  Icons.sentiment_satisfied_alt, AppTheme.neonLime),
   _ExploreCat('LATIN',      'EDM',    Icons.park,                    AppTheme.teal),
   _ExploreCat('LIVE MUSIC', 'LIVE',   Icons.bolt,                    AppTheme.hotPink),
@@ -392,8 +602,8 @@ class _ExploreTileState extends State<_ExploreTile>
   @override
   Widget build(BuildContext context) {
     final cat = widget.cat;
-    final onDark = cat.bg != AppTheme.neonLime;
-    final fg = onDark ? Colors.white : Colors.black;
+    // All accent tiles (lime/teal/pink) are bright enough for black text.
+    const fg = Colors.black;
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -491,7 +701,7 @@ class _LiveNowStatCards extends ConsumerWidget {
                     ? '${clubsList.length}'
                     : '--',
             // TODO: connect to real club count API when available
-            accent: AppTheme.teal,
+            accent: AppTheme.neonLime,
           ),
         ),
         const SizedBox(width: 10),
@@ -502,7 +712,7 @@ class _LiveNowStatCards extends ConsumerWidget {
                 ? '$barCount'
                 : '--',
             // TODO: connect to real bar count API when available
-            accent: AppTheme.neonLime,
+            accent: AppTheme.teal,
           ),
         ),
         const SizedBox(width: 10),

@@ -1,130 +1,50 @@
 // lib/components/home_top_bar.dart
+//
+// Minimal header row for the Home tab: hamburger (opens the side drawer)
+// and a notification bell (opens NotificationsPage). The greeting text lives
+// in the hero speech bubble instead of here.
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
-import 'package:nightride/providers/home_providers.dart';
-import 'package:nightride/components/home_language_sheet.dart';
+import 'package:nightride/pages/notifications_page.dart';
 
-class HomeTopBar extends ConsumerWidget {
-  const HomeTopBar({super.key, required this.username});
-  final String username;
+class HomeTopBar extends StatelessWidget {
+  const HomeTopBar({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final HomeLanguage lang = ref.watch(homeLanguageProvider);
+  Widget build(BuildContext context) {
     final actionH = AppResponsive.headerActionHeight(context);
     final notifSize = AppResponsive.notificationButtonSize(context);
-    final langWidth = AppResponsive.languageButtonWidth(context);
-
-    final displayName = username.isEmpty ? 'YOU' : username.toUpperCase();
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: <Widget>[
-        // Greeting text block
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'HEY $displayName',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.anton(
-                  fontSize: AppResponsive.font(context, 22).clamp(18.0, 26.0),
-                  fontWeight: FontWeight.w400,
-                  color: AppTheme.cream,
-                  letterSpacing: 1.8,
-                ),
-              ),
-            ],
-          ),
+      children: [
+        _IconSquareButton(
+          icon: Icons.menu_rounded,
+          size: actionH,
+          onTap: () => Scaffold.of(context).openDrawer(),
         ),
-        const SizedBox(width: 10),
-        // Language button
-        _LanguageButton(
-          label: langLabel(lang),
-          height: actionH,
-          width: langWidth,
-          onTap: () => HomeLanguageSheet.show(context, ref),
-        ),
-        SizedBox(width: AppResponsive.gap(context, 8)),
-        // Notification bell
-        _NotificationButton(
+        const Spacer(),
+        _IconSquareButton(
+          icon: Icons.notifications_outlined,
           size: notifSize,
-          onTap: () {},
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const NotificationsPage()),
+          ),
         ),
       ],
     );
   }
 }
 
-class _LanguageButton extends StatelessWidget {
-  const _LanguageButton({
-    required this.label,
-    required this.height,
-    required this.width,
+class _IconSquareButton extends StatelessWidget {
+  const _IconSquareButton({
+    required this.icon,
+    required this.size,
     required this.onTap,
   });
 
-  final String label;
-  final double height;
-  final double width;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppResponsive.radius(context, 10)),
-      child: Container(
-        height: height,
-        width: width,
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.gap(context, 10),
-        ),
-        decoration: BoxDecoration(
-          color: AppTheme.darkGray,
-          borderRadius:
-              BorderRadius.circular(AppResponsive.radius(context, 10)),
-          border: Border.all(color: AppTheme.borderGray, width: 1),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: AppResponsive.headerActionFontSize(context),
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.cream,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
-            SizedBox(width: AppResponsive.gap(context, 2)),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppTheme.cream.withValues(alpha: 0.75),
-              size: AppResponsive.headerActionIconSize(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NotificationButton extends StatelessWidget {
-  const _NotificationButton({required this.size, required this.onTap});
+  final IconData icon;
   final double size;
   final VoidCallback onTap;
 
@@ -144,7 +64,7 @@ class _NotificationButton extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Icon(
-          Icons.notifications_outlined,
+          icon,
           color: AppTheme.cream.withValues(alpha: 0.9),
           size: AppResponsive.headerActionIconSize(context),
         ),

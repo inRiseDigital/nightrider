@@ -372,39 +372,43 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
                   SizedBox(height: AppResponsive.gap(context, 20).clamp(12.0, 28.0)),
 
-                  // Floating mascot
+                  // Floating logo
                   AnimatedBuilder(
                     animation: _floatAnim,
                     builder: (_, child) => Transform.translate(
                       offset: Offset(0, _floatAnim.value),
                       child: child,
                     ),
-                    child: ColorFiltered(
-                      colorFilter: const ColorFilter.matrix([
-                        -1,  0,  0, 0, 255,
-                         0, -1,  0, 0, 255,
-                         0,  0, -1, 0, 255,
-                         0,  0,  0, 1,   0,
-                      ]),
-                      child: Image.asset(
-                        'assets/images/vinyl_mascot.png',
-                        width: mascotSize,
-                        height: mascotSize,
-                        fit: BoxFit.contain,
-                      ),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: mascotSize,
+                      height: mascotSize,
+                      fit: BoxFit.contain,
                     ),
                   ),
 
                   SizedBox(height: AppResponsive.gap(context, 16).clamp(10.0, 24.0)),
 
                   // Tagline
-                  Text(
-                    'FIND. PLAN. RIDE. REPEAT.',
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: 'FIND YOUR VIBE.\n'),
+                        const TextSpan(text: 'LIVE THE NIGHT.\n'),
+                        const TextSpan(text: 'MAKE IT '),
+                        TextSpan(
+                          text: 'RIDE.',
+                          style: TextStyle(color: accent),
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
                       fontSize: taglineFontSize,
                       fontWeight: FontWeight.w700,
-                      color: accent,
-                      letterSpacing: 2.8,
+                      color: cream,
+                      letterSpacing: 2.0,
+                      height: 1.6,
                     ),
                   ),
 

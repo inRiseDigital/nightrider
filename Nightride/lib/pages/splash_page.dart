@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/pages/app_shell_page.dart';
 import 'package:nightride/pages/auth/sign_in_page.dart';
+import 'package:nightride/pages/auth/sign_up_page.dart';
 import 'package:nightride/pages/onboard_questionnaire_page.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/services/auth_service.dart';
@@ -194,12 +195,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     super.dispose();
   }
 
-  // Slide-right page transition → SignIn
-  void _goToSignIn() {
+  // Slide-right page transition → destination
+  void _goTo(Widget page) {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const SignInPage(),
+        pageBuilder: (_, __, ___) => page,
         transitionDuration: const Duration(milliseconds: 380),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
           position: Tween<Offset>(
@@ -211,6 +212,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       ),
     );
   }
+
+  void _goToSignUp() => _goTo(const SignUpPage());
+  void _goToSignIn() => _goTo(const SignInPage());
 
   // Fast path for returning users — no delay, no decorative splash
   Future<void> _navigateReturningUser(User user) async {
@@ -237,6 +241,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
   }
 
+  // Auto-advances only if a user turns out to already be authenticated
+  // (missed by the synchronous check in initState). Logged-out users stay
+  // on this screen indefinitely — it's a welcome screen, not a timed
+  // splash, so GET STARTED / LOG IN are the only way forward for them.
   Future<void> _navigateAfterDelay() async {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
@@ -246,28 +254,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       onTimeout: () => FirebaseAuth.instance.currentUser,
     );
 
-    if (!mounted) return;
+    if (!mounted || user == null) return;
 
     Widget destination;
-    if (user != null) {
-      try {
-        final svc = ref.read(userProfileServiceProvider);
-        await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
-        await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
-        final role = await svc.getUserRole(user.uid).timeout(const Duration(seconds: 5));
-        if (!mounted) return;
-        if (role == 'organizer') {
-          destination = const OrganizerShellPage();
-        } else {
-          final onboardingDone =
-              await svc.hasCompletedOnboarding(user.uid).timeout(const Duration(seconds: 5));
-          destination = onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage();
-        }
-      } catch (_) {
-        destination = AppShellPage();
+    try {
+      final svc = ref.read(userProfileServiceProvider);
+      await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
+      await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
+      final role = await svc.getUserRole(user.uid).timeout(const Duration(seconds: 5));
+      if (!mounted) return;
+      if (role == 'organizer') {
+        destination = const OrganizerShellPage();
+      } else {
+        final onboardingDone =
+            await svc.hasCompletedOnboarding(user.uid).timeout(const Duration(seconds: 5));
+        destination = onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage();
       }
-    } else {
-      destination = const SignInPage();
+    } catch (_) {
+      destination = AppShellPage();
     }
 
     if (!mounted) return;
@@ -420,7 +424,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       horizontal: AppResponsive.gap(context, 40).clamp(28.0, 64.0),
                     ),
                     child: GestureDetector(
-                      onTap: _goToSignIn,
+                      onTap: _goToSignUp,
                       child: SizedBox(
                         height: 56,
                         child: CustomPaint(

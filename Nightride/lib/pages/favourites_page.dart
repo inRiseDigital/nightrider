@@ -521,7 +521,7 @@ class _EmptyState extends ConsumerWidget {
                 ),
                 const Gap(32),
                 GestureDetector(
-                  onTap: () => ref.read(appNavProvider.notifier).setIndex(1),
+                  onTap: () => ref.read(appNavProvider.notifier).setIndex(0),
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 36, vertical: 15),

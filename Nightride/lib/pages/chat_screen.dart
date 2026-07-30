@@ -27,6 +27,7 @@ const _kSurface  = Color(0xFF151515);
 const _kBorderGray = Color(0xFF333333);
 const _kMuted    = Color(0xFF9EAFA0);
 const _kWhite    = Color(0xFFfafafa);
+const _kTeal     = Color(0xFF2FE6C2);
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -659,7 +660,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         tooltip: 'Chat history',
       ),
       title: Text(
-        'NIGHT RITE AI ✦',
+        'PARTY RITE AI',
         style: GoogleFonts.anton(
           fontWeight: FontWeight.w400,
           fontSize: 22,
@@ -892,86 +893,103 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
 
   // ── Empty state ────────────────────────────────────────────────────────────
 
+  // Every vertical gap/size below is `<literal> * scale`. _kNaturalContentHeight
+  // is the sum of those same literals at scale == 1 (top gap + mascot box +
+  // gaps + speech bubble + button + suggestion buttons + bottom gap +
+  // top/bottom scroll padding) — i.e. the height this block renders at when
+  // scale is 1. Deriving scale as availableHeight / that sum (not an
+  // arbitrary constant) means the block's rendered height tracks
+  // availableHeight directly, so it fills the screen instead of leaving
+  // leftover space on tall devices or clipping on short ones.
+  static const double _kNaturalContentHeight =
+      16 + 110 + 10 + 59 + 12 + 39 + 10 + 156 + 12 + 24;
+
   Widget _buildEmptyState() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 16),
-          // Mascot (animated float)
-          const _FloatingMascot(assetPath: 'assets/images/vinyl_mascot_1.png', size: 140),
-          const SizedBox(height: 24),
-          // Speech bubble
-          _buildSpeechBubble(
-            child: Text(
-              'YO $_currentUserName! I GOT THE PLAN.\nYOU JUST BRING THE ENERGY.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.anton(
-                fontSize: 18,
-                color: _kBlack,
-                letterSpacing: 0.8,
-                height: 1.4,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : MediaQuery.of(context).size.height * 0.7;
+        final scale =
+            (availableHeight / _kNaturalContentHeight).clamp(0.75, 1.9);
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12 * scale),
+          child: Column(
+            children: [
+              SizedBox(height: 16 * scale),
+              // Mascot (animated float) with doodle accents
+              _buildMascotWithDoodles(scale),
+              SizedBox(height: 10 * scale),
+              // Speech bubble
+              _buildSpeechBubble(
+                scale: scale,
+                child: Text(
+                  'YO $_currentUserName! I GOT THE PLAN.\nYOU JUST BRING THE ENERGY.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.anton(
+                    fontSize: 14 * scale,
+                    color: _kBlack,
+                    letterSpacing: 0.6,
+                    height: 1.25,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 28),
-          // START PLANNING CTA
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                _controller.text = "What's happening tonight?";
-                _handleSend(text: "What's happening tonight?");
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kNeonLime,
-                foregroundColor: _kBlack,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-                elevation: 0,
+              SizedBox(height: 12 * scale),
+              // START PLANNING CTA
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    _controller.text = "What's happening tonight?";
+                    _handleSend(text: "What's happening tonight?");
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kNeonLime,
+                    foregroundColor: _kBlack,
+                    padding: EdgeInsets.symmetric(vertical: 11 * scale),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'START PLANNING',
+                    style: GoogleFonts.anton(
+                        fontSize: 15 * scale, color: _kBlack, letterSpacing: 1.2),
+                  ),
+                ),
               ),
-              child: Text(
-                'START PLANNING',
-                style: GoogleFonts.anton(
-                    fontSize: 18, color: _kBlack, letterSpacing: 1.5),
-              ),
-            ),
+              SizedBox(height: 10 * scale),
+              // Quick suggestion buttons (full-width, icon + accent color per item)
+              _buildSuggestionButtonsColumn(scale),
+              SizedBox(height: 12 * scale),
+            ],
           ),
-          const SizedBox(height: 20),
-          // Quick suggestion chips
-          Wrap(
-            spacing: 8,
-            runSpacing: 10,
-            alignment: WrapAlignment.center,
-            children: _suggestions.map((s) => _buildSuggestionChip(s)).toList(),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildSpeechBubble({required Widget child}) {
+  Widget _buildSpeechBubble({required Widget child, double scale = 1.0}) {
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          padding: EdgeInsets.symmetric(
+              horizontal: 16 * scale, vertical: 12 * scale),
           decoration: BoxDecoration(
             color: _kCream,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: child,
         ),
         // Tail pointing upward (toward mascot)
         Positioned(
-          top: -12,
+          top: -10 * scale,
           child: CustomPaint(
-            size: const Size(24, 14),
+            size: Size(20 * scale, 12 * scale),
             painter: _BubbleTailPainter(),
           ),
         ),
@@ -994,6 +1012,112 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
           style: GoogleFonts.poppins(
               color: _kWhite, fontSize: 13, fontWeight: FontWeight.w500),
         ),
+      ),
+    );
+  }
+
+  // Full-width vertical suggestion buttons shown on the empty state, each
+  // with its own icon + accent color (sparkle/cream, globe/teal,
+  // lightning/pink, calendar/lime), cycling if there are more than 4.
+  static const List<(Color, IconData)> _kSuggestionStyles = [
+    (_kCream, Icons.auto_awesome_rounded),
+    (_kTeal, Icons.public_rounded),
+    (_kHotPink, Icons.bolt_rounded),
+    (_kNeonLime, Icons.calendar_today_rounded),
+  ];
+
+  Widget _buildSuggestionButtonsColumn(double scale) {
+    return Column(
+      children: List.generate(_suggestions.length, (i) {
+        final (color, icon) = _kSuggestionStyles[i % _kSuggestionStyles.length];
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: i == _suggestions.length - 1 ? 0 : 8 * scale),
+          child: _buildSuggestionButtonFull(_suggestions[i], color, icon, scale),
+        );
+      }),
+    );
+  }
+
+  Widget _buildSuggestionButtonFull(
+      String text, Color color, IconData icon, double scale) {
+    return GestureDetector(
+      onTap: () => _handleSend(text: text),
+      child: Container(
+        width: double.infinity,
+        padding:
+            EdgeInsets.symmetric(horizontal: 16 * scale, vertical: 9 * scale),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: color.withValues(alpha: 0.65), width: 1.2),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 15 * scale),
+            SizedBox(width: 10 * scale),
+            Expanded(
+              child: Text(
+                text,
+                style: GoogleFonts.poppins(
+                    color: color,
+                    fontSize: 13 * scale,
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Mascot with scattered doodle accents (sparkles/stars/lightning) echoing
+  // the hand-drawn energy of the brand illustration.
+  Widget _buildMascotWithDoodles(double scale) {
+    return SizedBox(
+      width: 150 * scale,
+      height: 110 * scale,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: 2 * scale,
+            left: 0,
+            child: Transform.rotate(
+              angle: -0.35,
+              child: Icon(Icons.bolt_rounded,
+                  color: _kHotPink.withValues(alpha: 0.85), size: 18 * scale),
+            ),
+          ),
+          Positioned(
+            top: 0,
+            right: 6 * scale,
+            child: Icon(Icons.auto_awesome_rounded,
+                color: _kNeonLime, size: 13 * scale),
+          ),
+          Positioned(
+            top: 36 * scale,
+            right: -6 * scale,
+            child: Icon(Icons.star_rounded, color: _kTeal, size: 12 * scale),
+          ),
+          Positioned(
+            bottom: 28 * scale,
+            left: -8 * scale,
+            child: Icon(Icons.star_rounded,
+                color: _kHotPink.withValues(alpha: 0.85), size: 14 * scale),
+          ),
+          Positioned(
+            bottom: 2 * scale,
+            right: 0,
+            child: Transform.rotate(
+              angle: 0.3,
+              child: Icon(Icons.bolt_rounded,
+                  color: _kHotPink.withValues(alpha: 0.7), size: 15 * scale),
+            ),
+          ),
+          _FloatingMascot(
+              assetPath: 'assets/images/vinyl_mascot_1.png', size: 92 * scale),
+        ],
       ),
     );
   }
@@ -1167,7 +1291,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                     container.read(mapFocusProvider.notifier).state =
                         MapFocus(lat, lng, label: name, placeId: placeId);
                   }
-                  container.read(appNavProvider.notifier).setIndex(1);
+                  container.read(appNavProvider.notifier).setIndex(0);
                   return;
                 }
 
@@ -1187,7 +1311,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                     container.read(mapFocusProvider.notifier).state =
                         MapFocus(lat, lng, label: text);
                   }
-                  container.read(appNavProvider.notifier).setIndex(1);
+                  container.read(appNavProvider.notifier).setIndex(0);
                   return;
                 }
 

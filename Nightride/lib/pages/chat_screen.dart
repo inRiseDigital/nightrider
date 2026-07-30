@@ -1167,7 +1167,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                     container.read(mapFocusProvider.notifier).state =
                         MapFocus(lat, lng, label: name, placeId: placeId);
                   }
-                  container.read(appNavProvider.notifier).setIndex(0);
+                  container.read(appNavProvider.notifier).setIndex(1);
                   return;
                 }
 
@@ -1187,7 +1187,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                     container.read(mapFocusProvider.notifier).state =
                         MapFocus(lat, lng, label: text);
                   }
-                  container.read(appNavProvider.notifier).setIndex(0);
+                  container.read(appNavProvider.notifier).setIndex(1);
                   return;
                 }
 

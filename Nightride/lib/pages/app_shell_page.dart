@@ -21,8 +21,8 @@ class AppShellPage extends ConsumerWidget {
       body: IndexedStack(
         index: index,
         children: const <Widget>[
-          MapPage(),
           HomePage(),
+          MapPage(),
           ChatScreen(),
           FavouritesPage(),
           ProfilePage(),

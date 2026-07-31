@@ -26,6 +26,7 @@ import 'package:nightride/data/services/overpass_service.dart';
 import 'package:nightride/domain/live_hub_models.dart';
 import 'package:nightride/pages/clubs_page.dart';
 import 'package:nightride/pages/events_grid_page.dart';
+import 'package:nightride/pages/explore_page.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
 import 'package:nightride/providers/home_providers.dart';
 import 'package:nightride/providers/live_hub_providers.dart';
@@ -130,7 +131,7 @@ class HomePage extends ConsumerWidget {
                       accentColor: AppTheme.cream,
                       onViewAll: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                            builder: (_) => const EventsGridPage()),
+                            builder: (_) => const ExplorePage()),
                       ),
                     ),
                   ),

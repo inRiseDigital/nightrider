@@ -577,29 +577,8 @@ class _ExploreTile extends StatefulWidget {
   State<_ExploreTile> createState() => _ExploreTileState();
 }
 
-class _ExploreTileState extends State<_ExploreTile>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
+class _ExploreTileState extends State<_ExploreTile> {
   bool _pressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: -4.0, end: 4.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -635,14 +614,7 @@ class _ExploreTileState extends State<_ExploreTile>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedBuilder(
-                animation: _anim,
-                builder: (_, child) => Transform.translate(
-                  offset: Offset(0, _anim.value),
-                  child: child,
-                ),
-                child: Icon(cat.icon, color: fg, size: 28),
-              ),
+              Icon(cat.icon, color: fg, size: 28),
               const SizedBox(height: 8),
               Text(
                 cat.label,

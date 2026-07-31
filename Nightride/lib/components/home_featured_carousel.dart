@@ -21,10 +21,12 @@ class HomeFeaturedCarousel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final int current = ref.watch(featuredCarouselIndexProvider);
-    final featuredAsync = ref.watch(featuredEventsProvider);
     final carouselHeight = AppDimensions.featuredCarouselHeight(context);
 
-    if (featuredAsync.isLoading) {
+    final featuredAsync = ref.watch(featuredEventsProvider);
+    final trendingAsync = ref.watch(trendingEventsProvider);
+
+    if (featuredAsync.isLoading && trendingAsync.isLoading) {
       return SizedBox(
         height: carouselHeight,
         child: Center(
@@ -36,18 +38,39 @@ class HomeFeaturedCarousel extends ConsumerWidget {
       );
     }
 
-    final baseEvents = featuredAsync.asData?.value ?? [];
-    final filtered = ref.watch(filteredFeaturedProvider);
     final cat = ref.watch(selectedCategoryProvider);
     final country = ref.watch(selectedCountryProvider);
+    final bool filterActive = cat != 'ALL' || country != 'ALL';
 
-    // No real data at all — show dummy fallback
-    if (baseEvents.isEmpty) {
-      return _buildSlider(context, ref, current, kFeaturedEvents);
-    }
+    // Featured events — real data, dummy fallback, or empty when filtered out.
+    final featuredBase = featuredAsync.asData?.value ?? [];
+    final featuredFiltered = ref.watch(filteredFeaturedProvider);
+    final List<FeaturedEvent> featuredEvents = featuredBase.isEmpty
+        ? kFeaturedEvents
+        : (featuredFiltered.isEmpty && filterActive)
+            ? const []
+            : (featuredFiltered.isNotEmpty ? featuredFiltered : featuredBase);
 
-    // Filter active but nothing matches — show empty state
-    if (filtered.isEmpty && (cat != 'ALL' || country != 'ALL')) {
+    // Trending events — folded into the same carousel (no separate
+    // "TRENDING NEAR YOU" list), converted to the carousel's card shape.
+    final trendingBase = trendingAsync.asData?.value ?? [];
+    final trendingFiltered = ref.watch(filteredTrendingProvider);
+    final List<TrendingEvent> trendingSource = trendingBase.isEmpty
+        ? kTrendingEvents
+        : (trendingFiltered.isEmpty && filterActive)
+            ? const []
+            : (trendingFiltered.isNotEmpty ? trendingFiltered : trendingBase);
+
+    // Combine, de-duplicating by id (an event could show up in both feeds).
+    final seenIds = <String>{};
+    final events = <FeaturedEvent>[
+      for (final e in trendingSource.map(_trendingToFeatured))
+        if (e.id.isEmpty || seenIds.add(e.id)) e,
+      for (final e in featuredEvents)
+        if (e.id.isEmpty || seenIds.add(e.id)) e,
+    ];
+
+    if (events.isEmpty) {
       return SizedBox(
         height: carouselHeight,
         child: Center(
@@ -62,9 +85,19 @@ class HomeFeaturedCarousel extends ConsumerWidget {
       );
     }
 
-    final events = filtered.isNotEmpty ? filtered : baseEvents;
     return _buildSlider(context, ref, current, events);
   }
+
+  static FeaturedEvent _trendingToFeatured(TrendingEvent e) => FeaturedEvent(
+        id: e.id,
+        title: e.title,
+        subtitle: e.locationText,
+        badgeText: e.categoryTag,
+        dateText: e.dateText,
+        imageUrl: e.imageUrl,
+        genre: e.categoryTag,
+        countryCode: e.countryCode,
+      );
 
   Widget _buildSlider(
     BuildContext context,

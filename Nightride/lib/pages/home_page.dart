@@ -15,7 +15,6 @@ import 'package:nightride/pages/category_detail_page.dart';
 import 'package:nightride/components/home_location_row.dart';
 import 'package:nightride/components/home_section_title.dart';
 import 'package:nightride/components/home_top_bar.dart';
-import 'package:nightride/components/home_trending_list.dart';
 import 'package:nightride/components/home_ui_bits.dart';
 import 'package:nightride/components/layout/responsive_layout.dart';
 import 'package:nightride/components/nightrite_refresh.dart';
@@ -141,7 +140,9 @@ class HomePage extends ConsumerWidget {
                   ),
                   SizedBox(height: AppResponsive.gap(context, 28)),
 
-                  // ── TRENDING NEAR YOU horizontal scroll ─────────────────
+                  // ── TRENDING NEAR YOU — featured carousel ───────────────
+                  // The old one-at-a-time trending list was folded into this
+                  // carousel instead of showing as a separate section.
                   ResponsivePagePadding(
                     child: HomeSectionTitle(
                       title: 'TRENDING NEAR YOU',
@@ -150,9 +151,7 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                   SizedBox(height: AppResponsive.gap(context, 14)),
-                  // One trending card at a time, full width — margins are
-                  // applied per-page inside HomeTrendingList itself.
-                  const HomeTrendingList(),
+                  const HomeFeaturedCarousel(),
                   SizedBox(height: AppResponsive.gap(context, 28)),
 
                   // ── Location row (conditional) ──────────────────────────
@@ -162,9 +161,6 @@ class HomePage extends ConsumerWidget {
                     ),
                     SizedBox(height: AppResponsive.gap(context, 20)),
                   ],
-
-                  // ── Featured carousel — full-bleed ──────────────────────
-                  const HomeFeaturedCarousel(),
                 ],
               ),
             ),

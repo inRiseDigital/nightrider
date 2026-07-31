@@ -34,7 +34,7 @@ class HomeTrendingList extends ConsumerWidget {
     final country = ref.watch(selectedCountryProvider);
 
     // No Firestore data at all — show dummy fallback
-    if (allLive.isEmpty) return _buildRow(kTrendingEvents);
+    if (allLive.isEmpty) return _buildRow(context, kTrendingEvents);
 
     // Filter active but nothing in Firestore matches — fall back to dummy
     if (filtered.isEmpty && (cat != 'ALL' || country != 'ALL')) {
@@ -44,23 +44,25 @@ class HomeTrendingList extends ConsumerWidget {
               .where((e) => e.categoryTag == cat)
               .toList();
       return _buildRow(
-          fallback.isNotEmpty ? fallback : kTrendingEvents);
+          context, fallback.isNotEmpty ? fallback : kTrendingEvents);
     }
 
-    return _buildRow(filtered.isNotEmpty ? filtered : allLive);
+    return _buildRow(context, filtered.isNotEmpty ? filtered : allLive);
   }
 
-  Widget _buildRow(List<TrendingEvent> events) {
+  // One full-width card per page (with side margins) instead of a
+  // multi-card free-scroll — swiping snaps exactly one event at a time.
+  Widget _buildRow(BuildContext context, List<TrendingEvent> events) {
+    final margin = AppResponsive.gap(context, 20).clamp(16.0, 28.0);
     return SizedBox(
       height: 240,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
+      child: PageView.builder(
         clipBehavior: Clip.none,
-        padding: const EdgeInsets.only(right: 4, bottom: 4),
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemCount: events.length,
-        itemBuilder: (ctx, i) => _PolaroidCard(event: events[i]),
+        itemBuilder: (ctx, i) => Padding(
+          padding: EdgeInsets.only(left: margin, right: margin, bottom: 4),
+          child: _PolaroidCard(event: events[i]),
+        ),
       ),
     );
   }
@@ -104,7 +106,7 @@ class _PolaroidCard extends ConsumerWidget {
         MaterialPageRoute(builder: (_) => EventDetailPage(id: event.id)),
       ),
       child: Container(
-        width: 175,
+        width: double.infinity,
         decoration: BoxDecoration(
           color: AppTheme.darkGray,
           borderRadius: BorderRadius.circular(14),
@@ -328,15 +330,13 @@ class _TrendingSkeletonRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final margin = AppResponsive.gap(context, 20).clamp(16.0, 28.0);
     return SizedBox(
       height: 240,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemCount: 4,
-        itemBuilder: (_, __) => Container(
-          width: 175,
+      child: Padding(
+        padding: EdgeInsets.only(left: margin, right: margin, bottom: 4),
+        child: Container(
+          width: double.infinity,
           decoration: BoxDecoration(
             color: AppTheme.darkGray,
             borderRadius: BorderRadius.circular(14),

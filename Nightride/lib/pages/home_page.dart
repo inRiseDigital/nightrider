@@ -150,14 +150,9 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                   SizedBox(height: AppResponsive.gap(context, 14)),
-                  // Trending list scrolls edge-to-edge with left padding only
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: AppResponsive.gap(context, 20)
-                          .clamp(16.0, 28.0),
-                    ),
-                    child: const HomeTrendingList(),
-                  ),
+                  // One trending card at a time, full width — margins are
+                  // applied per-page inside HomeTrendingList itself.
+                  const HomeTrendingList(),
                   SizedBox(height: AppResponsive.gap(context, 28)),
 
                   // ── Location row (conditional) ──────────────────────────

@@ -30,11 +30,31 @@ const _kExploreCats = <_ExploreCat>[
   _ExploreCat('EDM',        'EDM',    Icons.bolt_rounded,            AppTheme.neonLime),
 ];
 
-class ExplorePage extends StatelessWidget {
+class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
 
   @override
+  State<ExplorePage> createState() => _ExplorePageState();
+}
+
+class _ExplorePageState extends State<ExplorePage> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final results = _query.isEmpty
+        ? _kExploreCats
+        : _kExploreCats
+            .where((c) => c.label.toLowerCase().contains(_query))
+            .toList();
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -54,16 +74,77 @@ class ExplorePage extends StatelessWidget {
           ),
         ),
       ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.3,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            child: _ExploreSearchBar(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+            ),
+          ),
+          Expanded(
+            child: results.isEmpty
+                ? Center(
+                    child: Text(
+                      'NO MATCHES',
+                      style: GoogleFonts.anton(
+                        color: AppTheme.cream.withValues(alpha: 0.4),
+                        fontSize: 16,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.3,
+                    ),
+                    itemCount: results.length,
+                    itemBuilder: (context, i) =>
+                        _ExploreGridTile(cat: results[i]),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Search bar ────────────────────────────────────────────────────────────────
+
+class _ExploreSearchBar extends StatelessWidget {
+  const _ExploreSearchBar({required this.controller, required this.onChanged});
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: AppTheme.darkGray,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.borderGray, width: 1),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: TextStyle(color: AppTheme.cream, fontSize: 14),
+        cursorColor: AppTheme.neonLime,
+        decoration: InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          hintText: 'Search categories',
+          hintStyle: TextStyle(color: AppTheme.cream.withValues(alpha: 0.4)),
+          prefixIcon: Icon(Icons.search_rounded,
+              color: AppTheme.cream.withValues(alpha: 0.5), size: 20),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
         ),
-        itemCount: _kExploreCats.length,
-        itemBuilder: (context, i) => _ExploreGridTile(cat: _kExploreCats[i]),
       ),
     );
   }

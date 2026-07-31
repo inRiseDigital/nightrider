@@ -49,11 +49,10 @@ class FavouritesPage extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _FilterPill(label: 'PLACES', index: 0, selected: tabIndex == 0),
-                  const Gap(10),
                   _FilterPill(label: 'EVENTS', index: 1, selected: tabIndex == 1),
-                  const Gap(10),
                   _FilterPill(label: 'PEOPLE', index: 2, selected: tabIndex == 2),
                 ],
               ),
@@ -195,14 +194,12 @@ class _FilterPill extends ConsumerWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+        padding: selected
+            ? const EdgeInsets.symmetric(horizontal: 20, vertical: 9)
+            : const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
         decoration: BoxDecoration(
           color: selected ? _kLime : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: selected ? _kLime : _kBorderLt,
-            width: 1.5,
-          ),
           boxShadow: selected
               ? [
                   BoxShadow(

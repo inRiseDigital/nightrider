@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:nightride/components/home_drawer.dart';
 import 'package:nightride/components/home_featured_carousel.dart';
@@ -24,6 +25,7 @@ import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/services/overpass_service.dart';
 import 'package:nightride/domain/live_hub_models.dart';
 import 'package:nightride/pages/clubs_page.dart';
+import 'package:nightride/pages/events_grid_page.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
 import 'package:nightride/providers/home_providers.dart';
 import 'package:nightride/providers/live_hub_providers.dart';
@@ -108,7 +110,7 @@ class HomePage extends ConsumerWidget {
                   ResponsivePagePadding(
                     child: HomeSectionTitle(
                       title: 'LIVE RIGHT NOW',
-                      accentColor: AppTheme.hotPink,
+                      accentColor: AppTheme.cream,
                       onViewAll: () => Navigator.of(context).push(
                         MaterialPageRoute(
                             builder: (_) => const ClubsPage()),
@@ -126,6 +128,10 @@ class HomePage extends ConsumerWidget {
                     child: HomeSectionTitle(
                       title: 'EXPLORE',
                       accentColor: AppTheme.cream,
+                      onViewAll: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const EventsGridPage()),
+                      ),
                     ),
                   ),
                   SizedBox(height: AppResponsive.gap(context, 14)),
@@ -702,6 +708,9 @@ class _LiveNowStatCards extends ConsumerWidget {
                     : '--',
             // TODO: connect to real club count API when available
             accent: AppTheme.neonLime,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ClubsPage()),
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -713,6 +722,9 @@ class _LiveNowStatCards extends ConsumerWidget {
                 : '--',
             // TODO: connect to real bar count API when available
             accent: AppTheme.teal,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const _BarsListPage()),
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -721,6 +733,9 @@ class _LiveNowStatCards extends ConsumerWidget {
             label: 'EVENTS',
             value: eventsCount != null ? '$eventsCount' : '--',
             accent: AppTheme.hotPink,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const EventsGridPage()),
+            ),
           ),
         ),
       ],
@@ -733,53 +748,154 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.accent,
+    required this.onTap,
   });
 
   final String label;
   final String value;
   final Color accent;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: accent,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: accent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: GoogleFonts.anton(
+                fontSize:
+                    AppResponsive.font(context, 28).clamp(22.0, 34.0),
+                fontWeight: FontWeight.w400,
+                color: Colors.black,
+                letterSpacing: 0.5,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize:
+                    AppResponsive.font(context, 10).clamp(9.0, 11.0),
+                fontWeight: FontWeight.w800,
+                color: Colors.black.withValues(alpha: 0.60),
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: GoogleFonts.anton(
-              fontSize:
-                  AppResponsive.font(context, 28).clamp(22.0, 34.0),
-              fontWeight: FontWeight.w400,
-              color: Colors.black,
-              letterSpacing: 0.5,
-              height: 1.0,
-            ),
+    );
+  }
+}
+
+// ── Bars list page ────────────────────────────────────────────────────────────
+//
+// "BARS" stat card destination — no dedicated bars page exists yet, so this
+// reuses the nearby-venue list/card/sheet already built for the map tab,
+// filtered down to bar-type venues.
+
+class _BarsListPage extends ConsumerWidget {
+  const _BarsListPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final venuesAsync = ref.watch(nearbyVenuesProvider);
+    final userPos = ref.watch(userLocationProvider).asData?.value;
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              size: 20, color: AppTheme.cream),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'BARS',
+          style: GoogleFonts.anton(
+            color: AppTheme.cream,
+            fontSize: AppResponsive.font(context, 20).clamp(16.0, 24.0),
+            letterSpacing: 2,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize:
-                  AppResponsive.font(context, 10).clamp(9.0, 11.0),
-              fontWeight: FontWeight.w800,
-              color: Colors.black.withValues(alpha: 0.60),
-              letterSpacing: 1.5,
-            ),
+        ),
+      ),
+      body: venuesAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppTheme.teal),
+        ),
+        error: (_, __) => Center(
+          child: Text(
+            'Could not load bars nearby',
+            style: TextStyle(color: AppTheme.cream.withValues(alpha: 0.5)),
           ),
-        ],
+        ),
+        data: (venues) {
+          final bars = venues
+              .where((v) =>
+                  v.type == 'bar' ||
+                  v.type == 'pub' ||
+                  v.type == 'cocktail_bar' ||
+                  v.type == 'wine_bar')
+              .toList();
+
+          if (bars.isEmpty) {
+            return Center(
+              child: Text(
+                'NO BARS NEARBY',
+                style: GoogleFonts.anton(
+                  color: AppTheme.cream.withValues(alpha: 0.4),
+                  fontSize: 16,
+                  letterSpacing: 1,
+                ),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: bars.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, i) {
+              final venue = bars[i];
+              final distanceKm = userPos != null
+                  ? haversineKm(
+                      userPos.latitude, userPos.longitude, venue.lat, venue.lng)
+                  : 0.0;
+              void openDirections() {
+                final url =
+                    'https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}';
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+              }
+
+              return _NearbyVenueListCard(
+                venue: venue,
+                distanceKm: distanceKm,
+                onTap: () => _NearbyVenueSheet.show(
+                    context, venue, distanceKm, openDirections),
+                onDirections: openDirections,
+              );
+            },
+          );
+        },
       ),
     );
   }

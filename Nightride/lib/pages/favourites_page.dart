@@ -51,9 +51,9 @@ class FavouritesPage extends ConsumerWidget {
               child: Row(
                 children: [
                   _FilterPill(label: 'PLACES', index: 0, selected: tabIndex == 0),
-                  const Gap(10),
+                  const Gap(14),
                   _FilterPill(label: 'EVENTS', index: 1, selected: tabIndex == 1),
-                  const Gap(10),
+                  const Gap(14),
                   _FilterPill(label: 'PEOPLE', index: 2, selected: tabIndex == 2),
                 ],
               ),
@@ -195,14 +195,12 @@ class _FilterPill extends ConsumerWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+        padding: selected
+            ? const EdgeInsets.symmetric(horizontal: 20, vertical: 9)
+            : const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
         decoration: BoxDecoration(
           color: selected ? _kLime : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: selected ? _kLime : _kBorderLt,
-            width: 1.5,
-          ),
           boxShadow: selected
               ? [
                   BoxShadow(
@@ -464,91 +462,72 @@ class _EmptyState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Mascot / logo with pink glow ring
-              Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _kPink.withValues(alpha: 0.18),
-                      blurRadius: 40,
-                      spreadRadius: 10,
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 48),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.anton(
+                      fontSize: 28,
+                      color: _kCream,
+                      letterSpacing: 2.0,
+                      height: 1.15,
                     ),
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  width: 140,
-                  height: 140,
-                  fit: BoxFit.contain,
-                  color: _kWhite.withValues(alpha: 0.30),
-                  colorBlendMode: BlendMode.modulate,
-                ),
-              ),
-              const Gap(28),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.anton(
-                  fontSize: 28,
-                  color: _kCream,
-                  letterSpacing: 2.0,
-                  height: 1.15,
-                ),
-              ),
-              if (showExplore) ...[
-                const Gap(10),
-                Text(
-                  'TAP THE HEART ON ANY EVENT OR PLACE TO SAVE IT HERE',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.anton(
-                    fontSize: 11,
-                    color: _kWhite.withValues(alpha: 0.38),
-                    letterSpacing: 1.2,
-                    height: 1.5,
                   ),
-                ),
-                const Gap(32),
-                GestureDetector(
-                  onTap: () => ref.read(appNavProvider.notifier).setIndex(0),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 36, vertical: 15),
-                    decoration: BoxDecoration(
-                      color: _kLime,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _kLime.withValues(alpha: 0.35),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      'EXPLORE EVENTS',
+                  if (showExplore) ...[
+                    const Gap(10),
+                    Text(
+                      'TAP THE HEART ON ANY EVENT OR PLACE TO SAVE IT HERE',
+                      textAlign: TextAlign.center,
                       style: GoogleFonts.anton(
-                        fontSize: 14,
-                        color: Colors.black,
-                        letterSpacing: 2.5,
-                        height: 1.1,
+                        fontSize: 11,
+                        color: _kWhite.withValues(alpha: 0.38),
+                        letterSpacing: 1.2,
+                        height: 1.5,
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ],
+                    const Gap(32),
+                    GestureDetector(
+                      onTap: () => ref.read(appNavProvider.notifier).setIndex(0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 36, vertical: 15),
+                        decoration: BoxDecoration(
+                          color: _kLime,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _kLime.withValues(alpha: 0.35),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          'EXPLORE EVENTS',
+                          style: GoogleFonts.anton(
+                            fontSize: 14,
+                            color: Colors.black,
+                            letterSpacing: 2.5,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

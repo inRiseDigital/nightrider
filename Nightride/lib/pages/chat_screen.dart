@@ -894,15 +894,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   // ── Empty state ────────────────────────────────────────────────────────────
 
   // Every vertical gap/size below is `<literal> * scale`. _kNaturalContentHeight
-  // is the sum of those same literals at scale == 1 (top gap + mascot box +
-  // gaps + speech bubble + button + suggestion buttons + bottom gap +
-  // top/bottom scroll padding) — i.e. the height this block renders at when
-  // scale is 1. Deriving scale as availableHeight / that sum (not an
-  // arbitrary constant) means the block's rendered height tracks
-  // availableHeight directly, so it fills the screen instead of leaving
-  // leftover space on tall devices or clipping on short ones.
+  // is the sum of those same literals at scale == 1, for everything EXCEPT the
+  // hero artwork (top gap + gaps + button + suggestion buttons + bottom gap +
+  // top/bottom scroll padding). The artwork is sized off the available box
+  // instead, so scale is derived from the height left over once it has taken
+  // its share — that keeps the rest of the block filling the screen rather than
+  // leaving dead space on tall devices or clipping on short ones.
   static const double _kNaturalContentHeight =
-      16 + 110 + 10 + 59 + 12 + 39 + 10 + 156 + 12 + 24;
+      16 + 12 + 39 + 10 + 156 + 12 + 24;
+
+  // The hero artwork is square, and the overlaid greeting is anchored to
+  // features inside it, so both are expressed as fractions of one side.
+  // Measured off assets/images/chat_hero_plan.png (2048x2048): the lime bubble
+  // stroke spans y 0.008..0.638, and the baked-in "I GOT THE PLAN. / YOU JUST /
+  // BRING THE ENERGY." headline occupies x 0.237..0.793, y 0.190..0.451 in
+  // three lines of ~0.060 cap height. The greeting drops into the bubble's
+  // headroom directly above that first line, left-aligned with it.
+  // IF THE ASSET IS RE-CROPPED OR RE-EXPORTED, RE-MEASURE THESE.
+  static const double _kHeroGreetingLeft = 0.237;
+  static const double _kHeroGreetingBottom = 0.837; // up from the lower edge
+  static const double _kHeroGreetingFont = 0.080; // matches the baked lines
 
   Widget _buildEmptyState() {
     return LayoutBuilder(
@@ -910,31 +921,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         final availableHeight = constraints.maxHeight.isFinite
             ? constraints.maxHeight
             : MediaQuery.of(context).size.height * 0.7;
-        final scale =
-            (availableHeight / _kNaturalContentHeight).clamp(0.75, 1.9);
+        // 24 of horizontal scroll padding either side.
+        final contentWidth = constraints.maxWidth - 48;
+        // Square, so cap it on height too or it would crowd out the CTA and
+        // the suggestion list on short screens.
+        final heroCap = availableHeight * 0.46;
+        final heroSide = contentWidth < heroCap ? contentWidth : heroCap;
+        final scale = ((availableHeight - heroSide) / _kNaturalContentHeight)
+            .clamp(0.75, 1.9);
 
         return SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12 * scale),
           child: Column(
             children: [
               SizedBox(height: 16 * scale),
-              // Mascot (animated float) with doodle accents
-              _buildMascotWithDoodles(scale),
-              SizedBox(height: 10 * scale),
-              // Speech bubble
-              _buildSpeechBubble(
-                scale: scale,
-                child: Text(
-                  'YO $_currentUserName! I GOT THE PLAN.\nYOU JUST BRING THE ENERGY.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.anton(
-                    fontSize: 14 * scale,
-                    color: _kBlack,
-                    letterSpacing: 0.6,
-                    height: 1.25,
-                  ),
-                ),
-              ),
+              // Hero artwork — bubble, headline, mascot and doodles are all
+              // baked into the asset; only the greeting is drawn on top.
+              _buildChatHero(heroSide),
               SizedBox(height: 12 * scale),
               // START PLANNING CTA
               SizedBox(
@@ -970,30 +973,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildSpeechBubble({required Widget child, double scale = 1.0}) {
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.topCenter,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(
-              horizontal: 16 * scale, vertical: 12 * scale),
-          decoration: BoxDecoration(
-            color: _kCream,
-            borderRadius: BorderRadius.circular(16),
+  // Hero artwork with the dynamic greeting laid into the speech bubble. The box
+  // is kept square to match the asset — letterboxing it under BoxFit.contain
+  // would slide the artwork away from the fractional anchors below.
+  Widget _buildChatHero(double side) {
+    return SizedBox(
+      width: side,
+      height: side,
+      child: Stack(
+        children: [
+          // Transparent backdrop, so it composites onto the page black with no
+          // visible edge. A flattened export would show a seam.
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/chat_hero_plan.png',
+              fit: BoxFit.contain,
+              semanticLabel:
+                  'I got the plan. You just bring the energy.',
+            ),
           ),
-          child: child,
-        ),
-        // Tail pointing upward (toward mascot)
-        Positioned(
-          top: -10 * scale,
-          child: CustomPaint(
-            size: Size(20 * scale, 12 * scale),
-            painter: _BubbleTailPainter(),
+          Positioned(
+            left: side * _kHeroGreetingLeft,
+            bottom: side * _kHeroGreetingBottom,
+            child: SizedBox(
+              // Stay inside the bubble: the baked headline runs to x 0.793.
+              width: side * (0.793 - _kHeroGreetingLeft),
+              child: Text(
+                'YO $_currentUserName!',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.anton(
+                  fontSize: side * _kHeroGreetingFont,
+                  color: _kHotPink,
+                  letterSpacing: side * 0.002,
+                  height: 1.0,
+                ),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1066,58 +1085,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // Mascot with scattered doodle accents (sparkles/stars/lightning) echoing
-  // the hand-drawn energy of the brand illustration.
-  Widget _buildMascotWithDoodles(double scale) {
-    return SizedBox(
-      width: 150 * scale,
-      height: 110 * scale,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: 2 * scale,
-            left: 0,
-            child: Transform.rotate(
-              angle: -0.35,
-              child: Icon(Icons.bolt_rounded,
-                  color: _kHotPink.withValues(alpha: 0.85), size: 18 * scale),
-            ),
-          ),
-          Positioned(
-            top: 0,
-            right: 6 * scale,
-            child: Icon(Icons.auto_awesome_rounded,
-                color: _kNeonLime, size: 13 * scale),
-          ),
-          Positioned(
-            top: 36 * scale,
-            right: -6 * scale,
-            child: Icon(Icons.star_rounded, color: _kTeal, size: 12 * scale),
-          ),
-          Positioned(
-            bottom: 28 * scale,
-            left: -8 * scale,
-            child: Icon(Icons.star_rounded,
-                color: _kHotPink.withValues(alpha: 0.85), size: 14 * scale),
-          ),
-          Positioned(
-            bottom: 2 * scale,
-            right: 0,
-            child: Transform.rotate(
-              angle: 0.3,
-              child: Icon(Icons.bolt_rounded,
-                  color: _kHotPink.withValues(alpha: 0.7), size: 15 * scale),
-            ),
-          ),
-          _FloatingMascot(
-              assetPath: 'assets/images/vinyl_mascot_1.png', size: 92 * scale),
-        ],
       ),
     );
   }
@@ -1571,22 +1538,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
 
 // ── Speech bubble tail painter ────────────────────────────────────────────────
 
-class _BubbleTailPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = _kCream;
-    final path = Path()
-      ..moveTo(size.width / 2, 0)
-      ..lineTo(0, size.height)
-      ..lineTo(size.width, size.height)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 // ── Bouncing tap animation ────────────────────────────────────────────────────
 
 class BouncingButton extends StatefulWidget {
@@ -1696,67 +1647,6 @@ class _ImageGalleryPageState extends State<ImageGalleryPage> {
         backgroundDecoration: const BoxDecoration(color: Colors.black),
         pageController: _pageController,
         onPageChanged: (index) => setState(() => _currentIndex = index),
-      ),
-    );
-  }
-}
-
-// ── Floating mascot with bob animation ───────────────────────────────────────
-class _FloatingMascot extends StatefulWidget {
-  const _FloatingMascot({required this.assetPath, required this.size});
-  final String assetPath;
-  final double size;
-
-  @override
-  State<_FloatingMascot> createState() => _FloatingMascotState();
-}
-
-class _FloatingMascotState extends State<_FloatingMascot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: -8.0, end: 8.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, child) => Transform.translate(
-        offset: Offset(0, _anim.value),
-        child: child,
-      ),
-      child: ColorFiltered(
-        colorFilter: const ColorFilter.matrix([
-          -1,  0,  0, 0, 255,
-           0, -1,  0, 0, 255,
-           0,  0, -1, 0, 255,
-           0,  0,  0, 1,   0,
-        ]),
-        child: Image.asset(
-          widget.assetPath,
-          width: widget.size,
-          height: widget.size,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) =>
-              const Icon(Icons.nightlife, size: 100, color: _kNeonLime),
-        ),
       ),
     );
   }

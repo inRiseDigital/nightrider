@@ -91,20 +91,18 @@ class HomePage extends ConsumerWidget {
                   SizedBox(
                       height: AppResponsive.gap(context, 18)),
 
-                  // ── Hero speech bubble + disco ball + mascot ────────────
+                  // ── Hero: artwork + greeting + AI Plan My Night stripe ──
+                  // The stripe is part of the hero rather than a sibling below
+                  // it, so it can sit in the artwork's empty lower-left pocket
+                  // with the vinyl mascot standing to its right.
                   ResponsivePagePadding(
-                    child: _HeroBubble(displayName: username),
-                  ),
-                  SizedBox(height: AppResponsive.gap(context, 22)),
-
-                  // ── AI Plan My Night highlighter stripe ─────────────────
-                  ResponsivePagePadding(
-                    child: _AiPlanStripe(
-                      onTap: () =>
+                    child: _HeroBubble(
+                      displayName: username,
+                      onAiPlanTap: () =>
                           ref.read(appNavProvider.notifier).setIndex(2),
                     ),
                   ),
-                  SizedBox(height: AppResponsive.gap(context, 28)),
+                  SizedBox(height: AppResponsive.gap(context, 18)),
 
                   // ── LIVE RIGHT NOW stat cards ───────────────────────────
                   ResponsivePagePadding(
@@ -171,248 +169,129 @@ class HomePage extends ConsumerWidget {
   }
 }
 
-// ── Hero speech bubble ────────────────────────────────────────────────────────
+// ── Hero ──────────────────────────────────────────────────────────────────────
 //
-// Bordered "comic bubble" holding the greeting + headline, with a disco-ball
-// placeholder (art asset to be swapped in later) floating top-right and the
-// vinyl mascot perched on its bottom-right corner.
+// The illustrated hero artwork — a single asset that bakes in the speech bubble,
+// "WHERE ARE WE GOING TONIGHT?" headline, hanging disco ball and vinyl mascot
+// that used to be drawn widget-by-widget — with the personalised greeting laid
+// over it, riding the bubble's top border line.
 
 class _HeroBubble extends StatelessWidget {
-  const _HeroBubble({required this.displayName});
+  const _HeroBubble({required this.displayName, required this.onAiPlanTap});
   final String displayName;
+  final VoidCallback onAiPlanTap;
+
+  // The overlays are anchored to features of the artwork, so they're expressed
+  // as fractions of the asset and every one of them is tied to its real aspect
+  // ratio. IF THE ASSET IS RE-CROPPED, THESE MUST BE RE-MEASURED — a crop moves
+  // the artwork inside its own canvas, so the fractions below go stale even
+  // though the picture looks the same.
+  //
+  // Current asset: 2048x1640.
+  static const _assetAspect = 2048 / 1640;
+
+  // Greeting. The bubble's hand-drawn top border runs from (400, 166) to
+  // (1200, 74), rising left-to-right at 6.56°; the greeting matches that slope
+  // and is anchored just above the line.
+  static const _borderAngle = -0.1145; // radians ≈ -6.56°
+  static const _greetingLeft = 0.145; // of width; clear of the rounded corner
+  static const _greetingBottom = 0.889; // of height; rests on the border line
+
+  // Stripe. The artwork leaves a pocket in its lower-left: the bubble's tail
+  // bottoms out at y 0.710 and nothing else occupies x < 0.62 below it, while
+  // the mascot's body starts at x 0.687 and its feet land at y 0.924. The
+  // stripe drops into that pocket, so the mascot stands to its right.
+  static const _stripeBandTop = 0.716; // of height; just clear of the tail
+  static const _stripeBandBottom = 0.05; // of height; up from the lower edge
+  static const _stripeRightInset = 0.38; // of width; ~0.07 clear of the mascot
 
   @override
   Widget build(BuildContext context) {
-    final greeting = displayName.isEmpty ? 'THERE' : displayName.toUpperCase();
-    final titleFontSize = AppResponsive.font(context, 30).clamp(24.0, 38.0);
+    // First name only — a full "HEY YOMITH RATHNYAKA!" overruns the border line.
+    final firstName = displayName.trim().split(RegExp(r'\s+')).first;
+    final greeting = firstName.isEmpty ? 'THERE' : firstName.toUpperCase();
 
     return Padding(
-      // Reserve room below the bubble for the tail + mascot overlap.
-      padding: const EdgeInsets.only(bottom: 26, top: 6),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 18, 100, 24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppTheme.cream, width: 2.5),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.only(top: 6),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Size the box to the asset's own ratio. Forcing a square here would
+          // letterbox a non-square asset under BoxFit.contain — the artwork
+          // would shrink inside an unchanged footprint and drift away from the
+          // anchors below, which is exactly what a crop must not cause.
+          final w = constraints.maxWidth;
+          final h = w / _assetAspect;
+          return SizedBox(
+            width: w,
+            height: h,
+            child: Stack(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'HEY $greeting!',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.anton(
-                        fontSize: AppResponsive.font(context, 16)
-                            .clamp(14.0, 18.0),
-                        fontWeight: FontWeight.w400,
-                        color: AppTheme.neonLime,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Transform.rotate(
-                      angle: 0.35,
-                      child: Icon(Icons.bolt_rounded,
-                          color: AppTheme.hotPink, size: 16),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppResponsive.gap(context, 10)),
-                Text(
-                  'WHERE ARE WE GOING',
-                  style: GoogleFonts.anton(
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.w400,
-                    color: AppTheme.cream,
-                    letterSpacing: 1.0,
-                    height: 1.1,
+                // The asset has a transparent backdrop, so it composites straight
+                // onto the page black with no visible rectangle edge — keep it
+                // that way. A flattened export on pure black would show a seam
+                // against the #070707 background.
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/hero_tonight.png',
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Where are we going tonight?',
                   ),
                 ),
-                Text(
-                  'TONIGHT?',
-                  style: GoogleFonts.anton(
-                    fontSize: titleFontSize * 1.05,
-                    fontWeight: FontWeight.w400,
-                    color: AppTheme.hotPink,
-                    letterSpacing: 1.0,
-                    height: 1.05,
+                Positioned(
+                  left: w * _greetingLeft,
+                  bottom: h * _greetingBottom,
+                  child: Transform.rotate(
+                    angle: _borderAngle,
+                    // Pivot on the anchored corner so the text pivots along the
+                    // border line instead of drifting off it.
+                    alignment: Alignment.bottomLeft,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: w * 0.62),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'HEY $greeting!',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.anton(
+                                fontSize: AppResponsive.font(context, 21)
+                                    .clamp(18.0, 24.0),
+                                fontWeight: FontWeight.w400,
+                                color: AppTheme.neonLime,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Transform.rotate(
+                            angle: 0.35,
+                            child: Icon(Icons.bolt_rounded,
+                                color: AppTheme.hotPink, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Banding the stripe rather than pinning it to a fixed offset
+                // lets it centre itself in the pocket whatever height its own
+                // padding and text scale work out to.
+                Positioned(
+                  left: 0,
+                  right: w * _stripeRightInset,
+                  top: h * _stripeBandTop,
+                  bottom: h * _stripeBandBottom,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: _AiPlanStripe(onTap: onAiPlanTap),
                   ),
                 ),
               ],
             ),
-          ),
-          // Speech-bubble tail
-          const Positioned(
-            left: 30,
-            bottom: -12,
-            child: _BubbleTail(),
-          ),
-          // Disco ball + sparkles — top right, hanging above the bubble
-          const Positioned(
-            right: 8,
-            top: -34,
-            child: _DiscoBallPlaceholder(),
-          ),
-          // Vinyl mascot — bottom right, overlapping the bubble corner
-          const Positioned(
-            right: -8,
-            bottom: -26,
-            child: _AnimatedMascot(
-              assetPath: 'assets/images/vinyl_mascot_3.png',
-              size: 96,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BubbleTail extends StatelessWidget {
-  const _BubbleTail();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(22, 16),
-      painter: _BubbleTailPainter(),
-    );
-  }
-}
-
-class _BubbleTailPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fill = Paint()
-      ..color = AppTheme.background
-      ..style = PaintingStyle.fill;
-    final stroke = Paint()
-      ..color = AppTheme.cream
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width * 0.45, size.height)
-      ..lineTo(size.width, 0);
-
-    canvas.drawPath(path, fill);
-    canvas.drawLine(Offset(0, 0), Offset(size.width * 0.45, size.height),
-        stroke);
-    canvas.drawLine(Offset(size.width, 0), Offset(size.width * 0.45, size.height),
-        stroke);
-  }
-
-  @override
-  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) => false;
-}
-
-// ── Disco ball placeholder ────────────────────────────────────────────────────
-//
-// Simple painted mirror-ball stand-in for the illustrated asset the user will
-// drop in later; decorated with a few scattered sparkle marks like the mock.
-
-class _DiscoBallPlaceholder extends StatelessWidget {
-  const _DiscoBallPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 96,
-      height: 96,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          const Positioned(top: 26, right: -2, child: _Sparkle(color: AppTheme.cream, size: 9)),
-          const Positioned(top: 4, right: 20, child: _Sparkle(color: AppTheme.hotPink, size: 7)),
-          const Positioned(bottom: 6, left: -6, child: _Sparkle(color: AppTheme.teal, size: 8)),
-          const Positioned(bottom: 22, right: -10, child: _Sparkle(color: AppTheme.neonLime, size: 7)),
-          Center(
-            child: CustomPaint(
-              size: const Size(56, 70),
-              painter: _DiscoBallPainter(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DiscoBallPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final ballRadius = size.width / 2;
-    final ballCenter = Offset(size.width / 2, size.height - ballRadius);
-
-    final chain = Paint()
-      ..color = AppTheme.cream.withValues(alpha: 0.7)
-      ..strokeWidth = 1.5;
-    canvas.drawLine(
-      Offset(size.width / 2, 0),
-      Offset(size.width / 2, size.height - ballRadius * 2 + 4),
-      chain,
-    );
-
-    final ballFill = Paint()
-      ..color = AppTheme.cream.withValues(alpha: 0.12)
-      ..style = PaintingStyle.fill;
-    final ballStroke = Paint()
-      ..color = AppTheme.cream
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-    canvas.drawCircle(ballCenter, ballRadius, ballFill);
-    canvas.drawCircle(ballCenter, ballRadius, ballStroke);
-
-    // Facet grid — a few latitude/longitude arcs to read as a mirror ball.
-    final facet = Paint()
-      ..color = AppTheme.cream.withValues(alpha: 0.55)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    for (final f in [0.35, 0.65, 1.0]) {
-      canvas.drawOval(
-        Rect.fromCenter(
-            center: ballCenter,
-            width: ballRadius * 2 * f,
-            height: ballRadius * 2),
-        facet,
-      );
-    }
-    for (final dy in [-0.45, 0.0, 0.45]) {
-      canvas.drawLine(
-        Offset(ballCenter.dx - ballRadius, ballCenter.dy + ballRadius * dy),
-        Offset(ballCenter.dx + ballRadius, ballCenter.dy + ballRadius * dy),
-        facet,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DiscoBallPainter oldDelegate) => false;
-}
-
-class _Sparkle extends StatelessWidget {
-  const _Sparkle({required this.color, required this.size});
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '✦',
-      style: TextStyle(
-        color: color,
-        fontSize: size,
-        fontWeight: FontWeight.w900,
+          );
+        },
       ),
     );
   }
@@ -468,65 +347,6 @@ class _AiPlanStripe extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Animated mascot (float bob) ──────────────────────────────────────────────
-class _AnimatedMascot extends StatefulWidget {
-  const _AnimatedMascot({required this.assetPath, required this.size});
-  final String assetPath;
-  final double size;
-
-  @override
-  State<_AnimatedMascot> createState() => _AnimatedMascotState();
-}
-
-class _AnimatedMascotState extends State<_AnimatedMascot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: -8.0, end: 8.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, child) => Transform.translate(
-        offset: Offset(0, _anim.value),
-        child: child,
-      ),
-      child: ColorFiltered(
-        colorFilter: const ColorFilter.matrix([
-          -1,  0,  0, 0, 255,
-           0, -1,  0, 0, 255,
-           0,  0, -1, 0, 255,
-           0,  0,  0, 1,   0,
-        ]),
-        child: Image.asset(
-          widget.assetPath,
-          width: widget.size,
-          height: widget.size,
-          fit: BoxFit.contain,
         ),
       ),
     );

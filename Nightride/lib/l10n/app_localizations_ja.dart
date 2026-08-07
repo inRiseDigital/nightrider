@@ -114,6 +114,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get continueAsGuest => 'ゲストとして続ける';
 
   @override
+  String get ownAClub => 'クラブを運営していますか？';
+
+  @override
+  String get applyHere => 'こちらから申請';
+
+  @override
+  String get organizerLogin => '主催者ログイン';
+
+  @override
+  String get logInWithFaceId => 'Face ID でログイン';
+
+  @override
   String get noResultsFound => '結果が見つかりません';
 
   @override

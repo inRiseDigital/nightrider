@@ -114,6 +114,18 @@ class AppLocalizationsPt extends AppLocalizations {
   String get continueAsGuest => 'Continuar como convidado';
 
   @override
+  String get ownAClub => 'Você tem um clube?';
+
+  @override
+  String get applyHere => 'Candidate-se aqui';
+
+  @override
+  String get organizerLogin => 'Login de organizador';
+
+  @override
+  String get logInWithFaceId => 'Entrar com Face ID';
+
+  @override
   String get noResultsFound => 'Nenhum resultado encontrado';
 
   @override

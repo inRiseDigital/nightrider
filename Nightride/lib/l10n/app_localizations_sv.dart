@@ -114,6 +114,18 @@ class AppLocalizationsSv extends AppLocalizations {
   String get continueAsGuest => 'Fortsätt som gäst';
 
   @override
+  String get ownAClub => 'Äger du en klubb?';
+
+  @override
+  String get applyHere => 'Ansök här';
+
+  @override
+  String get organizerLogin => 'Arrangörsinloggning';
+
+  @override
+  String get logInWithFaceId => 'Logga in med Face ID';
+
+  @override
   String get noResultsFound => 'Inga resultat hittades';
 
   @override

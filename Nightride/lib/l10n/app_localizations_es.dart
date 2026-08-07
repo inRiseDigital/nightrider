@@ -114,6 +114,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get continueAsGuest => 'Continuar como invitado';
 
   @override
+  String get ownAClub => '¿Tienes un club?';
+
+  @override
+  String get applyHere => 'Solicítalo aquí';
+
+  @override
+  String get organizerLogin => 'Acceso para organizadores';
+
+  @override
+  String get logInWithFaceId => 'Iniciar sesión con Face ID';
+
+  @override
   String get noResultsFound => 'No se encontraron resultados';
 
   @override

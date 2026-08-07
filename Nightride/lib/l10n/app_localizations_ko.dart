@@ -114,6 +114,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get continueAsGuest => '게스트로 계속';
 
   @override
+  String get ownAClub => '클럽을 운영하시나요?';
+
+  @override
+  String get applyHere => '여기서 신청하세요';
+
+  @override
+  String get organizerLogin => '주최자 로그인';
+
+  @override
+  String get logInWithFaceId => 'Face ID로 로그인';
+
+  @override
   String get noResultsFound => '결과를 찾을 수 없습니다';
 
   @override

@@ -7,6 +7,13 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account already exists for this email. Log in instead.",
   "auth/invalid-email": "Enter a valid email address, for example you@venue.com.",
   "auth/weak-password": "That password is too weak. Use at least 8 characters with mixed case, a number and a symbol.",
+  // Sign-in failures. Modern Firebase collapses wrong-password and unknown-email
+  // into `invalid-credential`; the older codes are kept for SDKs that still split
+  // them. All three share one message so the form never reveals which it was.
+  "auth/invalid-credential": "That email and password don't match an organizer account.",
+  "auth/wrong-password": "That email and password don't match an organizer account.",
+  "auth/user-not-found": "That email and password don't match an organizer account.",
+  "auth/user-disabled": "This account has been disabled. Contact the Night Ride team.",
   // Fires for BOTH email sign-up and phone verification — never name one of them.
   "auth/operation-not-allowed": "This Firebase project is refusing that sign-in method.",
   "auth/admin-restricted-operation": "This Firebase project is refusing that operation.",

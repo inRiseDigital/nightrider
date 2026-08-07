@@ -1,0 +1,18 @@
+# Netlify build config for the admin/organizer web panel.
+#
+# This is a monorepo: the deployable site is `nightride-webpanel/`, NOT the repo
+# root. Without `base`, Netlify publishes the root source tree — which has no
+# index.html — and every URL falls through to "Page not found".
+#
+# The six NEXT_PUBLIC_FIREBASE_* vars are inlined at BUILD time, so they must be
+# set in Netlify (Site settings -> Environment variables). `.env.local` is local
+# only and never reaches the build. See nightride-webpanel/.env.example.
+
+[build]
+  base    = "nightride-webpanel"
+  command = "npm run build"
+  # Relative to `base` -> nightride-webpanel/out
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "20"

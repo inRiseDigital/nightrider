@@ -35,6 +35,9 @@ yarn-error.log*
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 
+# ── Netlify CLI state (machine-local absolute paths + linked site id) ─────────
+.netlify/
+
 # ── IDEs ──────────────────────────────────────────────────────────────────────
 .vscode/settings.json
 .idea/

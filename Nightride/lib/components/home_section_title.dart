@@ -42,23 +42,13 @@ class HomeSectionTitle extends StatelessWidget {
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onViewAll,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: AppTheme.borderGray,
-                  width: 1,
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'VIEW ALL',
-                style: TextStyle(
-                  fontSize: AppResponsive.font(context, 10).clamp(9.0, 11.0),
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.cream.withValues(alpha: 0.55),
-                  letterSpacing: 1.2,
-                ),
+            child: Text(
+              'VIEW ALL',
+              style: TextStyle(
+                fontSize: AppResponsive.font(context, 11).clamp(10.0, 12.0),
+                fontWeight: FontWeight.w800,
+                color: AppTheme.hotPink,
+                letterSpacing: 1.0,
               ),
             ),
           ),

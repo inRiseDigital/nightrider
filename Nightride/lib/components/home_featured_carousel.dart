@@ -12,6 +12,8 @@ import 'package:nightride/data/home_dummy_data.dart';
 import 'package:nightride/domain/home_models.dart';
 import 'package:nightride/pages/event_detail_page.dart';
 import 'package:nightride/providers/home_providers.dart';
+import 'package:nightride/services/auth_service.dart';
+import 'package:nightride/services/favourites_service.dart';
 
 class HomeFeaturedCarousel extends ConsumerWidget {
   const HomeFeaturedCarousel({super.key});
@@ -19,10 +21,12 @@ class HomeFeaturedCarousel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final int current = ref.watch(featuredCarouselIndexProvider);
-    final featuredAsync = ref.watch(featuredEventsProvider);
     final carouselHeight = AppDimensions.featuredCarouselHeight(context);
 
-    if (featuredAsync.isLoading) {
+    final featuredAsync = ref.watch(featuredEventsProvider);
+    final trendingAsync = ref.watch(trendingEventsProvider);
+
+    if (featuredAsync.isLoading && trendingAsync.isLoading) {
       return SizedBox(
         height: carouselHeight,
         child: Center(
@@ -34,18 +38,39 @@ class HomeFeaturedCarousel extends ConsumerWidget {
       );
     }
 
-    final baseEvents = featuredAsync.asData?.value ?? [];
-    final filtered = ref.watch(filteredFeaturedProvider);
     final cat = ref.watch(selectedCategoryProvider);
     final country = ref.watch(selectedCountryProvider);
+    final bool filterActive = cat != 'ALL' || country != 'ALL';
 
-    // No real data at all — show dummy fallback
-    if (baseEvents.isEmpty) {
-      return _buildSlider(context, ref, current, kFeaturedEvents);
-    }
+    // Featured events — real data, dummy fallback, or empty when filtered out.
+    final featuredBase = featuredAsync.asData?.value ?? [];
+    final featuredFiltered = ref.watch(filteredFeaturedProvider);
+    final List<FeaturedEvent> featuredEvents = featuredBase.isEmpty
+        ? kFeaturedEvents
+        : (featuredFiltered.isEmpty && filterActive)
+            ? const []
+            : (featuredFiltered.isNotEmpty ? featuredFiltered : featuredBase);
 
-    // Filter active but nothing matches — show empty state
-    if (filtered.isEmpty && (cat != 'ALL' || country != 'ALL')) {
+    // Trending events — folded into the same carousel (no separate
+    // "TRENDING NEAR YOU" list), converted to the carousel's card shape.
+    final trendingBase = trendingAsync.asData?.value ?? [];
+    final trendingFiltered = ref.watch(filteredTrendingProvider);
+    final List<TrendingEvent> trendingSource = trendingBase.isEmpty
+        ? kTrendingEvents
+        : (trendingFiltered.isEmpty && filterActive)
+            ? const []
+            : (trendingFiltered.isNotEmpty ? trendingFiltered : trendingBase);
+
+    // Combine, de-duplicating by id (an event could show up in both feeds).
+    final seenIds = <String>{};
+    final events = <FeaturedEvent>[
+      for (final e in trendingSource.map(_trendingToFeatured))
+        if (e.id.isEmpty || seenIds.add(e.id)) e,
+      for (final e in featuredEvents)
+        if (e.id.isEmpty || seenIds.add(e.id)) e,
+    ];
+
+    if (events.isEmpty) {
       return SizedBox(
         height: carouselHeight,
         child: Center(
@@ -60,9 +85,19 @@ class HomeFeaturedCarousel extends ConsumerWidget {
       );
     }
 
-    final events = filtered.isNotEmpty ? filtered : baseEvents;
     return _buildSlider(context, ref, current, events);
   }
+
+  static FeaturedEvent _trendingToFeatured(TrendingEvent e) => FeaturedEvent(
+        id: e.id,
+        title: e.title,
+        subtitle: e.locationText,
+        badgeText: e.categoryTag,
+        dateText: e.dateText,
+        imageUrl: e.imageUrl,
+        genre: e.categoryTag,
+        countryCode: e.countryCode,
+      );
 
   Widget _buildSlider(
     BuildContext context,
@@ -137,12 +172,36 @@ class HomeFeaturedCarousel extends ConsumerWidget {
   }
 }
 
-class _FeaturedHeroCard extends StatelessWidget {
+class _FeaturedHeroCard extends ConsumerWidget {
   const _FeaturedHeroCard({required this.event});
   final FeaturedEvent event;
 
+  Future<void> _toggleFavourite(WidgetRef ref, bool isLiked) async {
+    final svc = ref.read(favouritesServiceProvider);
+    final user = ref.read(authStateProvider).asData?.value;
+    if (user == null) return;
+    if (isLiked) {
+      await svc.remove(user.uid, event.id);
+    } else {
+      await svc.add(user.uid, {
+        'id': event.id,
+        'name': event.title,
+        'title': event.title,
+        'cover_image': event.imageUrl,
+        'city': event.subtitle,
+        'country': event.countryCode,
+        'country_code': event.countryCode,
+        'date': event.dateText,
+        'genre': event.genre,
+      });
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final favs = ref.watch(favouritesStreamProvider).asData?.value ?? [];
+    final bool liked =
+        event.id.isNotEmpty && favs.any((f) => f['id'] == event.id);
     final cardRadius =
         AppResponsive.radius(context, 20).clamp(16.0, 24.0);
     return Padding(
@@ -195,14 +254,17 @@ class _FeaturedHeroCard extends StatelessWidget {
                 bottom: AppResponsive.gap(context, 16),
                 child: _FeaturedBottomRow(event: event),
               ),
-              // Top-right action button
+              // Top-right favourite button — matches the Trending cards.
               Positioned(
                 right: AppResponsive.gap(context, 12),
                 top: AppResponsive.gap(context, 12),
                 child: _ActionButton(
                   size: AppResponsive.featuredActionButtonSize(context),
-                  icon: Icons.near_me_rounded,
-                  onTap: () {},
+                  icon: liked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  iconColor: liked ? AppTheme.hotPink : null,
+                  onTap: () => _toggleFavourite(ref, liked),
                 ),
               ),
               // Hairline border
@@ -340,10 +402,14 @@ class _FeaturedBottomRow extends StatelessWidget {
 
 class _ActionButton extends StatelessWidget {
   const _ActionButton(
-      {required this.size, required this.icon, required this.onTap});
+      {required this.size,
+      required this.icon,
+      required this.onTap,
+      this.iconColor});
   final double size;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -363,7 +429,7 @@ class _ActionButton extends StatelessWidget {
         child: Icon(
           icon,
           size: size * 0.5,
-          color: AppTheme.cream.withValues(alpha: 0.9),
+          color: iconColor ?? AppTheme.cream.withValues(alpha: 0.9),
         ),
       ),
     );

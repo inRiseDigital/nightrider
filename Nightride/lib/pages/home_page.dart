@@ -7,13 +7,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'package:nightride/components/home_drawer.dart';
 import 'package:nightride/components/home_featured_carousel.dart';
 import 'package:nightride/pages/category_detail_page.dart';
 import 'package:nightride/components/home_location_row.dart';
 import 'package:nightride/components/home_section_title.dart';
 import 'package:nightride/components/home_top_bar.dart';
-import 'package:nightride/components/home_trending_list.dart';
 import 'package:nightride/components/home_ui_bits.dart';
 import 'package:nightride/components/layout/responsive_layout.dart';
 import 'package:nightride/components/nightrite_refresh.dart';
@@ -23,6 +24,8 @@ import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/data/services/overpass_service.dart';
 import 'package:nightride/domain/live_hub_models.dart';
 import 'package:nightride/pages/clubs_page.dart';
+import 'package:nightride/pages/events_grid_page.dart';
+import 'package:nightride/pages/explore_page.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
 import 'package:nightride/providers/home_providers.dart';
 import 'package:nightride/providers/live_hub_providers.dart';
@@ -54,6 +57,7 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
+      drawer: const HomeDrawer(),
       body: SafeArea(
         bottom: false,
         child: ScrollConfiguration(
@@ -80,40 +84,31 @@ class HomePage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Top bar ─────────────────────────────────────────────
-                  ResponsivePagePadding(
-                    child: HomeTopBar(username: username),
+                  // ── Top bar — hamburger + bell ──────────────────────────
+                  const ResponsivePagePadding(
+                    child: HomeTopBar(),
                   ),
                   SizedBox(
-                      height: AppResponsive.gap(context, 20)),
+                      height: AppResponsive.gap(context, 18)),
 
-                  // ── Hero headline ───────────────────────────────────────
+                  // ── Hero: artwork + greeting + AI Plan My Night stripe ──
+                  // The stripe is part of the hero rather than a sibling below
+                  // it, so it can sit in the artwork's empty lower-left pocket
+                  // with the vinyl mascot standing to its right.
                   ResponsivePagePadding(
-                    child: _HeroHeadline(
-                      onAiTap: () =>
+                    child: _HeroBubble(
+                      displayName: username,
+                      onAiPlanTap: () =>
                           ref.read(appNavProvider.notifier).setIndex(2),
                     ),
                   ),
-                  SizedBox(height: AppResponsive.gap(context, 8)),
-
-                  // ── Location row (conditional) ──────────────────────────
-                  if (locationLabel.isNotEmpty) ...[
-                    ResponsivePagePadding(
-                      child: HomeLocationRow(country: locationLabel),
-                    ),
-                    SizedBox(height: AppResponsive.gap(context, 24)),
-                  ] else
-                    SizedBox(height: AppResponsive.gap(context, 20)),
-
-                  // ── Featured carousel — full-bleed ──────────────────────
-                  const HomeFeaturedCarousel(),
-                  SizedBox(height: AppResponsive.gap(context, 28)),
+                  SizedBox(height: AppResponsive.gap(context, 18)),
 
                   // ── LIVE RIGHT NOW stat cards ───────────────────────────
                   ResponsivePagePadding(
                     child: HomeSectionTitle(
                       title: 'LIVE RIGHT NOW',
-                      accentColor: AppTheme.hotPink,
+                      accentColor: AppTheme.cream,
                       onViewAll: () => Navigator.of(context).push(
                         MaterialPageRoute(
                             builder: (_) => const ClubsPage()),
@@ -131,6 +126,10 @@ class HomePage extends ConsumerWidget {
                     child: HomeSectionTitle(
                       title: 'EXPLORE',
                       accentColor: AppTheme.cream,
+                      onViewAll: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const ExplorePage()),
+                      ),
                     ),
                   ),
                   SizedBox(height: AppResponsive.gap(context, 14)),
@@ -139,7 +138,9 @@ class HomePage extends ConsumerWidget {
                   ),
                   SizedBox(height: AppResponsive.gap(context, 28)),
 
-                  // ── TRENDING NEAR YOU horizontal scroll ─────────────────
+                  // ── TRENDING NEAR YOU — featured carousel ───────────────
+                  // The old one-at-a-time trending list was folded into this
+                  // carousel instead of showing as a separate section.
                   ResponsivePagePadding(
                     child: HomeSectionTitle(
                       title: 'TRENDING NEAR YOU',
@@ -148,14 +149,16 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                   SizedBox(height: AppResponsive.gap(context, 14)),
-                  // Trending list scrolls edge-to-edge with left padding only
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: AppResponsive.gap(context, 20)
-                          .clamp(16.0, 28.0),
+                  const HomeFeaturedCarousel(),
+                  SizedBox(height: AppResponsive.gap(context, 28)),
+
+                  // ── Location row (conditional) ──────────────────────────
+                  if (locationLabel.isNotEmpty) ...[
+                    ResponsivePagePadding(
+                      child: HomeLocationRow(country: locationLabel),
                     ),
-                    child: const HomeTrendingList(),
-                  ),
+                    SizedBox(height: AppResponsive.gap(context, 20)),
+                  ],
                 ],
               ),
             ),
@@ -166,159 +169,184 @@ class HomePage extends ConsumerWidget {
   }
 }
 
-// ── Hero headline block ───────────────────────────────────────────────────────
+// ── Hero ──────────────────────────────────────────────────────────────────────
+//
+// The illustrated hero artwork — a single asset that bakes in the speech bubble,
+// "WHERE ARE WE GOING TONIGHT?" headline, hanging disco ball and vinyl mascot
+// that used to be drawn widget-by-widget — with the personalised greeting laid
+// over it, riding the bubble's top border line.
 
-class _HeroHeadline extends StatelessWidget {
-  const _HeroHeadline({required this.onAiTap});
-  final VoidCallback onAiTap;
+class _HeroBubble extends StatelessWidget {
+  const _HeroBubble({required this.displayName, required this.onAiPlanTap});
+  final String displayName;
+  final VoidCallback onAiPlanTap;
+
+  // The overlays are anchored to features of the artwork, so they're expressed
+  // as fractions of the asset and every one of them is tied to its real aspect
+  // ratio. IF THE ASSET IS RE-CROPPED, THESE MUST BE RE-MEASURED — a crop moves
+  // the artwork inside its own canvas, so the fractions below go stale even
+  // though the picture looks the same.
+  //
+  // Current asset: 2048x1640.
+  static const _assetAspect = 2048 / 1640;
+
+  // Greeting. The bubble's hand-drawn top border runs from (400, 166) to
+  // (1200, 74), rising left-to-right at 6.56°; the greeting matches that slope
+  // and is anchored just above the line.
+  static const _borderAngle = -0.1145; // radians ≈ -6.56°
+  static const _greetingLeft = 0.145; // of width; clear of the rounded corner
+  static const _greetingBottom = 0.889; // of height; rests on the border line
+
+  // Stripe. The artwork leaves a pocket in its lower-left: the bubble's tail
+  // bottoms out at y 0.710 and nothing else occupies x < 0.62 below it, while
+  // the mascot's body starts at x 0.687 and its feet land at y 0.924. The
+  // stripe drops into that pocket, so the mascot stands to its right.
+  static const _stripeBandTop = 0.716; // of height; just clear of the tail
+  static const _stripeBandBottom = 0.05; // of height; up from the lower edge
+  static const _stripeRightInset = 0.38; // of width; ~0.07 clear of the mascot
 
   @override
   Widget build(BuildContext context) {
-    final titleFontSize =
-        AppResponsive.font(context, 34).clamp(26.0, 42.0);
+    // First name only — a full "HEY YOMITH RATHNYAKA!" overruns the border line.
+    final firstName = displayName.trim().split(RegExp(r'\s+')).first;
+    final greeting = firstName.isEmpty ? 'THERE' : firstName.toUpperCase();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        // ── Text + button (left) ──────────────────────────────────────
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Size the box to the asset's own ratio. Forcing a square here would
+          // letterbox a non-square asset under BoxFit.contain — the artwork
+          // would shrink inside an unchanged footprint and drift away from the
+          // anchors below, which is exactly what a crop must not cause.
+          final w = constraints.maxWidth;
+          final h = w / _assetAspect;
+          return SizedBox(
+            width: w,
+            height: h,
+            child: Stack(
+              children: [
+                // The asset has a transparent backdrop, so it composites straight
+                // onto the page black with no visible rectangle edge — keep it
+                // that way. A flattened export on pure black would show a seam
+                // against the #070707 background.
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/hero_tonight.png',
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Where are we going tonight?',
+                  ),
+                ),
+                Positioned(
+                  left: w * _greetingLeft,
+                  bottom: h * _greetingBottom,
+                  child: Transform.rotate(
+                    angle: _borderAngle,
+                    // Pivot on the anchored corner so the text pivots along the
+                    // border line instead of drifting off it.
+                    alignment: Alignment.bottomLeft,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: w * 0.62),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'HEY $greeting!',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.anton(
+                                fontSize: AppResponsive.font(context, 21)
+                                    .clamp(18.0, 24.0),
+                                fontWeight: FontWeight.w400,
+                                color: AppTheme.neonLime,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Transform.rotate(
+                            angle: 0.35,
+                            child: Icon(Icons.bolt_rounded,
+                                color: AppTheme.hotPink, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Banding the stripe rather than pinning it to a fixed offset
+                // lets it centre itself in the pocket whatever height its own
+                // padding and text scale work out to.
+                Positioned(
+                  left: 0,
+                  right: w * _stripeRightInset,
+                  top: h * _stripeBandTop,
+                  bottom: h * _stripeBandBottom,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: _AiPlanStripe(onTap: onAiPlanTap),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── AI Plan My Night — highlighter stripe CTA ────────────────────────────────
+
+class _AiPlanStripe extends StatelessWidget {
+  const _AiPlanStripe({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Transform.rotate(
+        angle: -0.015,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppTheme.neonLime,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.neonLime.withValues(alpha: 0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // "WHERE ARE WE GOING" line — cream
-              Text(
-                'WHERE ARE WE GOING',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.anton(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.w400,
-                  color: AppTheme.cream,
-                  letterSpacing: 1.2,
-                  height: 1.1,
+              const Text(
+                '✦',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              // "TONIGHT?" line — hotPink accent
+              const SizedBox(width: 10),
               Text(
-                'TONIGHT?',
+                'AI PLAN MY NIGHT',
                 style: GoogleFonts.anton(
-                  fontSize: titleFontSize * 1.06,
+                  fontSize: AppResponsive.font(context, 16).clamp(14.0, 18.0),
                   fontWeight: FontWeight.w400,
-                  color: AppTheme.hotPink,
-                  letterSpacing: 1.2,
-                  height: 1.05,
-                ),
-              ),
-              SizedBox(height: AppResponsive.gap(context, 18)),
-              // AI plan button
-              GestureDetector(
-                onTap: onAiTap,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 13),
-                  decoration: BoxDecoration(
-                    color: AppTheme.neonLime,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.neonLime.withValues(alpha: 0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        '✦',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'AI PLAN MY NIGHT',
-                        style: GoogleFonts.anton(
-                          fontSize: AppResponsive.font(context, 15)
-                              .clamp(13.0, 17.0),
-                          fontWeight: FontWeight.w400,
-                          color: Colors.black,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
+                  color: Colors.black,
+                  letterSpacing: 1.5,
                 ),
               ),
             ],
           ),
-        ),
-        // ── Vinyl mascot (right, animated) ───────────────────────────
-        const _AnimatedMascot(
-          assetPath: 'assets/images/vinyl_mascot_3.png',
-          size: 110,
-        ),
-      ],
-    );
-  }
-}
-
-// ── Animated mascot (float bob) ──────────────────────────────────────────────
-class _AnimatedMascot extends StatefulWidget {
-  const _AnimatedMascot({required this.assetPath, required this.size});
-  final String assetPath;
-  final double size;
-
-  @override
-  State<_AnimatedMascot> createState() => _AnimatedMascotState();
-}
-
-class _AnimatedMascotState extends State<_AnimatedMascot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: -8.0, end: 8.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, child) => Transform.translate(
-        offset: Offset(0, _anim.value),
-        child: child,
-      ),
-      child: ColorFiltered(
-        colorFilter: const ColorFilter.matrix([
-          -1,  0,  0, 0, 255,
-           0, -1,  0, 0, 255,
-           0,  0, -1, 0, 255,
-           0,  0,  0, 1,   0,
-        ]),
-        child: Image.asset(
-          widget.assetPath,
-          width: widget.size,
-          height: widget.size,
-          fit: BoxFit.contain,
         ),
       ),
     );
@@ -335,7 +363,7 @@ class _ExploreCat {
 }
 
 const _kExploreCats = <_ExploreCat>[
-  _ExploreCat('TECHNO',     'TECHNO', Icons.language,               Color(0xFF6D28D9)),
+  _ExploreCat('TECHNO',     'TECHNO', Icons.language,               AppTheme.teal),
   _ExploreCat('HOUSE',      'HOUSE',  Icons.sentiment_satisfied_alt, AppTheme.neonLime),
   _ExploreCat('LATIN',      'EDM',    Icons.park,                    AppTheme.teal),
   _ExploreCat('LIVE MUSIC', 'LIVE',   Icons.bolt,                    AppTheme.hotPink),
@@ -365,35 +393,14 @@ class _ExploreTile extends StatefulWidget {
   State<_ExploreTile> createState() => _ExploreTileState();
 }
 
-class _ExploreTileState extends State<_ExploreTile>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
+class _ExploreTileState extends State<_ExploreTile> {
   bool _pressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: -4.0, end: 4.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final cat = widget.cat;
-    final onDark = cat.bg != AppTheme.neonLime;
-    final fg = onDark ? Colors.white : Colors.black;
+    // All accent tiles (lime/teal/pink) are bright enough for black text.
+    const fg = Colors.black;
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -423,14 +430,7 @@ class _ExploreTileState extends State<_ExploreTile>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedBuilder(
-                animation: _anim,
-                builder: (_, child) => Transform.translate(
-                  offset: Offset(0, _anim.value),
-                  child: child,
-                ),
-                child: Icon(cat.icon, color: fg, size: 28),
-              ),
+              Icon(cat.icon, color: fg, size: 28),
               const SizedBox(height: 8),
               Text(
                 cat.label,
@@ -491,7 +491,10 @@ class _LiveNowStatCards extends ConsumerWidget {
                     ? '${clubsList.length}'
                     : '--',
             // TODO: connect to real club count API when available
-            accent: AppTheme.teal,
+            accent: AppTheme.neonLime,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ClubsPage()),
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -502,7 +505,10 @@ class _LiveNowStatCards extends ConsumerWidget {
                 ? '$barCount'
                 : '--',
             // TODO: connect to real bar count API when available
-            accent: AppTheme.neonLime,
+            accent: AppTheme.teal,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const _BarsListPage()),
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -511,6 +517,9 @@ class _LiveNowStatCards extends ConsumerWidget {
             label: 'EVENTS',
             value: eventsCount != null ? '$eventsCount' : '--',
             accent: AppTheme.hotPink,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const EventsGridPage()),
+            ),
           ),
         ),
       ],
@@ -523,53 +532,154 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.accent,
+    required this.onTap,
   });
 
   final String label;
   final String value;
   final Color accent;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: accent,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: accent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: GoogleFonts.anton(
+                fontSize:
+                    AppResponsive.font(context, 28).clamp(22.0, 34.0),
+                fontWeight: FontWeight.w400,
+                color: Colors.black,
+                letterSpacing: 0.5,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize:
+                    AppResponsive.font(context, 10).clamp(9.0, 11.0),
+                fontWeight: FontWeight.w800,
+                color: Colors.black.withValues(alpha: 0.60),
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: GoogleFonts.anton(
-              fontSize:
-                  AppResponsive.font(context, 28).clamp(22.0, 34.0),
-              fontWeight: FontWeight.w400,
-              color: Colors.black,
-              letterSpacing: 0.5,
-              height: 1.0,
-            ),
+    );
+  }
+}
+
+// ── Bars list page ────────────────────────────────────────────────────────────
+//
+// "BARS" stat card destination — no dedicated bars page exists yet, so this
+// reuses the nearby-venue list/card/sheet already built for the map tab,
+// filtered down to bar-type venues.
+
+class _BarsListPage extends ConsumerWidget {
+  const _BarsListPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final venuesAsync = ref.watch(nearbyVenuesProvider);
+    final userPos = ref.watch(userLocationProvider).asData?.value;
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              size: 20, color: AppTheme.cream),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'BARS',
+          style: GoogleFonts.anton(
+            color: AppTheme.cream,
+            fontSize: AppResponsive.font(context, 20).clamp(16.0, 24.0),
+            letterSpacing: 2,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize:
-                  AppResponsive.font(context, 10).clamp(9.0, 11.0),
-              fontWeight: FontWeight.w800,
-              color: Colors.black.withValues(alpha: 0.60),
-              letterSpacing: 1.5,
-            ),
+        ),
+      ),
+      body: venuesAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppTheme.teal),
+        ),
+        error: (_, __) => Center(
+          child: Text(
+            'Could not load bars nearby',
+            style: TextStyle(color: AppTheme.cream.withValues(alpha: 0.5)),
           ),
-        ],
+        ),
+        data: (venues) {
+          final bars = venues
+              .where((v) =>
+                  v.type == 'bar' ||
+                  v.type == 'pub' ||
+                  v.type == 'cocktail_bar' ||
+                  v.type == 'wine_bar')
+              .toList();
+
+          if (bars.isEmpty) {
+            return Center(
+              child: Text(
+                'NO BARS NEARBY',
+                style: GoogleFonts.anton(
+                  color: AppTheme.cream.withValues(alpha: 0.4),
+                  fontSize: 16,
+                  letterSpacing: 1,
+                ),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: bars.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, i) {
+              final venue = bars[i];
+              final distanceKm = userPos != null
+                  ? haversineKm(
+                      userPos.latitude, userPos.longitude, venue.lat, venue.lng)
+                  : 0.0;
+              void openDirections() {
+                final url =
+                    'https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}';
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+              }
+
+              return _NearbyVenueListCard(
+                venue: venue,
+                distanceKm: distanceKm,
+                onTap: () => _NearbyVenueSheet.show(
+                    context, venue, distanceKm, openDirections),
+                onDirections: openDirections,
+              );
+            },
+          );
+        },
       ),
     );
   }

@@ -1,6 +1,9 @@
 // lib/main.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:nightride/firebase_options.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -27,6 +30,20 @@ Future<void> main() async {
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   }
+
+  // Point at `firebase emulators:start` instead of real nightride-a9173.
+  // Off by default; tree-shaken out of release builds (compile-time const).
+  const useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR');
+  if (useFirebaseEmulator) {
+    // Android emulator (AVD) can't resolve "localhost" as the host machine.
+    // Real device: override with your machine's LAN IP instead.
+    final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+        ? '10.0.2.2'
+        : 'localhost';
+    await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+  }
+
   try {
     await NotificationService.init();
     await NotificationService.requestPermission();

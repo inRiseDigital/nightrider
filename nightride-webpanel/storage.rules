@@ -1,14 +1,101 @@
 rules_version = '2';
 
-// Placeholder — no storage.rules previously existed anywhere in this repo's
-// history (the real bucket's rules, if any, live only in Firebase Console).
-// Deny-all so the local Storage emulator can start; Nightride doesn't use
-// Firebase Storage in code at all. Tighten this before relying on it for
-// real Storage testing.
+// Night Ride / Night Rite — Cloud Storage rules.
+//
+// Object layout:
+//   avatars/{uid}.jpg
+//   kyc/{uid}/nic/{attempt}/front.jpg
+//   kyc/{uid}/nic/{attempt}/back.jpg
+//   kyc/{uid}/selfie/{attempt}/capture.jpg
+//   kyc/{uid}/video/{attempt}/walkthrough.mp4
+//   kyc/{uid}/video/{attempt}/poster.jpg
+//
+// {attempt} comes from users/{uid}/private/organizerReview.steps.<id>.attempt,
+// which only an admin can advance. Together with create-only permission that
+// makes both properties structural rather than a matter of client behaviour:
+// reviewed evidence cannot be overwritten (create implies the object does not
+// exist), and an applicant cannot mint fresh upload paths to burn storage,
+// because they cannot move the number that appears in the path.
+//
+// Deletion is Admin SDK only. Retention is enforced by the webpanel's server
+// route on the approve/reject action, backstopped by a bucket lifecycle rule of
+// age > 180 days on kyc/**. Object Versioning must stay off for this prefix —
+// it would resurrect deleted identity documents.
+
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if false;
+
+    function signedIn() { return request.auth != null; }
+
+    function userDoc(uid) {
+      return firestore.get(/databases/(default)/documents/users/$(uid));
     }
+    function isAdmin() {
+      return signedIn() && userDoc(request.auth.uid) != null
+        && userDoc(request.auth.uid).data.get('isAdmin', false) == true;
+    }
+
+    // Cross-service read of the admin-owned verdict document. Repeated calls on
+    // one path within a single evaluation resolve to the same cached read.
+    // Chained .get() defaults keep a missing document or a missing step from
+    // turning into an evaluation error.
+    function review(uid) {
+      return firestore.get(
+        /databases/(default)/documents/users/$(uid)/private/organizerReview
+      );
+    }
+    function step(uid, stepId) {
+      return review(uid) == null
+        ? {}
+        : review(uid).data.get('steps', {}).get(stepId, {});
+    }
+
+    // ── Avatars — world-readable, owner-written ──────────────────────────────
+    match /avatars/{file} {
+      allow read: if true;
+      allow write: if signedIn()
+        && file == request.auth.uid + '.jpg'
+        && (request.resource == null   // delete, on account removal
+            || (request.resource.size < 2 * 1024 * 1024
+                && request.resource.contentType.matches('image/(jpeg|png|webp)')));
+    }
+
+    // ── KYC evidence — owner + admin read, append-only, immutable ────────────
+    match /kyc/{uid}/{stepId}/{attempt}/{file} {
+
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && stepId in ['nic', 'selfie', 'video']
+        && step(uid, stepId).get('status', '') in ['active', 'needs_info']
+        // int() on the path segment rather than string() on the stored number:
+        // string(0) is "0" but string(0.0) is "0.0", so a number written as a
+        // double by any client would deny every upload.
+        && int(attempt) == step(uid, stepId).get('attempt', -1)
+        && (
+             (stepId == 'nic'
+               && file in ['front.jpg', 'back.jpg']
+               && request.resource.size < 6 * 1024 * 1024
+               && request.resource.contentType.matches('image/(jpeg|png)'))
+             ||
+             (stepId == 'selfie'
+               && file == 'capture.jpg'
+               && request.resource.size < 6 * 1024 * 1024
+               && request.resource.contentType.matches('image/(jpeg|png)'))
+             ||
+             (stepId == 'video'
+               && ((file == 'walkthrough.mp4'
+                     && request.resource.size < 30 * 1024 * 1024
+                     && request.resource.contentType == 'video/mp4')
+                   || (file == 'poster.jpg'
+                     && request.resource.size < 2 * 1024 * 1024
+                     && request.resource.contentType.matches('image/(jpeg|png)'))))
+           );
+
+      allow update, delete: if false;
+    }
+
+    match /{allPaths=**} { allow read, write: if false; }
   }
 }

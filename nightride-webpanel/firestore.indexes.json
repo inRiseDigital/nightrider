@@ -1,46 +1,75 @@
 {
   "indexes": [
-    {
-      "collectionGroup": "events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "country_code", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "country_code", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "live_hub_reports",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "country", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "live_hub_social",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "country", "order": "ASCENDING" },
-        { "fieldPath": "popularityScore", "order": "DESCENDING" }
-      ]
-    }
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "startAt", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "countryCode", "order": "ASCENDING" },
+      { "fieldPath": "startAt", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "source", "order": "ASCENDING" },
+      { "fieldPath": "popularityScore", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "interestedCount", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "name", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizerUid", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "venueId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "startAt", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizerApplication.submitted", "order": "ASCENDING" },
+      { "fieldPath": "organizerApplication.submittedAt", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizerStatus", "order": "ASCENDING" },
+      { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "venues", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "countryCode", "order": "ASCENDING" },
+      { "fieldPath": "city", "order": "ASCENDING" },
+      { "fieldPath": "name", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "venues", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "countryCode", "order": "ASCENDING" },
+      { "fieldPath": "geohash", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "venueReports", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "venueId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "venueReports", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "countryCode", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "logs", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "targetType", "order": "ASCENDING" },
+      { "fieldPath": "at", "order": "DESCENDING" } ] }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "users",
+      "fieldPath": "organizerApplication.steps",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "events",
+      "fieldPath": "performers",
+      "indexes": []
+    }
+  ]
 }

@@ -219,9 +219,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       final svc = ref.read(userProfileServiceProvider);
       await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
       await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
-      final role = await svc.getUserRole(user.uid).timeout(const Duration(seconds: 5));
+      final isOrganizer = await svc.isApprovedOrganizer(user.uid).timeout(const Duration(seconds: 5));
       if (!mounted) return;
-      if (role == 'organizer') {
+      if (isOrganizer) {
         destination = const OrganizerShellPage();
       } else {
         final onboardingDone =
@@ -254,9 +254,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         final svc = ref.read(userProfileServiceProvider);
         await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
         await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
-        final role = await svc.getUserRole(user.uid).timeout(const Duration(seconds: 5));
+        final isOrganizer = await svc.isApprovedOrganizer(user.uid).timeout(const Duration(seconds: 5));
         if (!mounted) return;
-        if (role == 'organizer') {
+        if (isOrganizer) {
           destination = const OrganizerShellPage();
         } else {
           final onboardingDone =

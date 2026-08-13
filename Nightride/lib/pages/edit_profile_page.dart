@@ -74,7 +74,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
       // Save avatar as base64 in Firestore if a new photo was picked
       if (_pickedImage != null) {
-        await service.saveAvatarBase64(uid, _pickedImage!);
+        await service.saveAvatar(uid, _pickedImage!);
       }
 
       // Save profile fields to Firestore (always runs)
@@ -132,7 +132,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final avatarBase64 = ref.watch(avatarBase64Provider).asData?.value;
+    final avatarUrl = ref.watch(avatarUrlProvider).asData?.value;
 
     return Scaffold(
       backgroundColor: AppTheme.scaffold,
@@ -186,8 +186,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                       child: ClipOval(
                         child: _pickedImage != null
                             ? Image.file(_pickedImage!, fit: BoxFit.cover)
-                            : avatarBase64 != null
-                                ? Image.memory(base64Decode(avatarBase64), fit: BoxFit.cover)
+                            : avatarUrl != null
+                                ? Image.network(avatarUrl, fit: BoxFit.cover)
                                 : Icon(Icons.person_rounded, color: Colors.white38, size: AppResponsive.icon(context, 44).clamp(36.0, 48.0)),
                       ),
                     ),

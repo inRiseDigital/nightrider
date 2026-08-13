@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,14 +22,12 @@ class ProfileHeader extends StatelessWidget {
     required this.onEdit,
     required this.onSave,
     required this.onCancel,
-    this.avatarBase64,
   });
 
   final ProfileState state;
   final VoidCallback onEdit;
   final VoidCallback onSave;
   final VoidCallback onCancel;
-  final String? avatarBase64;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +37,7 @@ class ProfileHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         // ── Avatar with neonLime ring ──
-        _Avatar(url: d.avatarUrl, avatarBase64: avatarBase64),
+        _Avatar(url: d.avatarUrl),
         SizedBox(width: AppResponsive.profileHeaderGap(context)),
 
         // ── Name / pronouns / badge / network ──
@@ -155,9 +151,8 @@ class ProfileHeader extends StatelessWidget {
 // ─── Avatar ─────────────────────────────────────────────────────────────────
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.url, this.avatarBase64});
+  const _Avatar({required this.url});
   final String url;
-  final String? avatarBase64;
 
   @override
   Widget build(BuildContext context) {
@@ -165,9 +160,7 @@ class _Avatar extends StatelessWidget {
     final double fallbackIcon = s * 0.5;
     Widget child;
 
-    if (avatarBase64 != null && avatarBase64!.isNotEmpty) {
-      child = Image.memory(base64Decode(avatarBase64!), fit: BoxFit.cover);
-    } else if (url.isNotEmpty && url.startsWith('http')) {
+    if (url.isNotEmpty && url.startsWith('http')) {
       child = CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,

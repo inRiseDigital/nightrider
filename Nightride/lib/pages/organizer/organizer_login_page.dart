@@ -153,6 +153,18 @@ class _OrganizerLoginPageState extends ConsumerState<OrganizerLoginPage> {
               : 'Your organizer application was not approved: $reason';
         });
 
+      // Approval withdrawn after the fact. Worth saying plainly rather than
+      // folding into "not approved", which would read as if they never were.
+      case OrganizerAccess.revoked:
+        final reason = await service.rejectionReasonFor(user.uid);
+        if (!mounted) return;
+        setState(() {
+          _notice = '';
+          _error = reason.isEmpty
+              ? 'Your organizer access has been withdrawn.'
+              : 'Your organizer access has been withdrawn: $reason';
+        });
+
       case OrganizerAccess.none:
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const OrganizerApplyPage()),

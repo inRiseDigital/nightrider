@@ -37,6 +37,10 @@ dependencies:
   firebase_auth: ^5.3.3
   local_auth: ^2.3.0
   cloud_firestore: ^5.4.4
+  # Avatars and KYC evidence are Storage objects. Avatars used to be base64
+  # blobs inside Firestore documents, which capped a profile photo at 300 KB
+  # to keep the document under Firestore's 1 MiB limit.
+  firebase_storage: ^12.3.7
   url_launcher: ^6.3.1
   google_sign_in: ^6.2.2
   image_picker: ^1.1.2

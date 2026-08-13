@@ -79,20 +79,20 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   }
 
   Future<void> _routeForUser(User? user) async {
-    String role = 'user';
+    bool isOrganizer = false;
     bool onboardingDone = true;
     if (user != null) {
       final svc = ref.read(userProfileServiceProvider);
       await svc.createIfAbsent(user);
-      role = await svc.getUserRole(user.uid);
-      if (role != 'organizer') {
+      isOrganizer = await svc.isApprovedOrganizer(user.uid);
+      if (!isOrganizer) {
         onboardingDone = await svc.hasCompletedOnboarding(user.uid);
       }
     }
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => role == 'organizer'
+        builder: (_) => isOrganizer
             ? const OrganizerShellPage()
             : onboardingDone
                 ? AppShellPage()

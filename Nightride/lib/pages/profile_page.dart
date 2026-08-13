@@ -29,7 +29,6 @@ class ProfilePage extends ConsumerWidget {
     ref.watch(dailyPointsProvider); // awards daily login points
     final state        = ref.watch(profileProvider);
     final controller   = ref.read(profileProvider.notifier);
-    final avatarBase64 = ref.watch(avatarBase64Provider).asData?.value;
     final partiesCount = ref.watch(favouritesStreamProvider).asData?.value.length
         ?? state.data.partiesAttended;
 
@@ -96,7 +95,6 @@ class ProfilePage extends ConsumerWidget {
                         onEdit: controller.enterEdit,
                         onSave: controller.saveEdit,
                         onCancel: controller.cancelEdit,
-                        avatarBase64: avatarBase64,
                       ),
                       SizedBox(height: AppResponsive.profileSectionGap(context)),
 

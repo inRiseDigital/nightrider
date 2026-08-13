@@ -267,15 +267,27 @@ class _CreateEventSheet extends StatefulWidget {
   State<_CreateEventSheet> createState() => _CreateEventSheetState();
 }
 
+/// The four countries the product covers today (see CLAUDE.md) — ISO-3166
+/// alpha-2, uppercase, matching what `shapeOk()` in firestore.rules requires.
+const Map<String, String> kOrganizerCountries = {
+  'AE': 'UAE — Dubai',
+  'JP': 'Japan — Tokyo',
+  'GB': 'UK — London',
+  'AU': 'Australia — Melbourne',
+};
+
 class _CreateEventSheetState extends State<_CreateEventSheet> {
   late final TextEditingController _title;
   late final TextEditingController _venue;
+  late final TextEditingController _city;
   late final TextEditingController _dateTimeText;
   late final TextEditingController _description;
   late final TextEditingController _price;
   DateTime? _selectedDateTime;
+  String _countryCode = 'AE';
   bool _saving = false;
   String? _dateError;
+  String? _cityError;
 
   @override
   void initState() {
@@ -283,6 +295,7 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
     final e = widget.existing;
     _title        = TextEditingController(text: e?.name ?? '');
     _venue        = TextEditingController(text: e?.venueName ?? '');
+    _city         = TextEditingController(text: e?.city ?? '');
     _description  = TextEditingController(text: e?.description ?? '');
     _price        = TextEditingController(text: e != null ? e.price.hintText : '');
     _selectedDateTime = e?.startDateTime;
@@ -291,11 +304,37 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
           ? DateFormat('MMM d, yyyy · h:mm a').format(_selectedDateTime!)
           : '',
     );
+    _countryCode = kOrganizerCountries.containsKey(e?.countryCode) ? e!.countryCode : 'AE';
+
+    // Prefill city/country from the organizer's own profile so the common
+    // case — creating an event in the organizer's home city — is one tap.
+    // Only for a brand-new event: editing an existing one keeps its own
+    // (already-illegal-to-omit) city/countryCode.
+    if (e == null && widget.uid != null) {
+      _prefillFromProfile(widget.uid!);
+    }
+  }
+
+  Future<void> _prefillFromProfile(String uid) async {
+    try {
+      final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final data = snap.data();
+      if (data == null || !mounted) return;
+      final profileCity = data['city'] as String? ?? '';
+      final profileCountry = (data['countryCode'] as String? ?? '').toUpperCase();
+      setState(() {
+        if (_city.text.isEmpty && profileCity.isNotEmpty) _city.text = profileCity;
+        if (kOrganizerCountries.containsKey(profileCountry)) _countryCode = profileCountry;
+      });
+    } catch (_) {
+      // Best-effort prefill only — the organizer can still fill both fields
+      // in by hand.
+    }
   }
 
   @override
   void dispose() {
-    _title.dispose(); _venue.dispose(); _dateTimeText.dispose();
+    _title.dispose(); _venue.dispose(); _city.dispose(); _dateTimeText.dispose();
     _description.dispose(); _price.dispose();
     super.dispose();
   }
@@ -328,6 +367,10 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
       setState(() => _dateError = 'Pick a date & time');
       return;
     }
+    if (_city.text.trim().isEmpty) {
+      setState(() => _cityError = 'Required');
+      return;
+    }
     setState(() => _saving = true);
     try {
       final startAt = Timestamp.fromDate(_selectedDateTime!);
@@ -337,6 +380,8 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
         final updated = existing.copyWith(
           name: _title.text.trim(),
           venueName: _venue.text.trim(),
+          city: _city.text.trim(),
+          countryCode: _countryCode,
           startAt: startAt,
           description: _description.text.trim(),
           price: price,
@@ -346,6 +391,8 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
         final event = Event(
           name: _title.text.trim(),
           venueName: _venue.text.trim(),
+          city: _city.text.trim(),
+          countryCode: _countryCode,
           startAt: startAt,
           description: _description.text.trim(),
           price: price,
@@ -382,6 +429,31 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
           _SheetField(controller: _title, label: 'Event Title *', hint: 'e.g. Neon Night Festival', icon: Icons.title_rounded),
           Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(controller: _venue, label: 'Venue', hint: 'e.g. Skyline Rooftop, Colombo', icon: Icons.location_on_outlined),
+          Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _SheetField(
+                  controller: _city,
+                  label: 'City *',
+                  hint: 'e.g. Dubai',
+                  icon: Icons.location_city_rounded,
+                  errorText: _cityError,
+                  onChanged: (_) {
+                    if (_cityError != null) setState(() => _cityError = null);
+                  },
+                ),
+              ),
+              const Gap(12),
+              Expanded(
+                child: _SheetCountryDropdown(
+                  value: _countryCode,
+                  onChanged: (v) => setState(() => _countryCode = v),
+                ),
+              ),
+            ],
+          ),
           Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(
             controller: _dateTimeText,
@@ -429,6 +501,7 @@ class _SheetField extends StatelessWidget {
     this.maxLines = 1,
     this.readOnly = false,
     this.onTap,
+    this.onChanged,
     this.errorText,
   });
   final TextEditingController controller;
@@ -438,6 +511,7 @@ class _SheetField extends StatelessWidget {
   final int maxLines;
   final bool readOnly;
   final VoidCallback? onTap;
+  final ValueChanged<String>? onChanged;
   final String? errorText;
 
   @override
@@ -450,6 +524,7 @@ class _SheetField extends StatelessWidget {
         maxLines: maxLines,
         readOnly: readOnly,
         onTap: onTap,
+        onChanged: onChanged,
         style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14)),
         cursorColor: AppTheme.primary,
         decoration: InputDecoration(
@@ -461,6 +536,38 @@ class _SheetField extends StatelessWidget {
             child: Icon(icon, color: AppTheme.primaryLight.withValues(alpha: 0.6), size: AppResponsive.icon(context, 18)),
           ) : null,
           prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
+          contentPadding: EdgeInsets.symmetric(vertical: AppResponsive.gap(context, 14).clamp(10, 18), horizontal: 14),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.primary.withValues(alpha: 0.6), width: 1.5)),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Same visual language as [_SheetField] but for the fixed four-country list
+/// the product covers — see [kOrganizerCountries].
+class _SheetCountryDropdown extends StatelessWidget {
+  const _SheetCountryDropdown({required this.value, required this.onChanged});
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Country *', style: TextStyle(color: Colors.white70, fontSize: AppResponsive.font(context, 12), fontWeight: FontWeight.w700)),
+      Gap(AppResponsive.gap(context, 6).clamp(4, 10)),
+      DropdownButtonFormField<String>(
+        initialValue: value,
+        dropdownColor: AppTheme.surface,
+        style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 13)),
+        onChanged: (v) { if (v != null) onChanged(v); },
+        items: kOrganizerCountries.entries
+            .map((e) => DropdownMenuItem(value: e.key, child: Text(e.key, overflow: TextOverflow.ellipsis)))
+            .toList(),
+        decoration: InputDecoration(
           filled: true,
           fillColor: Colors.white.withValues(alpha: 0.05),
           contentPadding: EdgeInsets.symmetric(vertical: AppResponsive.gap(context, 14).clamp(10, 18), horizontal: 14),

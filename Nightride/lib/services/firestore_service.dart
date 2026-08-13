@@ -13,34 +13,6 @@ class FirestoreService {
 
   static const int defaultListLimit = 60;
 
-  // ── Legacy raw-map API ──────────────────────────────────────────────────
-  // Kept only because lib/pages/admin/admin_panel_page.dart and
-  // admin_add_event_page.dart (both out of this migration's scope) still call
-  // these with the old snake_case shape. They are not schema-compliant and
-  // the updated Firestore rules will reject writes made through `addEvent`/
-  // `updateEvent` once the admin pages are migrated — that migration is not
-  // part of this change. Do not add new callers of these.
-
-  @Deprecated('Writes the pre-migration shape; use createOrganizerEvent/updateOrganizerEvent instead.')
-  Stream<QuerySnapshot<Map<String, dynamic>>> streamEvents({String? status}) {
-    Query<Map<String, dynamic>> q = _events.orderBy('date', descending: false);
-    if (status != null) q = q.where('status', isEqualTo: status);
-    return q.snapshots();
-  }
-
-  @Deprecated('Writes the pre-migration shape; use createOrganizerEvent instead.')
-  Future<void> addEvent(Map<String, dynamic> data) async {
-    final now = FieldValue.serverTimestamp();
-    await _events.add({...data, 'created_at': now, 'updated_at': now});
-  }
-
-  @Deprecated('Writes the pre-migration shape; use updateOrganizerEvent instead.')
-  Future<void> updateEvent(String id, Map<String, dynamic> data) async {
-    await _events
-        .doc(id)
-        .update({...data, 'updated_at': FieldValue.serverTimestamp()});
-  }
-
   Future<void> deleteEvent(String id) async {
     await _events.doc(id).delete();
   }

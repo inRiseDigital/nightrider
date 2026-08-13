@@ -101,14 +101,16 @@ FeaturedEvent _toFeatured(Event e) {
   );
 }
 
+// NOTE: event_detail_page.dart no longer uses this — it defines its own
+// FutureProvider.family<Event?, String> and reads the typed Event directly,
+// now that the Event.toLegacyDetailMap() shim this provider used to call has
+// been deleted. Left in place only because nothing else in this file's
+// public surface depends on removing it and no other caller was found.
 final eventDetailProvider =
-    FutureProvider.family<Map<String, dynamic>?, String>((ref, id) async {
+    FutureProvider.family<Event?, String>((ref, id) async {
   ref.keepAlive();
   if (id.isEmpty) return null;
-  final event = await firestoreService.getEvent(id);
-  // Reshaped to the legacy snake_case detail map: event_detail_page.dart
-  // (outside this migration's scope) still reads the old field names.
-  return event?.toLegacyDetailMap();
+  return firestoreService.getEvent(id);
 });
 
 TrendingEvent _toTrending(Event e) {

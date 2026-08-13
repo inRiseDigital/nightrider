@@ -358,38 +358,6 @@ class Event {
     return map;
   }
 
-  /// Reshapes this event back into the legacy snake_case detail map that
-  /// `event_detail_page.dart` (out of this migration's scope) still reads,
-  /// so that screen keeps working unmodified.
-  Map<String, dynamic> toLegacyDetailMap() => {
-        'id': id,
-        'name': name,
-        'cover_image': coverImage,
-        'genre': genre,
-        'date': isoDate,
-        'start_time': isoTime,
-        'venue_name': venueName,
-        'address': '',
-        'city': city,
-        'country': countryCode,
-        'price_hint': price.hintText,
-        'description': description,
-        'ticket_url': ticketUrl,
-        'language': language,
-        'lat': geo?.latitude ?? 0,
-        'lng': geo?.longitude ?? 0,
-        'artists': performers.map((p) => p.name).where((n) => n.isNotEmpty).toList(),
-        'performers': performers.map((p) => p.toMap()).toList(),
-        'policies': {
-          'age_restriction': policies.ageRestriction,
-          'refund_policy': policies.refundPolicy,
-          're_entry_allowed': policies.reEntryAllowed,
-          'wheelchair_accessible': policies.wheelchairAccessible,
-          'allow_pets': policies.allowPets,
-        },
-        'attendee_count': interestedCount,
-      };
-
   Event copyWith({
     String? name,
     String? description,

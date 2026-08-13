@@ -8,11 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:nightride/core/config/maps_config.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
+import 'package:nightride/domain/event.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/providers/app_nav_provider.dart';
-import 'package:nightride/providers/home_providers.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/favourites_service.dart';
+import 'package:nightride/services/firestore_service.dart';
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 class _P {
@@ -29,6 +30,15 @@ class _P {
 
 // ── Entry point ────────────────────────────────────────────────────────────────
 
+/// Fetches the typed `events/{id}` document directly — no reshaping into a
+/// legacy map. Defined here (rather than in the shared home_providers.dart)
+/// because this page is its only consumer.
+final _eventDetailProvider = FutureProvider.family<Event?, String>((ref, id) async {
+  ref.keepAlive();
+  if (id.isEmpty) return null;
+  return firestoreService.getEvent(id);
+});
+
 class EventDetailPage extends ConsumerWidget {
   const EventDetailPage({super.key, required this.id});
 
@@ -36,16 +46,16 @@ class EventDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(eventDetailProvider(id));
+    final async = ref.watch(_eventDetailProvider(id));
 
     return Scaffold(
       backgroundColor: _P.black,
       body: async.when(
         loading: () => const _LoadingBody(),
         error: (_, __) => const _ErrorBody(),
-        data: (data) {
-          if (data == null) return const _ErrorBody();
-          return _DetailBody(data: data);
+        data: (event) {
+          if (event == null) return const _ErrorBody();
+          return _DetailBody(event: event);
         },
       ),
     );
@@ -105,8 +115,8 @@ class _ErrorBody extends StatelessWidget {
 // ── Detail body ───────────────────────────────────────────────────────────────
 
 class _DetailBody extends ConsumerStatefulWidget {
-  const _DetailBody({required this.data});
-  final Map<String, dynamic> data;
+  const _DetailBody({required this.event});
+  final Event event;
 
   @override
   ConsumerState<_DetailBody> createState() => _DetailBodyState();
@@ -114,37 +124,41 @@ class _DetailBody extends ConsumerStatefulWidget {
 
 class _DetailBodyState extends ConsumerState<_DetailBody> {
   // ── Field getters ─────────────────────────────────────────────────────────
-  String get _id          => widget.data['id'] as String? ?? '';
-  String get _name        => widget.data['name'] as String? ?? '';
-  String get _coverImage  => widget.data['cover_image'] as String? ?? '';
-  String get _genre       => widget.data['genre'] as String? ?? 'Music';
-  String get _date        => widget.data['date'] as String? ?? '';
-  String get _startTime   => widget.data['start_time'] as String? ?? '';
-  String get _venueName   => widget.data['venue_name'] as String? ?? '';
-  String get _address     => widget.data['address'] as String? ?? '';
-  String get _city        => widget.data['city'] as String? ?? '';
-  String get _country     => widget.data['country'] as String? ?? '';
-  String get _priceHint   => widget.data['price_hint'] as String? ?? '';
-  String get _description => widget.data['description'] as String? ?? '';
-  String get _ticketUrl   => widget.data['ticket_url'] as String? ?? '';
-  String get _language    => widget.data['language'] as String? ?? '';
-  double get _lat         => (widget.data['lat'] as num? ?? 0).toDouble();
-  double get _lng         => (widget.data['lng'] as num? ?? 0).toDouble();
+  // Reads the typed Event directly — see docs/FIRESTORE_SCHEMA.md for the
+  // authoritative shape. _date/_startTime below feed the same "YYYY-MM-DD" /
+  // "HH:mm" parsing _formatDayMonth()/_formatTime() always expected, so those
+  // helpers are unchanged.
+  Event get _event        => widget.event;
+  String get _id          => _event.id;
+  String get _name        => _event.name;
+  String get _coverImage  => _event.coverImage;
+  String get _genre       => _event.genre.isNotEmpty ? _event.genre : 'Music';
+  String get _date        => _event.isoDate;
+  String get _startTime   => _event.isoTime;
+  String get _venueName   => _event.venueName;
+  String get _city        => _event.city;
+  String get _country     => _event.countryCode;
+  String get _priceHint   => _event.price.hintText;
+  String get _description => _event.description;
+  String get _ticketUrl   => _event.ticketUrl;
+  String get _language    => _event.language;
+  double get _lat         => _event.geo?.latitude ?? 0;
+  double get _lng         => _event.geo?.longitude ?? 0;
 
-  List<String> get _artists =>
-      (widget.data['artists'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList() ??
-      [];
+  List<Performer> get _performers => _event.performers;
 
-  List<Map<String, dynamic>> get _performers {
-    final raw = widget.data['performers'] as List<dynamic>?;
-    if (raw == null || raw.isEmpty) return [];
-    return raw.whereType<Map>().map((p) => Map<String, dynamic>.from(p)).toList();
-  }
+  EventPolicies get _policies => _event.policies;
 
-  Map<String, dynamic> get _policies =>
-      (widget.data['policies'] as Map<String, dynamic>?) ?? {};
+  /// Whether there is any non-default policy worth a dedicated section —
+  /// the typed model always carries a `policies` map, so "has policies" can
+  /// no longer be inferred from field presence the way the legacy raw map
+  /// allowed.
+  bool get _hasPolicyData =>
+      _policies.ageRestriction > 0 ||
+      _policies.refundPolicy.isNotEmpty ||
+      _policies.reEntryAllowed ||
+      _policies.wheelchairAccessible ||
+      _policies.allowPets;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -201,6 +215,25 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     }
   }
 
+  /// `users/{uid}/favourites/{eventId}` — favourites_service.dart and
+  /// favourites_page.dart (outside this migration's scope) still read this
+  /// legacy snake_case shape, so it is built narrowly here rather than
+  /// re-adding a general-purpose reshaping method to the Event model.
+  Map<String, dynamic> _favouriteMap() => {
+        'id': _id,
+        'name': _name,
+        'cover_image': _coverImage,
+        'genre': _genre,
+        'category': _event.category,
+        'date': _date,
+        'start_time': _startTime,
+        'venue_name': _venueName,
+        'address': _city,
+        'city': _city,
+        'country': _country,
+        'price_hint': _priceHint,
+      };
+
   Future<void> _toggleFavourite(bool isCurrentlyFav) async {
     final svc = ref.read(favouritesServiceProvider);
     final user = ref.read(authStateProvider).asData?.value;
@@ -208,10 +241,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     if (isCurrentlyFav) {
       await svc.remove(user.uid, _id);
     } else {
-      await svc.add(user.uid, {
-        ...widget.data,
-        'id': _id,
-      });
+      await svc.add(user.uid, _favouriteMap());
     }
     ref.invalidate(isFavouriteProvider(_id));
     ref.invalidate(favouritesStreamProvider);
@@ -229,8 +259,9 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     final isFav = isFavAsync.asData?.value ?? false;
 
     final favsAll = ref.watch(favouritesStreamProvider).asData?.value ?? [];
-    final attendeeCount = widget.data['attendee_count'] as int?
-        ?? (favsAll.isNotEmpty ? favsAll.length : null);
+    final attendeeCount = _event.interestedCount > 0
+        ? _event.interestedCount
+        : (favsAll.isNotEmpty ? favsAll.length : null);
 
     const String mapsKey = String.fromEnvironment(
       'GOOGLE_MAPS_API_KEY',
@@ -252,8 +283,10 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
 
     final locationLine =
         [_city, _country].where((s) => s.isNotEmpty).join(', ');
-    final addressLine =
-        [_venueName, _address].where((s) => s.isNotEmpty).join(' · ');
+    // Schema has no separate `address` field for events (venueName/city/
+    // countryCode only), matching what this line already rendered in
+    // practice — the legacy admin form never populated one either.
+    final addressLine = _venueName;
     final priceLabel = _priceHint.isNotEmpty ? _priceHint.toUpperCase() : 'FREE';
     final dayMonth  = _formatDayMonth();
     final timeStr   = _formatTime();
@@ -498,7 +531,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                         ),
 
                         // ── Performers section ─────────────────────────────
-                        if (_performers.isNotEmpty || _artists.isNotEmpty) ...[
+                        if (_performers.isNotEmpty) ...[
                           _SectionDivider(),
                           Padding(
                             padding:
@@ -517,15 +550,11 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                                   ),
                                 ),
                                 const Gap(14),
-                                if (_performers.isNotEmpty)
-                                  Column(
+                                Column(
                                     children: _performers.map((p) {
-                                      final pName =
-                                          p['name'] as String? ?? '';
-                                      final type =
-                                          p['type'] as String? ?? 'DJ';
-                                      final bio =
-                                          p['bio'] as String? ?? '';
+                                      final pName = p.name;
+                                      final type = p.type;
+                                      final bio = p.bio;
                                       return Container(
                                         margin:
                                             const EdgeInsets.only(bottom: 10),
@@ -628,47 +657,6 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                                         ),
                                       );
                                     }).toList(),
-                                  )
-                                else
-                                  Wrap(
-                                    spacing: 10,
-                                    runSpacing: 10,
-                                    children: _artists
-                                        .map((artist) => Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 14,
-                                                      vertical: 9),
-                                              decoration: BoxDecoration(
-                                                color: _P.black
-                                                    .withValues(alpha: 0.06),
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: _P.black
-                                                      .withValues(alpha: 0.10),
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Icon(Icons.mic_rounded,
-                                                      color: _P.hotPink,
-                                                      size: 13),
-                                                  const Gap(7),
-                                                  Text(
-                                                    artist,
-                                                    style: GoogleFonts.poppins(
-                                                      color: _P.black,
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ))
-                                        .toList(),
                                   ),
                                 const Gap(22),
                               ],
@@ -677,7 +665,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                         ],
 
                         // ── Event policies ─────────────────────────────────
-                        if (_policies.isNotEmpty) ...[
+                        if (_hasPolicyData) ...[
                           _SectionDivider(),
                           Padding(
                             padding:
@@ -706,70 +694,54 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                                   ),
                                   child: Column(
                                     children: [
-                                      if ((_policies['age_restriction']
-                                                  as int? ??
-                                              0) >
-                                          0) ...[
+                                      if (_policies.ageRestriction > 0) ...[
                                         _PolicyRow(
                                           icon: Icons.person_outline_rounded,
                                           iconColor: Colors.orangeAccent,
                                           label: 'Age Restriction',
                                           value:
-                                              '${_policies['age_restriction']}+ only',
+                                              '${_policies.ageRestriction}+ only',
                                         ),
                                         _PolicyDivider(),
                                       ],
-                                      if ((_policies['refund_policy']
-                                                  as String? ??
-                                              '')
-                                          .isNotEmpty) ...[
+                                      if (_policies.refundPolicy.isNotEmpty) ...[
                                         _PolicyRow(
                                           icon: Icons.receipt_long_rounded,
                                           iconColor: Colors.blue,
                                           label: 'Refund Policy',
-                                          value: _policies['refund_policy']
-                                              as String,
+                                          value: _policies.refundPolicy,
                                         ),
                                         _PolicyDivider(),
                                       ],
                                       _PolicyRow(
                                         icon: Icons.loop_rounded,
-                                        iconColor:
-                                            _policies['re_entry_allowed'] ==
-                                                    true
+                                        iconColor: _policies.reEntryAllowed
                                                 ? Colors.green
                                                 : Colors.redAccent,
                                         label: 'Re-entry',
-                                        value:
-                                            _policies['re_entry_allowed'] ==
-                                                    true
+                                        value: _policies.reEntryAllowed
                                                 ? 'Allowed'
                                                 : 'Not allowed',
                                       ),
                                       _PolicyDivider(),
                                       _PolicyRow(
                                         icon: Icons.accessible_rounded,
-                                        iconColor:
-                                            _policies['wheelchair_accessible'] ==
-                                                    true
+                                        iconColor: _policies.wheelchairAccessible
                                                 ? Colors.green
                                                 : Colors.black38,
                                         label: 'Wheelchair Access',
-                                        value:
-                                            _policies['wheelchair_accessible'] ==
-                                                    true
+                                        value: _policies.wheelchairAccessible
                                                 ? 'Accessible'
                                                 : 'Not specified',
                                       ),
                                       _PolicyDivider(),
                                       _PolicyRow(
                                         icon: Icons.pets_rounded,
-                                        iconColor:
-                                            _policies['allow_pets'] == true
-                                                ? Colors.green
-                                                : Colors.black38,
+                                        iconColor: _policies.allowPets
+                                            ? Colors.green
+                                            : Colors.black38,
                                         label: 'Pets',
-                                        value: _policies['allow_pets'] == true
+                                        value: _policies.allowPets
                                             ? 'Allowed'
                                             : 'Not allowed',
                                       ),

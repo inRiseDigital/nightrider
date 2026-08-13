@@ -62,6 +62,9 @@ out/
 firebase_service_account.json
 **/firebase_service_account.json
 
+# Firebase emulator persisted data (scripts/emulators.sh)
+emulator-data/
+
 # Python cache
 __pycache__/
 *.py[cod]

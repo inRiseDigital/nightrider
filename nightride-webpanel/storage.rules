@@ -11,11 +11,17 @@ rules_version = '2';
 //   kyc/{uid}/video/{attempt}/poster.jpg
 //
 // {attempt} comes from users/{uid}/private/organizerReview.steps.<id>.attempt,
-// which only an admin can advance. Together with create-only permission that
-// makes both properties structural rather than a matter of client behaviour:
-// reviewed evidence cannot be overwritten (create implies the object does not
-// exist), and an applicant cannot mint fresh upload paths to burn storage,
-// because they cannot move the number that appears in the path.
+// which only an admin can advance. Together with an explicit `resource == null`
+// that makes both properties structural rather than a matter of client
+// behaviour: reviewed evidence cannot be overwritten, and an applicant cannot
+// mint fresh upload paths to burn storage, because they cannot move the number
+// that appears in the path.
+//
+// Note the `resource == null` is load-bearing and not redundant. Storage is not
+// Firestore here: `create` does not imply the object is absent, because a
+// content re-upload writes a new generation of an immutable object and is still
+// classified as a create. `update` covers metadata-only mutation. Dropping that
+// one clause makes reviewed evidence silently overwritable.
 //
 // Deletion is Admin SDK only. Retention is enforced by the webpanel's server
 // route on the approve/reject action, backstopped by a bucket lifecycle rule of
@@ -67,6 +73,13 @@ service firebase.storage {
 
       allow create: if signedIn()
         && request.auth.uid == uid
+        // Unlike Firestore, Storage's `create` does NOT imply the object is
+        // absent: overwriting an existing object's content is still a
+        // `create` request (GCS objects are immutable; a re-upload is a new
+        // generation, not an in-place "update" — `update` here only covers
+        // metadata-only mutation). The immutability guarantee this comment
+        // block promises has to be spelled out explicitly.
+        && resource == null
         && stepId in ['nic', 'selfie', 'video']
         && step(uid, stepId).get('status', '') in ['active', 'needs_info']
         // int() on the path segment rather than string() on the stored number:

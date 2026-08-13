@@ -1,0 +1,17 @@
+{
+  "name": "firestore-tests",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Security-rules test suite for nightride-webpanel firestore.rules / storage.rules, run against the local Firebase emulator.",
+  "scripts": {
+    "test": "firebase emulators:exec --project nightride-test --only firestore,storage \"vitest run\"",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.0.0",
+    "firebase-tools": "^13.29.0",
+    "vitest": "^2.1.0"
+  }
+}

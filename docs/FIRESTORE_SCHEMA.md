@@ -390,12 +390,20 @@ kyc/{uid}/video/{attempt}/poster.jpg
 ```
 
 `{attempt}` is `organizerReview.steps.<id>.attempt`, which only an admin
-advances. With create-only permission that makes two properties structural
-rather than a matter of client behaviour: reviewed evidence cannot be
-overwritten, because `create` implies the object does not exist; and an
-applicant cannot burn storage, because they cannot move the number in the path.
-Filenames are pinned per step, so an attempt directory cannot be filled with
-arbitrary objects.
+advances. With create-only permission and an explicit `resource == null` check,
+that makes two properties structural rather than a matter of client behaviour:
+reviewed evidence cannot be overwritten, and an applicant cannot burn storage,
+because they cannot move the number in the path. Filenames are pinned per step,
+so an attempt directory cannot be filled with arbitrary objects.
+
+The `resource == null` clause is not redundant, and this is worth stating
+plainly because the intuition carried over from Firestore is wrong: in Cloud
+Storage, `create` does **not** imply the object is absent. A content re-upload
+to an existing path writes a new generation of an immutable object and is still
+classified as a create; `update` covers metadata-only mutation. Without that
+clause, `allow create` alone leaves reviewed evidence overwritable by the
+applicant who submitted it. The rules test suite pins this
+(`firestore-tests/tests/storage.test.js`).
 
 The walkthrough video is capped at 60 seconds, 720p, H.264/AAC MP4, 30 MB —
 enforced by the recorder preset, a client pre-check, and the Storage rule. The

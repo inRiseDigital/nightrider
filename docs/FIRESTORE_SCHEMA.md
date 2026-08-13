@@ -64,6 +64,20 @@ requires it, so no query needs a missing-field branch. It duplicates
 `organizerReview.status` deliberately: it keeps `isOrganizer()` on the same
 cached document read as `isAdmin()`, and an admin writes both in one batch.
 
+The two states that look alike are worth pinning down, because only an admin can
+write this field and an applicant must be able to apply without one:
+
+| Situation | `organizerStatus` | `organizerApplication.submitted` |
+|---|---|---|
+| Never applied | `none` | `false` |
+| Applied, nobody has looked yet | `none` | `true` |
+| An admin has picked it up | `pending` | `true` |
+| Decided | `approved` / `rejected` / `revoked` | `true` |
+
+So the untriaged review queue is `submitted == true && organizerStatus == 'none'`,
+ordered by `submittedAt`, and `'pending'` means a human has it — not merely that a
+form was sent. The applicant cannot put themselves in either state.
+
 `rank` may only rise, by at most 50 per write. That bounds a single write, not a
 session; the gamification counters are honour-system and are documented as such.
 
@@ -167,6 +181,21 @@ together with `organizerApplication.profile.venueName`, creates
 A `needs_info` cycle on a file step means the admin advances `attempt`, which
 opens exactly one fresh set of Storage paths. `attempt` is capped at 3 by the
 rules; past that an admin must reset the step.
+
+Three shape questions this document was silent on, settled:
+
+- Every step carries the full `ReviewStep` key set, including `venueId: null` on
+  the four steps that will never use it. A uniform shape means the review UI and
+  the migration script index it the same way for all five.
+- There is no per-attempt history array. `ReviewStep` holds only the current
+  attempt, status and note. The trail is recoverable without one: each prior
+  attempt's evidence still sits at its own immutable `kyc/{uid}/{step}/{n}/…`
+  path until retention deletes it, and each decision is a `logs` entry. An
+  in-document history array would duplicate both and grow unbounded.
+- `venues.live` may be structurally absent. A venue nobody has reported on has
+  no door status, and inventing `'closed'` for it would be a lie rather than a
+  default — hence the `!touched(['live'])` escape in the rules and the "N minutes
+  ago" label rendering from `live.updatedAt` only when the map exists.
 
 There is no `sha256`, no `extraSteps`, no postcard or video-call step type, and
 no scheduling. Five pieces of evidence from a handful of applicants do not need

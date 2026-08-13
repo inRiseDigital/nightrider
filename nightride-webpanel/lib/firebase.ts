@@ -1,6 +1,7 @@
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 /**
  * Firebase web config for the `nightride-a9173` project — the same project the
@@ -41,4 +42,14 @@ export function getFirebaseAuth(): Auth {
 
 export function getDb(): Firestore {
   return getFirestore(getFirebaseApp());
+}
+
+/**
+ * Avatar uploads and KYC review both read from Cloud Storage. Reads of
+ * `kyc/**` succeed for an admin because storage.rules cross-checks
+ * `users/{uid}.isAdmin`; deletes never do, from any client — those go through
+ * `/api/admin/kyc`, which holds the Admin SDK.
+ */
+export function getBucket(): FirebaseStorage {
+  return getStorage(getFirebaseApp());
 }

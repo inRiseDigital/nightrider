@@ -121,34 +121,67 @@ user has a verified email in the Auth emulator.
 
 ## 5. Seeding test data
 
-Fresh `demo-`/emulator Firestore starts empty — no `events`, nothing to
-favourite, nothing to show on the home feed. `events` is public-read
-(`allow read: if true` in `nightride-webpanel/firestore.rules`), so real
-event data can be pulled anonymously, no login needed:
+`scripts/seed-emulator/` fills an empty emulator with data that matches
+`docs/FIRESTORE_SCHEMA.md` exactly, using the Admin SDK — which bypasses
+security rules, and is the reason it is the right tool for seed data.
 
 ```bash
-curl -s "https://firestore.googleapis.com/v1/projects/nightride-a9173/databases/(default)/documents/events?pageSize=25" \
-  -o real_events.json
+cd scripts/seed-emulator
+npm install                     # once
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+STORAGE_EMULATOR_HOST=http://127.0.0.1:9199 \
+  node seed.mjs
 ```
 
-Then write each doc straight into the local emulator via its admin REST
-bypass (`Authorization: Bearer owner` skips security rules entirely —
-local emulator only, never touches anything real):
+It refuses to run without `FIRESTORE_EMULATOR_HOST`, so it cannot be
+pointed at production by accident, and it is idempotent — a second run
+overwrites rather than duplicates. `--wipe` clears the collections it owns
+first. It prints the five seeded accounts and their passwords at the end;
+they cover every access state (admin, plain user, submitted applicant,
+approved organizer, rejected applicant), and all of them have
+`emailVerified: true`, because chat writes are gated on a verified email
+and the Auth emulator otherwise defaults it to false.
+
+The old approach in this section — pulling real events over the public
+REST API and PATCHing them in — no longer works, and is worth
+understanding rather than just deleting. `events` was `allow read: if
+true`; it is now readable only per-document for published events, so an
+anonymous *list* is denied outright. That is the rule working, not a
+regression.
+
+## 6. Rules tests
+
+`firestore-tests/` runs the security rules against a real emulator that it
+starts and tears down itself, on non-default ports (Firestore 8180,
+Storage 9299) so it never collides with the suite you are developing
+against.
 
 ```bash
-curl -s -X PATCH \
-  "http://127.0.0.1:8080/v1/projects/nightride-a9173/databases/(default)/documents/events/<docId>" \
-  -H "Authorization: Bearer owner" -H "Content-Type: application/json" \
-  -d '{"fields": { ...same shape as the real doc's "fields"... }}'
+cd firestore-tests
+npm install                     # once
+npm test
 ```
 
-Other collections aren't public (e.g. `live_hub_clubs` needs
-`request.auth != null`, everything undeclared is deny-all) — either seed
-hand-written mock data the same way (see git history around this doc's
-commit for a worked example), or pull real data with a `gcloud
-auth login` + `gcloud auth print-access-token` bearer (IAM-level access,
-bypasses rules like the Admin SDK does) instead of an anonymous read.
+105 cases across users, the organizer review document, events, venues,
+venue reports, logs and Storage. They are the executable form of
+`docs/FIRESTORE_SCHEMA.md`: if the two disagree, the tests are right.
 
-**Browsing seeded data**: emulator UI's Firestore tab only shows the
-project it was started with — use the REST calls above (drop `-X PATCH`
-for a plain `GET`) if inspecting from a project the UI can't display.
+## 7. Migrating pre-schema data
+
+`scripts/migrate-schema/` rewrites documents written before the current
+schema — legacy events in particular, which have no `startAt` and so drop
+out of every indexed query rather than merely rendering badly.
+
+```bash
+cd scripts/migrate-schema
+npm install                     # once
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node migrate.mjs            # dry run
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node migrate.mjs --apply    # commit
+```
+
+Dry run is the default because it rewrites real user data. `--apply`
+commits; `--delete-retired` removes the retired collections and only runs
+alongside `--apply`, never in the same pass that writes. Targeting
+anything that is not an emulator requires `--i-know-this-is-production`.
+Running it twice is a no-op.

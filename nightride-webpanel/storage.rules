@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// Placeholder — no storage.rules previously existed anywhere in this repo's
+// history (the real bucket's rules, if any, live only in Firebase Console).
+// Deny-all so the local Storage emulator can start; Nightride doesn't use
+// Firebase Storage in code at all. Tighten this before relying on it for
+// real Storage testing.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

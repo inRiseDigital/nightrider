@@ -6,11 +6,17 @@ enum OrganizerAccess {
   /// Approved by an admin — the organizer dashboard is unlocked.
   approved,
 
-  /// An application exists and is still being reviewed.
+  /// An application has been submitted and is waiting on, or in front of, an
+  /// admin. `organizerStatus` alone cannot tell those two apart, which is the
+  /// point: only an admin can move the field, so an untriaged application sits
+  /// at 'none' with `organizerApplication.submitted` true.
   pending,
 
   /// An application was reviewed and turned down.
   rejected,
+
+  /// Approval was withdrawn after the fact.
+  revoked,
 
   /// A normal account that has never applied.
   none,
@@ -22,60 +28,87 @@ final organizerServiceProvider = Provider<OrganizerService>(
 
 /// Reads organizer state for a uid.
 ///
-/// Three systems write this data and none of them agree on a single field, so
-/// all three are checked in priority order:
-///   1. `users/{uid}.isOrganizer` — set by the in-app admin panel on approval.
-///   2. `users/{uid}.role == 'organizer'` — what the main sign-in flow routes on.
-///   3. `users/{uid}.organizerApplication` — the webpanel's application
-///      (nightride-webpanel/lib/organizer/application-service.ts).
-///   4. `organizer_requests/{uid}` — the legacy in-app application form.
+/// There is exactly one source of truth now: `users/{uid}.organizerStatus`,
+/// which only an admin can write. `isOrganizer`, `role` and the
+/// `organizer_requests` collection are all gone — the last of those is denied
+/// by firestore.rules, so the old fallback chain could only ever have thrown.
+///
+/// The reviewer's notes live in `users/{uid}/private/organizerReview`, readable
+/// by the owner and by admins and writable by neither the applicant nor this
+/// app.
 class OrganizerService {
   const OrganizerService(this._db);
 
   final FirebaseFirestore _db;
 
+  DocumentReference<Map<String, dynamic>> _userDoc(String uid) =>
+      _db.collection('users').doc(uid);
+
+  DocumentReference<Map<String, dynamic>> _reviewDoc(String uid) =>
+      _userDoc(uid).collection('private').doc('organizerReview');
+
   Future<OrganizerAccess> accessFor(String uid) async {
-    final profile = (await _db.collection('users').doc(uid).get()).data();
+    final profile = (await _userDoc(uid).get()).data();
+    if (profile == null) return OrganizerAccess.none;
 
-    if (profile?['isOrganizer'] == true || profile?['role'] == 'organizer') {
-      return OrganizerAccess.approved;
+    switch (profile['organizerStatus'] as String?) {
+      case 'approved':
+        return OrganizerAccess.approved;
+      case 'rejected':
+        return OrganizerAccess.rejected;
+      case 'revoked':
+        return OrganizerAccess.revoked;
+      case 'pending':
+        return OrganizerAccess.pending;
     }
 
-    final application = profile?['organizerApplication'];
-    if (application is Map) {
-      return application['rejected'] == true
-          ? OrganizerAccess.rejected
-          : OrganizerAccess.pending;
+    // 'none' with a submitted application means nobody has picked it up yet,
+    // which reads as pending to the applicant even though no admin has it.
+    final application = profile['organizerApplication'];
+    if (application is Map && application['submitted'] == true) {
+      return OrganizerAccess.pending;
     }
-
-    // `organizer_requests` has no match in firestore.rules, so this read is
-    // denied outright on a locked-down project. A failure here means "we can't
-    // see a legacy application", not "something went wrong" — fall through to
-    // `none` so the applicant is offered the form rather than an error.
-    try {
-      final request =
-          (await _db.collection('organizer_requests').doc(uid).get()).data();
-      switch (request?['status'] as String?) {
-        case 'approved':
-          return OrganizerAccess.approved;
-        case 'rejected':
-          return OrganizerAccess.rejected;
-        case 'pending':
-          return OrganizerAccess.pending;
-      }
-    } catch (_) {}
 
     return OrganizerAccess.none;
   }
 
-  /// The admin's note explaining a rejection, when the webpanel recorded one.
+  /// Live access state, so the dashboard unlocks the moment an admin approves
+  /// rather than on the next cold start.
+  Stream<OrganizerAccess> watchAccess(String uid) =>
+      _userDoc(uid).snapshots().map((snapshot) {
+        final profile = snapshot.data();
+        if (profile == null) return OrganizerAccess.none;
+
+        switch (profile['organizerStatus'] as String?) {
+          case 'approved':
+            return OrganizerAccess.approved;
+          case 'rejected':
+            return OrganizerAccess.rejected;
+          case 'revoked':
+            return OrganizerAccess.revoked;
+          case 'pending':
+            return OrganizerAccess.pending;
+        }
+
+        final application = profile['organizerApplication'];
+        if (application is Map && application['submitted'] == true) {
+          return OrganizerAccess.pending;
+        }
+        return OrganizerAccess.none;
+      });
+
+  /// The admin's note explaining a rejection.
   Future<String> rejectionReasonFor(String uid) async {
-    final profile = (await _db.collection('users').doc(uid).get()).data();
-    final application = profile?['organizerApplication'];
-    if (application is Map) {
-      final reason = application['rejectionReason'];
-      if (reason is String && reason.trim().isNotEmpty) return reason.trim();
-    }
-    return '';
+    final review = (await _reviewDoc(uid).get()).data();
+    final reason = review?['rejectionReason'];
+    return reason is String ? reason.trim() : '';
+  }
+
+  /// Per-step review state, for showing the applicant what an admin asked for.
+  /// Returns an empty map when no application has been started.
+  Future<Map<String, dynamic>> reviewStepsFor(String uid) async {
+    final review = (await _reviewDoc(uid).get()).data();
+    final steps = review?['steps'];
+    return steps is Map ? Map<String, dynamic>.from(steps) : <String, dynamic>{};
   }
 }

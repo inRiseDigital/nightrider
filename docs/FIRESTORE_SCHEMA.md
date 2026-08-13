@@ -366,6 +366,7 @@ global, and an unbounded `where countryCode == …` pulls all of it.
 ```
 venueReports/{reportId} {
   venueId: string
+  venueName: string                  // denormalised for list rendering
   uid: string                        // author, == request.auth.uid
   username, avatarUrl: string
   city, countryCode: string
@@ -378,6 +379,10 @@ venueReports/{reportId} {
 
 venueReports/{reportId}/upvotes/{voterUid} { at: Timestamp }
 ```
+
+`venueName` is denormalised for the same reason `events.venueName` is: the Live
+Hub renders fifty reports at a time and joining each one back to its venue would
+be fifty extra reads for one string.
 
 `comment` is always present, defaulting to `""` — omitting the field is what
 made every commentless report fail the old rule. `vibeRating` is validated as a

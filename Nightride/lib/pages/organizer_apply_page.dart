@@ -59,6 +59,19 @@ class _OrganizerApplyPageState extends State<OrganizerApplyPage> {
     super.dispose();
   }
 
+  /// The initial shape firestore.rules requires of every review step. Every
+  /// step carries the full key set, `venueId` included, so the review UI and
+  /// the migration script can index all five identically.
+  Map<String, dynamic> _initialReviewStep(String status) => {
+        'status': status,
+        'attempt': 0,
+        'note': '',
+        'reviewedAt': null,
+        'reviewedBy': null,
+        'venueId': null,
+        'mediaDeletedAt': null,
+      };
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedTypes.isEmpty) {
@@ -69,24 +82,70 @@ class _OrganizerApplyPageState extends State<OrganizerApplyPage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      await FirebaseFirestore.instance
-          .collection('organizer_requests')
-          .doc(user.uid)
-          .set({
-        'uid': user.uid,
+
+      // The application is applicant-authored and advisory. It carries no
+      // status: the verdict lives in users/{uid}/private/organizerReview,
+      // which only an admin may update, and organizerStatus on this document
+      // is pinned against the applicant by firestore.rules. Writing a status
+      // here would simply be denied.
+      //
+      // submittedAt must be the server's clock — the rules require it to equal
+      // request.time, which is what stops an application backdating itself to
+      // the front of the review queue.
+      final users = FirebaseFirestore.instance.collection('users');
+      await users.doc(user.uid).set({
         'displayName': _nameCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
-        'orgName': _orgNameCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'city': _cityCtrl.text.trim(),
-        'eventTypes': _selectedTypes.toList(),
-        'eventsPerMonth': _eventsPerMonth,
-        'instagram': _instagramCtrl.text.trim(),
-        'website': _websiteCtrl.text.trim(),
-        'bio': _bioCtrl.text.trim(),
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        'organizerApplication': {
+          'submitted': true,
+          'submittedAt': FieldValue.serverTimestamp(),
+          'profile': {
+            'orgName': _orgNameCtrl.text.trim(),
+            'venueName': '',
+            'instagram': _instagramCtrl.text.trim(),
+            'website': _websiteCtrl.text.trim(),
+            'bio': _bioCtrl.text.trim(),
+            'eventTypes': _selectedTypes.toList(),
+            'eventsPerMonth': _eventsPerMonth,
+          },
+          'steps': {
+            'venueAddress': null,
+            'nic': {'uploaded': false},
+            'selfie': {'uploaded': false},
+            'video': {'uploaded': false},
+            'gps': {'attempts': <Map<String, dynamic>>[]},
+          },
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Create-once, and the applicant may only ever create it in this exact
+      // shape. A second application from the same account finds it already
+      // there, so the failure is expected rather than exceptional.
+      try {
+        await users.doc(user.uid).collection('private').doc('organizerReview').set({
+          'status': 'none',
+          'appliedAt': FieldValue.serverTimestamp(),
+          'decidedAt': null,
+          'decidedBy': '',
+          'rejectionReason': '',
+          'phoneVerified': false,
+          'steps': {
+            'venueAddress': _initialReviewStep('active'),
+            'nic': _initialReviewStep('active'),
+            'selfie': _initialReviewStep('active'),
+            'video': _initialReviewStep('active'),
+            // gps cannot start until an admin has accepted a venue address
+            // for it to be measured against.
+            'gps': _initialReviewStep('pending'),
+          },
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } on FirebaseException catch (error) {
+        if (error.code != 'permission-denied') rethrow;
+      }
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(

@@ -182,6 +182,26 @@ A `needs_info` cycle on a file step means the admin advances `attempt`, which
 opens exactly one fresh set of Storage paths. `attempt` is capped at 3 by the
 rules; past that an admin must reset the step.
 
+### Reapplying after a rejection
+
+Because the review document is create-once and admin-only afterwards, a rejected
+applicant cannot reopen their own steps — deliberately, since a self-service
+retry would make the attempt cap meaningless. They are not stuck, though. The
+loop is:
+
+1. The applicant edits `organizerApplication` and sets `submittedAt` again. This
+   is the one thing they can still do, and the rules pin it to `request.time`.
+2. An admin sees them in the reapplication queue —
+   `organizerStatus == 'rejected'` ordered by `organizerApplication.submittedAt`,
+   which is what the second `users` composite index exists for.
+3. The admin advances the relevant step's `attempt` and sets its status to
+   `needs_info`. That opens exactly one fresh set of Storage paths.
+4. The applicant uploads to the new attempt.
+
+So every retry costs an admin one deliberate action, and the cap holds. The
+webpanel therefore has no client-side "resubmit" button, and its absence is the
+design rather than an omission.
+
 Three shape questions this document was silent on, settled:
 
 - Every step carries the full `ReviewStep` key set, including `venueId: null` on

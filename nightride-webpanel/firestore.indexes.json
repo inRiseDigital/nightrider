@@ -39,6 +39,10 @@
       { "fieldPath": "organizerStatus", "order": "ASCENDING" },
       { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
 
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizerStatus", "order": "ASCENDING" },
+      { "fieldPath": "organizerApplication.submittedAt", "order": "ASCENDING" } ] },
+
     { "collectionGroup": "venues", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "countryCode", "order": "ASCENDING" },
       { "fieldPath": "city", "order": "ASCENDING" },

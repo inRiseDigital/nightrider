@@ -16,3 +16,19 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# The panel itself is a static export, but four operations cannot be client
+# writes and so cannot live in it: setting isAdmin, deleting KYC objects,
+# deleting an account, and the scheduled retention sweep. The security rules deny
+# all four to every client on purpose (see docs/FIRESTORE_SCHEMA.md).
+#
+# These functions are that runtime. They hold the Admin SDK and are the reason
+# this project needs no Firebase Cloud Functions deployment at all — the
+# serverless platform the site already deploys to is enough.
+#
+# They require FIREBASE_SERVICE_ACCOUNT_JSON and FIREBASE_PROJECT_ID in the
+# Netlify environment. Without them the functions fail closed at init rather than
+# running with ambient credentials.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

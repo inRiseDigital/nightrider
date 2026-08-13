@@ -1,14 +1,20 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { adminDb, requireAdmin } from "@/lib/firebase-admin";
-import { IDENTITY_STEPS, VIDEO_STEP, purgeKycSteps, type PurgeStep } from "@/lib/admin/kyc-retention";
+import { adminDb, requireAdmin } from "../../lib/firebase-admin";
+import { IDENTITY_STEPS, VIDEO_STEP, purgeKycSteps, type PurgeStep } from "../../lib/admin/kyc-retention";
 
 /**
  * POST /api/admin/kyc — delete an applicant's KYC evidence.
  *
- * storage.rules denies `delete` on `kyc/**` to every client, admins included,
- * so that reviewed evidence cannot be altered by any compromised session. That
- * makes this route the only deletion path, and it is the one the approve and
- * reject actions call inline.
+ * storage.rules denies `delete` on `kyc/**` to every client, admins included, so
+ * that reviewed evidence cannot be altered by any compromised session. That
+ * makes this the only deletion path, and it is what the approve and reject
+ * actions call inline.
+ *
+ * This is a Netlify Function rather than a Next route handler because the panel
+ * is a static export (next.config.mjs sets output: "export") published to
+ * Netlify — there is no Next server to host a route. Netlify Functions are the
+ * runtime this project already deploys, which is why the Admin SDK work lives
+ * here instead of in a Firebase Cloud Function.
  *
  * Body: { uid: string, scope: "identity" | "all" }
  *   identity — nic + selfie, the 30-day-after-approval case
@@ -20,7 +26,11 @@ const SCOPES: Record<string, PurgeStep[]> = {
   all: [...IDENTITY_STEPS, VIDEO_STEP],
 };
 
-export async function POST(request: Request) {
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== "POST") {
+    return Response.json({ error: "POST only" }, { status: 405 });
+  }
+
   const caller = await requireAdmin(request);
   if (!caller) {
     return Response.json({ error: "admin authentication required" }, { status: 403 });
@@ -62,3 +72,5 @@ export async function POST(request: Request) {
 
   return Response.json(result);
 }
+
+export const config = { path: "/api/admin/kyc" };

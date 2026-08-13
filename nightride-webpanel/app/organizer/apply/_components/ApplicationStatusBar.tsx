@@ -1,15 +1,18 @@
 "use client";
 
-import { AccentButton } from "@/components/organizer/ui/AccentButton";
 import { cn } from "@/components/organizer/ui/cn";
-import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
+import { useApplicationState } from "@/lib/organizer/store";
 import type { OverallView } from "@/lib/organizer/types";
 
-/** Pinned summary of where the whole application stands. */
+/**
+ * Pinned summary of where the whole application stands. `rejected` and
+ * `rejectionReason` come from the review doc — the applicant can never write
+ * a verdict, so there is also no client-side "resubmit" action: only an admin
+ * can move a rejected application forward again.
+ */
 export function ApplicationStatusBar({ overall }: { overall: OverallView }) {
-  const { application, busy } = useApplicationState();
-  const { resubmit } = useApplicationActions();
-  const { rejected, rejectionReason } = application;
+  const { review } = useApplicationState();
+  const rejected = review.status === "rejected";
 
   return (
     <div className="w-full shrink-0 px-5 pb-5">
@@ -35,17 +38,11 @@ export function ApplicationStatusBar({ overall }: { overall: OverallView }) {
             <p className="text-sm font-semibold text-nr-text-primary">Application status</p>
             <p className={cn("mt-0.5 font-mono text-[11px]", overall.textClass)}>{overall.label}</p>
             {rejected && (
-              <p className="mt-1.5 max-w-[420px] text-xs text-nr-text-secondary">Reason: {rejectionReason}</p>
+              <p className="mt-1.5 max-w-[420px] text-xs text-nr-text-secondary">Reason: {review.rejectionReason}</p>
             )}
           </div>
 
-          {rejected ? (
-            <AccentButton onClick={() => void resubmit()} loading={busy} className="shrink-0">
-              Resubmit application
-            </AccentButton>
-          ) : (
-            <p className="max-w-[220px] text-xs text-nr-text-secondary sm:text-right">{overall.detail}</p>
-          )}
+          <p className="max-w-[220px] text-xs text-nr-text-secondary sm:text-right">{overall.detail}</p>
         </div>
       </div>
     </div>

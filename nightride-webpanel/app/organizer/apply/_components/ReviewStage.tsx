@@ -4,7 +4,6 @@ import { ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { COPY_TONE, FLOW_LAYOUT, TONE_COPY } from "@/lib/organizer/constants";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
 import type { StepView } from "@/lib/organizer/types";
-import { SimulationTriggers } from "./SimulationTriggers";
 import { StepChecklist } from "./StepChecklist";
 import { StepTimeline } from "./StepTimeline";
 
@@ -37,8 +36,6 @@ export function ReviewStage({ steps }: { steps: StepView[] }) {
       )}
 
       {FLOW_LAYOUT === "timeline" ? <StepTimeline steps={steps} /> : <StepChecklist steps={steps} />}
-
-      <SimulationTriggers />
     </div>
   );
 }

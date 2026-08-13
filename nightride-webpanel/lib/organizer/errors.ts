@@ -37,6 +37,33 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   unavailable: "Can't reach Firestore right now. Check your connection and try again.",
 };
 
+/**
+ * Cloud Storage surfaces codes like `storage/unauthorized`. The KYC rule
+ * (nightride-webpanel/storage.rules) denies a re-upload to an already-written
+ * path as a matter of design — reviewed evidence is immutable — so that
+ * specific code gets applicant-facing copy instead of a raw permission error.
+ * Storage does not distinguish "this object already exists" from "this step
+ * isn't open for upload" in the error it returns, so this message covers both.
+ */
+const STORAGE_ERROR_MESSAGES: Record<string, string> = {
+  "storage/unauthorized": "This step is already submitted — wait for review.",
+  "storage/canceled": "Upload canceled.",
+  "storage/retry-limit-exceeded": "Upload failed after repeated retries. Check your connection and try again.",
+  "storage/quota-exceeded": "Storage quota exceeded. Contact the Night Ride team.",
+  "storage/unauthenticated": "You're signed out. Sign in again and retry the upload.",
+};
+
+export function describeUploadError(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = String((error as { code: unknown }).code);
+    const known = STORAGE_ERROR_MESSAGES[code];
+    if (typeof console !== "undefined") console.error("[organizer] Storage error", code, error);
+    return known ?? `Upload failed: ${code}`;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return "Upload failed. Try again.";
+}
+
 export function describeAuthError(error: unknown): string {
   // Anything carrying a Firebase code keeps that code in the visible message.
   // A mapped message can be wrong about the cause; the raw code never is.

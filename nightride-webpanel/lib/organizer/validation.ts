@@ -1,3 +1,6 @@
+import { KYC_IMAGE_MAX_BYTES, KYC_IMAGE_TYPES, KYC_VIDEO_MAX_BYTES, KYC_VIDEO_TYPE } from "./constants";
+import type { VenueAddressDraft } from "./types";
+
 export const PASSWORD_MIN_LENGTH = 8;
 
 export interface PasswordRule {
@@ -65,4 +68,34 @@ export function validatePassword(password: string): string | null {
 
 export function checkPasswordRules(password: string) {
   return PASSWORD_RULES.map((rule) => ({ id: rule.id, label: rule.label, met: rule.test(password) }));
+}
+
+const MB = 1024 * 1024;
+
+/**
+ * Client-side pre-check so a bad file gets a real message instead of a
+ * Storage permission error — the rule enforces the same size/type limits
+ * server-side (nightride-webpanel/storage.rules, kyc/{uid}/{stepId}/... block).
+ */
+export function validateKycImage(file: File): string | null {
+  if (!KYC_IMAGE_TYPES.includes(file.type)) return "Use a JPEG or PNG image.";
+  if (file.size > KYC_IMAGE_MAX_BYTES) return `Image must be under ${KYC_IMAGE_MAX_BYTES / MB} MB.`;
+  return null;
+}
+
+export function validateKycVideo(file: File): string | null {
+  if (file.type !== KYC_VIDEO_TYPE) return "Use an MP4 video.";
+  if (file.size > KYC_VIDEO_MAX_BYTES) return `Video must be under ${KYC_VIDEO_MAX_BYTES / MB} MB.`;
+  return null;
+}
+
+/**
+ * Nothing here is rules-enforced (organizerApplication is advisory), but an
+ * empty or malformed address is useless to the admin reviewing it.
+ */
+export function validateVenueAddress(draft: VenueAddressDraft): string | null {
+  if (!draft.address.trim()) return "Enter the venue's street address.";
+  if (!draft.city.trim()) return "Enter the venue's city.";
+  if (!/^[A-Za-z]{2}$/.test(draft.countryCode.trim())) return "Enter a 2-letter country code, for example AE.";
+  return null;
 }

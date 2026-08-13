@@ -1,36 +1,34 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { adminDb, requireAdmin } from "@/lib/firebase-admin";
-import { runRetentionSweep } from "@/lib/admin/kyc-retention";
+import { adminDb, requireAdmin } from "../../lib/firebase-admin";
+import { runRetentionSweep, stepsDueForPurge } from "../../lib/admin/kyc-retention";
 
 /**
- * POST /api/admin/retention — sweep every decided application and delete the
- * KYC media whose retention window has passed.
+ * /api/admin/retention — delete the KYC media whose retention window has passed.
+ *
+ * GET  reports what would be deleted, touching nothing.
+ * POST performs the sweep.
  *
  * The approve and reject actions delete inline, so this is the catch-up path for
  * anything that failed at decision time, plus the mechanism behind the 30-day
- * approval window (which by definition cannot happen inline). Safe to call
+ * post-approval window, which by definition cannot happen inline. Safe to call
  * repeatedly: an already-purged step is skipped.
  *
- * GET returns what the sweep would do, deleting nothing, so the window can be
- * inspected before it is acted on.
+ * See admin-scheduled-retention.mts for the unattended daily run. Both exist on
+ * purpose: the schedule is what makes the policy real, and the manual endpoint is
+ * what lets an admin prove it works without waiting a day.
  */
-
-async function sweep(request: Request, dryRun: boolean) {
+export default async function handler(request: Request): Promise<Response> {
   const caller = await requireAdmin(request);
   if (!caller) {
     return Response.json({ error: "admin authentication required" }, { status: 403 });
   }
 
-  if (dryRun) {
-    // Reuse the same predicate as the real sweep by running it against a bucket
-    // it cannot touch: simplest honest dry run is to report the candidates from
-    // Firestore alone, without calling into Storage at all.
+  if (request.method === "GET") {
     const reviews = await adminDb()
       .collectionGroup("private")
       .where("status", "in", ["approved", "rejected", "revoked"])
       .get();
 
-    const { stepsDueForPurge } = await import("@/lib/admin/kyc-retention");
     const candidates = reviews.docs
       .filter((doc) => doc.id === "organizerReview")
       .map((doc) => ({
@@ -40,6 +38,10 @@ async function sweep(request: Request, dryRun: boolean) {
       .filter((row) => row.uid && row.steps.length > 0);
 
     return Response.json({ dryRun: true, candidates });
+  }
+
+  if (request.method !== "POST") {
+    return Response.json({ error: "GET or POST only" }, { status: 405 });
   }
 
   const results = await runRetentionSweep();
@@ -59,10 +61,4 @@ async function sweep(request: Request, dryRun: boolean) {
   return Response.json({ dryRun: false, applicants: results.length, objectsDeleted, results });
 }
 
-export async function GET(request: Request) {
-  return sweep(request, true);
-}
-
-export async function POST(request: Request) {
-  return sweep(request, false);
-}
+export const config = { path: "/api/admin/retention" };

@@ -3,8 +3,7 @@
 import { AccentButton } from "@/components/organizer/ui/AccentButton";
 import { AuthCard, AuthCardTitle, ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { TextField } from "@/components/organizer/ui/TextField";
-import { devSimulate } from "@/lib/organizer/application-service";
-import { OTP_LENGTH } from "@/lib/organizer/constants";
+import { IS_DEV, OTP_LENGTH } from "@/lib/organizer/constants";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
 import { SessionFooter } from "./SessionFooter";
 
@@ -44,7 +43,7 @@ export function OtpStage() {
         </AccentButton>
       </form>
 
-      {devSimulate.enabled && (
+      {IS_DEV && (
         <p className="mt-3 text-center font-mono text-[10px] text-nr-text-hint">
           Dev only — no SMS is sent; any {OTP_LENGTH} digits will pass.
         </p>

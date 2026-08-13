@@ -1,12 +1,12 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { adminAuth, adminBucket, adminDb, requireAdmin } from "@/lib/firebase-admin";
+import { adminAuth, adminBucket, adminDb, requireAdmin } from "../../lib/firebase-admin";
 
 /**
  * DELETE /api/admin/account — delete a user account and everything attached to it.
  *
  * firestore.rules denies `delete` on users/{uid} to every client, including the
  * owner. That is not paternalism: a client delete would strand the applicant's
- * KYC objects, which are immutable by the Storage rules and unreachable by any
+ * KYC objects, which are immutable under the Storage rules and unreachable by any
  * retention flow once the metadata pointing at them is gone. Erasure has to run
  * somewhere that can delete objects, which means here.
  *
@@ -16,7 +16,11 @@ import { adminAuth, adminBucket, adminDb, requireAdmin } from "@/lib/firebase-ad
  *
  * Body: { uid: string }
  */
-export async function DELETE(request: Request) {
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== "DELETE") {
+    return Response.json({ error: "DELETE only" }, { status: 405 });
+  }
+
   const caller = await requireAdmin(request);
   if (!caller) {
     return Response.json({ error: "admin authentication required" }, { status: 403 });
@@ -34,7 +38,7 @@ export async function DELETE(request: Request) {
 
   if (uid === caller.uid) {
     // An admin deleting themselves would leave the panel without the account
-    // that authorises this route, and isAdmin cannot be granted from here.
+    // that authorises this endpoint, and isAdmin cannot be granted from here.
     return Response.json({ error: "an admin cannot delete their own account" }, { status: 400 });
   }
 
@@ -71,3 +75,5 @@ export async function DELETE(request: Request) {
 
   return Response.json({ uid, objectsDeleted });
 }
+
+export const config = { path: "/api/admin/account" };

@@ -454,12 +454,32 @@ rejection; the walkthrough video is retained while the organizer is active and
 deleted 90 days after rejection; gps observations are structured, tiny, and
 retained indefinitely.
 
-Deletion runs in the webpanel's **server route** using the Admin SDK — the
-Storage rules deny `delete` to every client, so an inline client delete is
-impossible, and the webpanel already ships a server. A bucket lifecycle rule of
-`age > 180 days` on `kyc/**` backstops anything the admin flow misses. Object
-Versioning stays off for this prefix: it would resurrect deleted identity
-documents.
+Deletion runs in a **Netlify Function** using the Admin SDK — the Storage rules
+deny `delete` to every client, so an inline client delete is impossible.
+
+Not a Next route handler: the panel sets `output: "export"` in
+`next.config.mjs` and is published to Netlify as a static site, so it has no
+Next server to host one. Netlify Functions are the runtime this project already
+deploys, which is what keeps the "no Cloud Functions" position honest rather than
+merely stated — the alternative was standing up a Firebase Functions runtime, its
+deploy pipeline, and its IAM surface for four operations.
+
+| Function | Path | Purpose |
+|---|---|---|
+| `admin-kyc.mts` | `POST /api/admin/kyc` | delete evidence on a decision |
+| `admin-retention.mts` | `GET`/`POST /api/admin/retention` | dry run, or sweep on demand |
+| `admin-scheduled-retention.mts` | `@daily`, not HTTP-reachable | the unattended sweep |
+| `admin-account.mts` | `DELETE /api/admin/account` | erase an account |
+
+The schedule is not optional decoration. An inline delete on the approve action
+cannot fire thirty days later, and the bucket lifecycle rule only catches objects
+at 180 days, so without a daily run the 30-day window is a paragraph rather than
+a policy. Its audit entries are attributed to `system`, because no admin
+performed them.
+
+A bucket lifecycle rule of `age > 180 days` on `kyc/**` backstops anything the
+sweep misses. Object Versioning stays off for this prefix: it would resurrect
+deleted identity documents.
 
 Firestore metadata (paths, sizes, reviewer, timestamps, notes) is retained
 permanently, which preserves a provable audit trail at no breach cost. A NIC-

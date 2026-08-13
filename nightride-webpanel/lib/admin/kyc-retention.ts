@@ -1,5 +1,8 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { adminBucket, adminDb } from "@/lib/firebase-admin";
+// Relative rather than the "@/" alias: this module is also bundled by Netlify's
+// esbuild for the functions in netlify/functions/, which does not read the
+// tsconfig path aliases that Next resolves.
+import { adminBucket, adminDb } from "../firebase-admin";
 
 /**
  * KYC retention.

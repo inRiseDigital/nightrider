@@ -12,29 +12,32 @@ import {
 import { createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
 import {
-  devSimulate,
+  beginReview,
   EMPTY_APPLICATION,
-  ensureApplication,
+  EMPTY_REVIEW,
+  ensureApplicationDoc,
+  ensureReviewDoc,
   loadApplication,
-  saveExtraSteps,
+  saveVenueAddress,
   savePhone,
   subscribeToApplication,
-  type StoredApplication,
+  uploadNicFiles,
+  uploadSelfieFile,
+  uploadVideoFile,
 } from "./application-service";
-import { OTP_MIN_LENGTH, REJECTION_REASON } from "./constants";
+import { OTP_MIN_LENGTH } from "./constants";
 import { describeAuthError } from "./errors";
-import { validateEmail, validatePassword } from "./validation";
-import type { ApplicationStage, ExtraStep, ExtraStepType } from "./types";
+import { validateEmail, validatePassword, validateVenueAddress } from "./validation";
+import type { ApplicantApplication, ApplicationStage, ReviewDoc, VenueAddressDraft } from "./types";
 
 /**
  * Firebase phone auth is deliberately NOT wired up.
  *
  * The phone and OTP screens are part of the designed flow, so they stay — but
- * no SMS is sent and any code of OTP_MIN_LENGTH digits is accepted. The number
- * the applicant types is still saved to their user document. To restore real
- * verification, reinstate `RecaptchaVerifier` + `linkWithPhoneNumber` in
- * submitPhone/submitOtp and drop `phoneVerified` in favour of the linked
- * phone credential on the Firebase user.
+ * no SMS is sent and any code of OTP_MIN_LENGTH digits is accepted. The
+ * number the applicant types is still saved to their user document. To
+ * restore real verification, reinstate `RecaptchaVerifier` +
+ * `linkWithPhoneNumber` in submitPhone/submitOtp.
  *
  * Call sites are marked with a PHONE_AUTH_STUBBED comment.
  */
@@ -52,9 +55,10 @@ export interface ApplicationState {
   otp: string;
   error: string;
   openStepId: string | null;
-  application: StoredApplication;
-  /** Postcard codes being typed, keyed by step id — not persisted until submitted. */
-  codeDrafts: Record<string, string>;
+  application: ApplicantApplication;
+  review: ReviewDoc;
+  /** Transient upload progress (0..1), keyed by step id — never persisted. */
+  uploadProgress: Record<string, number>;
 }
 
 const INITIAL_STATE: ApplicationState = {
@@ -68,9 +72,10 @@ const INITIAL_STATE: ApplicationState = {
   phone: "",
   otp: "",
   error: "",
-  openStepId: "nic",
+  openStepId: "venueAddress",
   application: EMPTY_APPLICATION,
-  codeDrafts: {},
+  review: EMPTY_REVIEW,
+  uploadProgress: {},
 };
 
 type Action =
@@ -81,9 +86,10 @@ type Action =
   | { type: "setStage"; stage: ApplicationStage }
   | { type: "signedIn"; uid: string; stage: ApplicationStage; phone: string; email: string }
   | { type: "signedOut" }
-  | { type: "applicationChanged"; application: StoredApplication }
+  | { type: "snapshotChanged"; application: ApplicantApplication; review: ReviewDoc; phone?: string }
   | { type: "toggleStep"; id: string }
-  | { type: "setCodeDraft"; id: string; value: string };
+  | { type: "setUploadProgress"; id: string; progress: number }
+  | { type: "clearUploadProgress"; id: string };
 
 function reducer(state: ApplicationState, action: Action): ApplicationState {
   switch (action.type) {
@@ -109,12 +115,22 @@ function reducer(state: ApplicationState, action: Action): ApplicationState {
       };
     case "signedOut":
       return { ...INITIAL_STATE, ready: true };
-    case "applicationChanged":
-      return { ...state, application: action.application };
+    case "snapshotChanged":
+      return {
+        ...state,
+        application: action.application,
+        review: action.review,
+        phone: action.phone ?? state.phone,
+      };
     case "toggleStep":
       return { ...state, openStepId: state.openStepId === action.id ? null : action.id };
-    case "setCodeDraft":
-      return { ...state, codeDrafts: { ...state.codeDrafts, [action.id]: action.value } };
+    case "setUploadProgress":
+      return { ...state, uploadProgress: { ...state.uploadProgress, [action.id]: action.progress } };
+    case "clearUploadProgress": {
+      const next = { ...state.uploadProgress };
+      delete next[action.id];
+      return { ...state, uploadProgress: next };
+    }
     default:
       return state;
   }
@@ -127,13 +143,10 @@ export interface ApplicationActions {
   submitPhone: () => Promise<void>;
   submitOtp: () => Promise<void>;
   toggleStep: (id: string) => void;
-  setExtraCode: (id: string, value: string) => void;
-  submitExtraCode: (id: string) => Promise<void>;
-  pickSlot: (id: string, slot: string) => Promise<void>;
-  addExtraStep: (extraType: ExtraStepType) => Promise<void>;
-  completeBaseSteps: () => Promise<void>;
-  reject: () => Promise<void>;
-  resubmit: () => Promise<void>;
+  submitVenueAddress: (draft: VenueAddressDraft) => Promise<void>;
+  uploadNic: (front: File, back: File) => Promise<void>;
+  uploadSelfie: (file: File) => Promise<void>;
+  uploadVideo: (file: File) => Promise<void>;
   signOutApplicant: () => Promise<void>;
 }
 
@@ -158,18 +171,24 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
         dispatch({ type: "signedOut" });
         return;
       }
-      // Read the document once so a reload resumes at the right stage instead
-      // of sending a half-finished applicant back to the phone screen.
+      // Read both documents once so a reload resumes at the right stage
+      // instead of sending a half-finished applicant back to the phone
+      // screen. `submitted` (not the old client-set `phoneVerified`, which no
+      // longer exists — phoneVerified moved to the admin-owned review doc)
+      // is the resume signal: it is only ever set once, in beginReview.
       void loadApplication(user.uid)
-        .then(({ application, phone }) => {
-          dispatch({ type: "applicationChanged", application });
+        .then(({ application, review, phone }) => {
+          dispatch({ type: "snapshotChanged", application, review, phone });
           dispatch({
             type: "signedIn",
             uid: user.uid,
-            stage: application.phoneVerified ? "review" : "phone",
+            stage: application.submitted ? "review" : "phone",
             phone,
             email: user.email ?? "",
           });
+          // Defensive: guarantees the review doc exists even if a prior
+          // beginReview call was interrupted before it completed. Idempotent.
+          if (application.submitted) void ensureReviewDoc(user.uid);
         })
         .catch((error) => {
           dispatch({
@@ -184,12 +203,12 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
     });
   }, []);
 
-  // Live application document — admin decisions land here without a refresh.
+  // Live documents — admin decisions land here without a refresh.
   useEffect(() => {
     if (!state.uid) return;
     return subscribeToApplication(
       state.uid,
-      (application) => dispatch({ type: "applicationChanged", application }),
+      ({ application, review, phone }) => dispatch({ type: "snapshotChanged", application, review, phone }),
       (error) => dispatch({ type: "setError", error: describeAuthError(error) })
     );
   }, [state.uid]);
@@ -210,19 +229,10 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
       return uid;
     };
 
-    /**
-     * Safe to read the array straight off state: Firestore applies writes to
-     * the local cache and fires onSnapshot before the server acknowledges, so
-     * `state.application.extraSteps` is current by the time a second action can
-     * run — and every trigger is disabled while `busy` anyway.
-     */
-    const currentExtraSteps: ExtraStep[] = state.application.extraSteps;
-
     return {
       setCredential: (field, value) => dispatch({ type: "setCredential", field, value }),
       toggleCaptcha: () => dispatch({ type: "toggleCaptcha" }),
       toggleStep: (id) => dispatch({ type: "toggleStep", id }),
-      setExtraCode: (id, value) => dispatch({ type: "setCodeDraft", id, value }),
 
       submitSignup: () =>
         run(async () => {
@@ -240,7 +250,7 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
             email,
             state.password
           );
-          await ensureApplication(credential.user.uid, email);
+          await ensureApplicationDoc(credential.user.uid, email);
           dispatch({ type: "setStage", stage: "phone" });
         }),
 
@@ -265,66 +275,59 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
             throw new Error("Enter the code sent to your phone.");
           }
           // PHONE_AUTH_STUBBED: no confirmation result to check against, so any
-          // code of the right length passes. The number is still recorded, and
-          // `phoneVerified` is what lets a reload resume at the review stage.
+          // code of the right length passes. The number is still recorded.
           await savePhone(uid, state.phone.trim());
+          // First entry into the flow: creates the review doc (once) and
+          // marks the application submitted.
+          await beginReview(uid);
           dispatch({ type: "setStage", stage: "review" });
         }),
 
-      submitExtraCode: (id) =>
+      submitVenueAddress: (draft) =>
         run(async () => {
           const uid = requireUid();
-          if (!state.codeDrafts[id]?.trim()) throw new Error("Enter the code from your postcard.");
-          await saveExtraSteps(
-            uid,
-            currentExtraSteps.map((step) => (step.id === id ? { ...step, status: "done" } : step))
-          );
-          dispatch({ type: "setBusy", busy: false });
+          const validationError = validateVenueAddress(draft);
+          if (validationError) throw new Error(validationError);
+          await saveVenueAddress(uid, draft);
         }),
 
-      pickSlot: (id, slot) =>
+      uploadNic: (front, back) =>
         run(async () => {
           const uid = requireUid();
-          await saveExtraSteps(
-            uid,
-            currentExtraSteps.map((step) =>
-              step.id === id ? { ...step, status: "scheduled", scheduledSlot: slot } : step
-            )
-          );
-          dispatch({ type: "setBusy", busy: false });
-        }),
-
-      addExtraStep: (extraType) =>
-        run(async () => {
-          const uid = requireUid();
-          if (currentExtraSteps.some((step) => step.type === extraType)) {
-            dispatch({ type: "toggleStep", id: extraType });
-            dispatch({ type: "setBusy", busy: false });
-            return;
+          const attempt = state.review.steps.nic.attempt;
+          try {
+            await uploadNicFiles(uid, attempt, front, back, (progress) =>
+              dispatch({ type: "setUploadProgress", id: "nic", progress })
+            );
+          } finally {
+            dispatch({ type: "clearUploadProgress", id: "nic" });
           }
-          await saveExtraSteps(uid, [
-            ...currentExtraSteps,
-            { id: extraType, type: extraType, status: "needs_info", scheduledSlot: null },
-          ]);
-          dispatch({ type: "setBusy", busy: false });
         }),
 
-      completeBaseSteps: () =>
+      uploadSelfie: (file) =>
         run(async () => {
-          await devSimulate.completeBaseSteps(requireUid());
-          dispatch({ type: "setBusy", busy: false });
+          const uid = requireUid();
+          const attempt = state.review.steps.selfie.attempt;
+          try {
+            await uploadSelfieFile(uid, attempt, file, (progress) =>
+              dispatch({ type: "setUploadProgress", id: "selfie", progress })
+            );
+          } finally {
+            dispatch({ type: "clearUploadProgress", id: "selfie" });
+          }
         }),
 
-      reject: () =>
+      uploadVideo: (file) =>
         run(async () => {
-          await devSimulate.reject(requireUid(), REJECTION_REASON);
-          dispatch({ type: "setBusy", busy: false });
-        }),
-
-      resubmit: () =>
-        run(async () => {
-          await devSimulate.clearRejection(requireUid());
-          dispatch({ type: "setBusy", busy: false });
+          const uid = requireUid();
+          const attempt = state.review.steps.video.attempt;
+          try {
+            await uploadVideoFile(uid, attempt, file, (progress) =>
+              dispatch({ type: "setUploadProgress", id: "video", progress })
+            );
+          } finally {
+            dispatch({ type: "clearUploadProgress", id: "video" });
+          }
         }),
 
       signOutApplicant: () =>

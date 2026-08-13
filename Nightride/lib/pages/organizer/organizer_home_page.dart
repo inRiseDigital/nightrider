@@ -3,9 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:intl/intl.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
+import 'package:nightride/domain/event.dart';
 import 'package:nightride/providers/settings_providers.dart';
+import 'package:nightride/services/firestore_service.dart';
 
 class OrganizerHomePage extends ConsumerWidget {
   const OrganizerHomePage({super.key});
@@ -53,31 +56,28 @@ class OrganizerHomePage extends ConsumerWidget {
       ),
       body: uid == null
           ? const Center(child: Text('Not logged in', style: TextStyle(color: Colors.white54)))
-          : StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('events')
-                  .where('organizerUid', isEqualTo: uid)
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
+          // organizerUid == uid, ordered by createdAt desc.
+          // Index: events(organizerUid ASC, createdAt DESC)
+          : StreamBuilder<List<Event>>(
+              stream: firestoreService.streamOrganizerEvents(uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
                 }
-                final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
+                final events = snapshot.data ?? const <Event>[];
+                if (events.isEmpty) {
                   return _EmptyState(onTap: () => _showCreateEventSheet(context, uid));
                 }
                 return ListView.separated(
                   padding: EdgeInsets.fromLTRB(16, AppResponsive.gap(context, 16).clamp(12, 22), 16, AppResponsive.gap(context, 100).clamp(80, 120)),
-                  itemCount: docs.length,
+                  itemCount: events.length,
                   separatorBuilder: (_, __) => Gap(AppResponsive.gap(context, 12).clamp(8, 16)),
                   itemBuilder: (context, i) {
-                    final data = docs[i].data() as Map<String, dynamic>;
+                    final event = events[i];
                     return _EventCard(
-                      docId: docs[i].id,
-                      data: data,
-                      onEdit: () => _showCreateEventSheet(context, uid, docId: docs[i].id, existing: data),
-                      onDelete: () => _confirmDelete(context, docs[i].id),
+                      event: event,
+                      onEdit: () => _showCreateEventSheet(context, uid, existing: event),
+                      onDelete: () => _confirmDelete(context, event.id),
                     );
                   },
                 );
@@ -86,12 +86,12 @@ class OrganizerHomePage extends ConsumerWidget {
     );
   }
 
-  void _showCreateEventSheet(BuildContext context, String? uid, {String? docId, Map<String, dynamic>? existing}) {
+  void _showCreateEventSheet(BuildContext context, String? uid, {Event? existing}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CreateEventSheet(uid: uid, docId: docId, existing: existing),
+      builder: (_) => _CreateEventSheet(uid: uid, existing: existing),
     );
   }
 
@@ -106,7 +106,7 @@ class OrganizerHomePage extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
           TextButton(
             onPressed: () {
-              FirebaseFirestore.instance.collection('events').doc(docId).delete();
+              firestoreService.deleteEvent(docId);
               Navigator.pop(ctx);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
@@ -146,19 +146,18 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _EventCard extends StatelessWidget {
-  const _EventCard({required this.docId, required this.data, required this.onEdit, required this.onDelete});
-  final String docId;
-  final Map<String, dynamic> data;
+  const _EventCard({required this.event, required this.onEdit, required this.onDelete});
+  final Event event;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final title = data['title'] as String? ?? 'Untitled';
-    final date = data['date'] as String? ?? '';
-    final venue = data['venue'] as String? ?? '';
-    final status = data['status'] as String? ?? 'draft';
-    final isPublished = status == 'published';
+    final title = event.name.isEmpty ? 'Untitled' : event.name;
+    final dt = event.startDateTime;
+    final dateText = dt == null ? '' : DateFormat('MMM d, yyyy · h:mm a').format(dt);
+    final venue = event.venueName;
+    final isPublished = event.isPublished;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -181,18 +180,18 @@ class _EventCard extends StatelessWidget {
                   color: isPublished ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(status.toUpperCase(),
+                child: Text(event.status.toUpperCase(),
                     style: TextStyle(color: isPublished ? Colors.greenAccent : Colors.orangeAccent, fontSize: AppResponsive.font(context, 9), fontWeight: FontWeight.w900)),
               ),
             ],
           ),
-          if (date.isNotEmpty || venue.isNotEmpty) ...[
+          if (dateText.isNotEmpty || venue.isNotEmpty) ...[
             Gap(AppResponsive.gap(context, 6).clamp(4, 10)),
-            if (date.isNotEmpty)
+            if (dateText.isNotEmpty)
               Row(children: [
                 Icon(Icons.calendar_today_rounded, size: AppResponsive.icon(context, 12), color: Colors.white38),
                 Gap(4),
-                Text(date, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12))),
+                Text(dateText, style: TextStyle(color: Colors.white54, fontSize: AppResponsive.font(context, 12))),
               ]),
             if (venue.isNotEmpty) ...[
               Gap(3),
@@ -211,8 +210,11 @@ class _EventCard extends StatelessWidget {
               _ActionBtn(
                 icon: isPublished ? Icons.visibility_off_outlined : Icons.publish_rounded,
                 label: isPublished ? 'Unpublish' : 'Publish',
-                onTap: () => FirebaseFirestore.instance.collection('events').doc(docId)
-                    .update({'status': isPublished ? 'draft' : 'published'}),
+                // Narrow status-only patch — never touches interestedCount/popularityScore.
+                onTap: () => firestoreService.patchEventFields(
+                  event.id,
+                  {'status': isPublished ? 'draft' : 'published'},
+                ),
               ),
               const Spacer(),
               GestureDetector(
@@ -257,10 +259,9 @@ class _ActionBtn extends StatelessWidget {
 // ── Create / Edit Event Sheet ─────────────────────────────────────────────────
 
 class _CreateEventSheet extends StatefulWidget {
-  const _CreateEventSheet({this.uid, this.docId, this.existing});
+  const _CreateEventSheet({this.uid, this.existing});
   final String? uid;
-  final String? docId;
-  final Map<String, dynamic>? existing;
+  final Event? existing;
 
   @override
   State<_CreateEventSheet> createState() => _CreateEventSheetState();
@@ -269,47 +270,90 @@ class _CreateEventSheet extends StatefulWidget {
 class _CreateEventSheetState extends State<_CreateEventSheet> {
   late final TextEditingController _title;
   late final TextEditingController _venue;
-  late final TextEditingController _date;
+  late final TextEditingController _dateTimeText;
   late final TextEditingController _description;
   late final TextEditingController _price;
+  DateTime? _selectedDateTime;
   bool _saving = false;
+  String? _dateError;
 
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
-    _title       = TextEditingController(text: e?['title'] as String? ?? '');
-    _venue       = TextEditingController(text: e?['venue'] as String? ?? '');
-    _date        = TextEditingController(text: e?['date'] as String? ?? '');
-    _description = TextEditingController(text: e?['description'] as String? ?? '');
-    _price       = TextEditingController(text: e?['price'] as String? ?? '');
+    _title        = TextEditingController(text: e?.name ?? '');
+    _venue        = TextEditingController(text: e?.venueName ?? '');
+    _description  = TextEditingController(text: e?.description ?? '');
+    _price        = TextEditingController(text: e != null ? e.price.hintText : '');
+    _selectedDateTime = e?.startDateTime;
+    _dateTimeText = TextEditingController(
+      text: _selectedDateTime != null
+          ? DateFormat('MMM d, yyyy · h:mm a').format(_selectedDateTime!)
+          : '',
+    );
   }
 
   @override
   void dispose() {
-    _title.dispose(); _venue.dispose(); _date.dispose();
+    _title.dispose(); _venue.dispose(); _dateTimeText.dispose();
     _description.dispose(); _price.dispose();
     super.dispose();
   }
 
+  Future<void> _pickDateTime() async {
+    final now = DateTime.now();
+    final initial = _selectedDateTime ?? now.add(const Duration(hours: 1));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(now) ? now : initial,
+      firstDate: now.subtract(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 730)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return;
+    setState(() {
+      _selectedDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _dateTimeText.text = DateFormat('MMM d, yyyy · h:mm a').format(_selectedDateTime!);
+      _dateError = null;
+    });
+  }
+
   Future<void> _save() async {
     if (_title.text.trim().isEmpty) return;
+    if (_selectedDateTime == null) {
+      setState(() => _dateError = 'Pick a date & time');
+      return;
+    }
     setState(() => _saving = true);
-    final col = FirebaseFirestore.instance.collection('events');
-    final payload = {
-      'title': _title.text.trim(),
-      'venue': _venue.text.trim(),
-      'date': _date.text.trim(),
-      'description': _description.text.trim(),
-      'price': _price.text.trim(),
-      'organizerUid': widget.uid,
-      'status': widget.existing?['status'] ?? 'draft',
-    };
     try {
-      if (widget.docId != null) {
-        await col.doc(widget.docId).update(payload);
+      final startAt = Timestamp.fromDate(_selectedDateTime!);
+      final price = EventPrice.parseInput(_price.text.trim());
+      final existing = widget.existing;
+      if (existing != null) {
+        final updated = existing.copyWith(
+          name: _title.text.trim(),
+          venueName: _venue.text.trim(),
+          startAt: startAt,
+          description: _description.text.trim(),
+          price: price,
+        );
+        await firestoreService.updateOrganizerEvent(existing.id, updated);
       } else {
-        await col.add({...payload, 'createdAt': FieldValue.serverTimestamp()});
+        final event = Event(
+          name: _title.text.trim(),
+          venueName: _venue.text.trim(),
+          startAt: startAt,
+          description: _description.text.trim(),
+          price: price,
+          organizerUid: widget.uid,
+          source: 'organizer',
+          status: 'draft',
+        );
+        await firestoreService.createOrganizerEvent(event);
       }
       if (mounted) Navigator.pop(context);
     } finally {
@@ -332,14 +376,22 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
         child: ListView(controller: controller, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
           Gap(AppResponsive.gap(context, 16).clamp(12, 22)),
-          Text(widget.docId != null ? 'Edit Event' : 'Create Event',
+          Text(widget.existing != null ? 'Edit Event' : 'Create Event',
               style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 18), fontWeight: FontWeight.w800)),
           Gap(AppResponsive.gap(context, 20).clamp(14, 28)),
           _SheetField(controller: _title, label: 'Event Title *', hint: 'e.g. Neon Night Festival', icon: Icons.title_rounded),
           Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(controller: _venue, label: 'Venue', hint: 'e.g. Skyline Rooftop, Colombo', icon: Icons.location_on_outlined),
           Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
-          _SheetField(controller: _date, label: 'Date & Time', hint: 'e.g. May 10, 2026 · 9PM', icon: Icons.calendar_today_rounded),
+          _SheetField(
+            controller: _dateTimeText,
+            label: 'Date & Time *',
+            hint: 'Tap to pick a date & time',
+            icon: Icons.calendar_today_rounded,
+            readOnly: true,
+            onTap: _pickDateTime,
+            errorText: _dateError,
+          ),
           Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
           _SheetField(controller: _price, label: 'Ticket Price', hint: 'e.g. \$15 or Free', icon: Icons.confirmation_number_outlined),
           Gap(AppResponsive.gap(context, 14).clamp(10, 18)),
@@ -358,7 +410,7 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
               ),
               child: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(widget.docId != null ? 'Save Changes' : 'Create Event',
+                  : Text(widget.existing != null ? 'Save Changes' : 'Create Event',
                       style: TextStyle(fontSize: AppResponsive.font(context, 15), fontWeight: FontWeight.w800)),
             ),
           ),
@@ -369,12 +421,24 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
 }
 
 class _SheetField extends StatelessWidget {
-  const _SheetField({required this.controller, required this.label, required this.hint, required this.icon, this.maxLines = 1});
+  const _SheetField({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.maxLines = 1,
+    this.readOnly = false,
+    this.onTap,
+    this.errorText,
+  });
   final TextEditingController controller;
   final String label;
   final String hint;
   final IconData icon;
   final int maxLines;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -384,11 +448,14 @@ class _SheetField extends StatelessWidget {
       TextField(
         controller: controller,
         maxLines: maxLines,
+        readOnly: readOnly,
+        onTap: onTap,
         style: TextStyle(color: Colors.white, fontSize: AppResponsive.font(context, 14)),
         cursorColor: AppTheme.primary,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(color: Colors.white24, fontSize: AppResponsive.font(context, 13)),
+          errorText: errorText,
           prefixIcon: maxLines == 1 ? Padding(
             padding: const EdgeInsets.only(left: 12, right: 8),
             child: Icon(icon, color: AppTheme.primaryLight.withValues(alpha: 0.6), size: AppResponsive.icon(context, 18)),

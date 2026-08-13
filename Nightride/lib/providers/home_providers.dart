@@ -8,8 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:nightride/data/map_dummy_data.dart';
+import 'package:nightride/domain/event.dart';
 import 'package:nightride/domain/home_models.dart';
 import 'package:nightride/services/auth_service.dart';
+import 'package:nightride/services/firestore_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 final featuredCarouselIndexProvider =
@@ -68,34 +70,34 @@ String langName(HomeLanguage lang) {
 }
 
 // ── Firestore helpers ────────────────────────────────────────────────────────
+//
+// All list queries below run server-side against the composite indexes in
+// nightride-webpanel/firestore.indexes.json — see FirestoreService for which
+// index backs each one. Client-side date-string comparisons and status
+// filtering (the old `_isUpcoming`/`_isVisible`/`_sortUpcomingFirst` trio)
+// are gone: `startAt` is a real Timestamp now, so `where(startAt >= now)
+// orderBy(startAt)` does the range query the old string comparison only
+// pretended to do, and `status` is queried directly instead of filtered
+// client-side after the fact.
 
-String _fmtDate(String date) {
-  if (date.length < 10) return date;
+String _fmtTimestamp(Timestamp? ts) {
+  if (ts == null) return '';
+  final dt = ts.toDate();
   const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  try {
-    final parts = date.substring(0, 10).split('-');
-    final m = int.parse(parts[1]);
-    final d = int.parse(parts[2]);
-    return '${months[m]} $d';
-  } catch (_) {
-    return date;
-  }
+  return '${months[dt.month]} ${dt.day}';
 }
 
-FeaturedEvent _toFeatured(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-  final d = doc.data();
-  final venue = d['venue_name'] as String? ?? '';
-  final city = d['city'] as String? ?? '';
-  final sub = [venue, city].where((s) => s.isNotEmpty).join(' · ');
+FeaturedEvent _toFeatured(Event e) {
+  final sub = [e.venueName, e.city].where((s) => s.isNotEmpty).join(' · ');
   return FeaturedEvent(
-    id: doc.id,
-    title: d['name'] as String? ?? '',
+    id: e.id,
+    title: e.name,
     subtitle: sub.isNotEmpty ? sub : 'Music Event',
-    badgeText: d['genre'] as String? ?? 'Music',
-    dateText: _fmtDate(d['date'] as String? ?? ''),
-    imageUrl: d['cover_image'] as String? ?? '',
-    genre: d['genre'] as String? ?? '',
-    countryCode: d['country_code'] as String? ?? '',
+    badgeText: e.genre.isNotEmpty ? e.genre : 'Music',
+    dateText: _fmtTimestamp(e.startAt),
+    imageUrl: e.coverImage,
+    genre: e.genre,
+    countryCode: e.countryCode,
   );
 }
 
@@ -103,117 +105,77 @@ final eventDetailProvider =
     FutureProvider.family<Map<String, dynamic>?, String>((ref, id) async {
   ref.keepAlive();
   if (id.isEmpty) return null;
-  final doc =
-      await FirebaseFirestore.instance.collection('events').doc(id).get();
-  return doc.data();
+  final event = await firestoreService.getEvent(id);
+  // Reshaped to the legacy snake_case detail map: event_detail_page.dart
+  // (outside this migration's scope) still reads the old field names.
+  return event?.toLegacyDetailMap();
 });
 
-TrendingEvent _toTrending(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-  final d = doc.data();
-  final city = d['city'] as String? ?? '';
-  final country = d['country'] as String? ?? '';
-  final loc = [city, country].where((s) => s.isNotEmpty).join(', ');
-  final rawDate = d['date'] as String? ?? '';
+TrendingEvent _toTrending(Event e) {
+  final loc = [e.city, e.countryCode].where((s) => s.isNotEmpty).join(', ');
   return TrendingEvent(
-    id: doc.id,
-    title: d['name'] as String? ?? '',
+    id: e.id,
+    title: e.name,
     locationText: loc.isNotEmpty ? loc : 'Unknown',
-    dateText: _fmtDate(rawDate),
-    categoryTag: (d['genre'] as String? ?? 'Music').toUpperCase(),
-    imageUrl: d['cover_image'] as String? ?? '',
-    interestedCountText: d['price_hint'] as String? ?? 'Tickets',
-    countryCode: d['country_code'] as String? ?? '',
-    language: d['language'] as String? ?? '',
-    rawDate: rawDate,
+    dateText: _fmtTimestamp(e.startAt),
+    categoryTag: (e.genre.isNotEmpty ? e.genre : 'Music').toUpperCase(),
+    imageUrl: e.coverImage,
+    // The old code stuffed the free-text `price_hint` into this field, so
+    // sorting by "interested count" (lib/pages/category_detail_page.dart)
+    // was actually sorting by whatever digits happened to appear in the
+    // price string. `interestedCount` is real now.
+    interestedCountText: '+${e.interestedCount}',
+    countryCode: e.countryCode,
+    language: e.language,
+    rawDate: e.isoDate,
   );
 }
 
-String get _todayIso {
-  final now = DateTime.now();
-  return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-}
-
-bool _isUpcoming(Map<String, dynamic> d) {
-  final date = d['date'] as String? ?? '';
-  // ISO format dates (YYYY-MM-DD) can be compared as strings
-  if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(date)) return date.compareTo(_todayIso) >= 0;
-  // Organizer text dates (e.g. "May 10, 2026") — always show
-  return true;
-}
-
-bool _isVisible(Map<String, dynamic> d) {
-  final status = d['status'] as String?;
-  // Seeded events have no status — always show; organizer events must be published
-  return status == null || status == 'published';
-}
-
-List<QueryDocumentSnapshot<Map<String, dynamic>>> _sortUpcomingFirst(
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-) {
-  final upcoming = docs.where((d) => _isUpcoming(d.data())).toList()
-    ..sort((a, b) => ((a.data()['date'] as String?) ?? '')
-        .compareTo((b.data()['date'] as String?) ?? ''));
-  final past = docs.where((d) => !_isUpcoming(d.data())).toList()
-    ..sort((a, b) => ((b.data()['date'] as String?) ?? '')
-        .compareTo((a.data()['date'] as String?) ?? ''));
-  return [...upcoming, ...past];
-}
-
+/// Featured carousel: upcoming published events, soonest first.
+/// Query: status=='published' && startAt>=now, orderBy startAt asc, limit 10.
+/// Index: events(status ASC, startAt ASC) / events(status ASC, countryCode ASC, startAt ASC)
 final featuredEventsProvider = StreamProvider<List<FeaturedEvent>>((ref) {
   final country = ref.watch(selectedCountryProvider);
-  Query<Map<String, dynamic>> q = FirebaseFirestore.instance.collection('events');
-  if (country != 'ALL') q = q.where('country_code', isEqualTo: country);
-  return q.limit(country == 'ALL' ? 60 : 200).snapshots().map((snap) {
-    final sorted = _sortUpcomingFirst(
-      snap.docs.where((d) => _isVisible(d.data())).toList(),
-    );
-    return sorted.map(_toFeatured).take(10).toList();
-  });
+  final stream = country == 'ALL'
+      ? firestoreService.streamUpcomingEvents(limit: 10)
+      : firestoreService.streamUpcomingEventsByCountry(country, limit: 10);
+  return stream.map((events) => events.map(_toFeatured).toList());
 });
 
+/// Trending: top N published events by interestedCount, globally — country
+/// narrowing happens client-side in [filteredTrendingProvider] on top of this.
+/// Query: status=='published', orderBy interestedCount desc, limit 20.
+/// Index: events(status ASC, interestedCount DESC)
 final trendingEventsProvider = StreamProvider<List<TrendingEvent>>((ref) {
-  final country = ref.watch(selectedCountryProvider);
-  Query<Map<String, dynamic>> q = FirebaseFirestore.instance.collection('events');
-  if (country != 'ALL') q = q.where('country_code', isEqualTo: country);
-  return q.limit(country == 'ALL' ? 100 : 300).snapshots().map((snap) {
-    final sorted = _sortUpcomingFirst(
-      snap.docs.where((d) => _isVisible(d.data())).toList(),
-    );
-    return sorted.map(_toTrending).take(20).toList();
-  });
+  return firestoreService
+      .streamTrendingEvents(limit: 20)
+      .map((events) => events.map(_toTrending).toList());
 });
 
-MapBottomCardData _toMapCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-  final d = doc.data();
-  final city = d['city'] as String? ?? '';
-  final country = d['country'] as String? ?? '';
-  final genre = d['genre'] as String? ?? 'Music';
+MapBottomCardData _toMapCard(Event e) {
+  final genre = e.genre.isNotEmpty ? e.genre : 'Music';
   return MapBottomCardData(
-    id: doc.id,
-    title: d['name'] as String? ?? '',
+    id: e.id,
+    title: e.name,
     subtitle: genre,
-    locationLine: [city, country].where((s) => s.isNotEmpty).join(', '),
-    imageUrl: d['cover_image'] as String? ?? '',
+    locationLine: [e.city, e.countryCode].where((s) => s.isNotEmpty).join(', '),
+    imageUrl: e.coverImage,
     tags: [genre],
     distanceKm: 0.0,
-    openText: _fmtDate(d['date'] as String? ?? ''),
-    priceHint: d['price_hint'] as String? ?? 'Tickets',
-    lat: (d['lat'] as num? ?? 0).toDouble(),
-    lng: (d['lng'] as num? ?? 0).toDouble(),
+    openText: _fmtTimestamp(e.startAt),
+    priceHint: e.price.hintText,
+    lat: e.geo?.latitude ?? 0,
+    lng: e.geo?.longitude ?? 0,
   );
 }
 
+/// Map pins: upcoming published events.
+/// Query: status=='published' && startAt>=now, orderBy startAt asc, limit 300.
+/// Index: events(status ASC, startAt ASC)
 final mapEventsProvider = StreamProvider<List<MapBottomCardData>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('events')
-      .limit(300)
-      .snapshots()
-      .map((snap) {
-        final sorted = _sortUpcomingFirst(
-          snap.docs.where((d) => _isVisible(d.data())).toList(),
-        );
-        return sorted.map(_toMapCard).toList();
-      });
+  return firestoreService
+      .streamUpcomingEvents(limit: 300)
+      .map((events) => events.map(_toMapCard).toList());
 });
 
 // ── Location & distance helpers ──────────────────────────────────────────────
@@ -319,23 +281,18 @@ bool matchesGenre(String genre, String label) {
 
 bool _matchesCategory(String tag, String selected) => matchesGenre(tag, selected);
 
+/// Distinct country codes among published events, for the country filter row.
+/// Query: status=='published', limit 500. Single equality filter — no
+/// composite index required.
 final availableCountriesProvider = StreamProvider<List<String>>((ref) {
   ref.keepAlive();
   const pinned = {'JP', 'LK'};
   final uid = ref.watch(authStateProvider).asData?.value?.uid;
   if (uid == null) return Stream.value(pinned.toList()..sort());
-  return FirebaseFirestore.instance
-      .collection('events')
-      .limit(500)
-      .snapshots()
-      .map((snap) {
-        final seen = <String>{...pinned};
-        final fromFirestore = snap.docs
-            .map((d) => (d.data()['country_code'] as String? ?? '').toUpperCase())
-            .where((c) => c.isNotEmpty && seen.add(c))
-            .toList();
-        return [...pinned, ...fromFirestore]..sort();
-      });
+  return firestoreService.streamPublishedCountryCodes(limit: 500).map((codes) {
+    final seen = <String>{...pinned, ...codes};
+    return seen.toList()..sort();
+  });
 });
 
 final filteredTrendingProvider = Provider<List<TrendingEvent>>((ref) {

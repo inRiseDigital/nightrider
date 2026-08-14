@@ -284,7 +284,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                         text: TextSpan(
                           children: [
                             TextSpan(
-                              text: '${AppLocalizations.of(context)!.ownAClub} ',
+                              text: 'Own a club? ',
                               style: GoogleFonts.inter(
                                 fontSize: AppResponsive.font(context, 13.5),
                                 color: Colors.white.withValues(alpha: 0.55),
@@ -293,7 +293,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                             ),
                             TextSpan(
                               text: AppLocalizations.of(context)!
-                                  .applyHere
+                                  .organizerLogin
                                   .toUpperCase(),
                               style: GoogleFonts.inter(
                                 fontSize: AppResponsive.font(context, 13.5),

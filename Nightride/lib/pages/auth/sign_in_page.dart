@@ -308,14 +308,14 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '${l.ownAClub} ',
+                              'Own a club? ',
                               style: TextStyle(
                                 fontSize: AuthDimensions.subtitleFontSize(context),
                                 color: Colors.white.withValues(alpha: 0.55),
                               ),
                             ),
                             Text(
-                              l.applyHere.toUpperCase(),
+                              l.organizerLogin.toUpperCase(),
                               style: TextStyle(
                                 fontSize: AuthDimensions.subtitleFontSize(context),
                                 color: AppTheme.teal,

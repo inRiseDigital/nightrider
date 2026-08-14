@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { AdminConsole } from "@/components/admin/m3/AdminConsole";
 
-export default function AdminIndexPage() {
-  redirect("/admin/dashboard");
+export default function AdminPage() {
+  return <AdminConsole />;
 }

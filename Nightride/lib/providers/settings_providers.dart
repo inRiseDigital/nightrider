@@ -40,7 +40,19 @@ StreamProvider<bool> _userRoleProvider(String field) => StreamProvider<bool>((re
 });
 
 final isAdminProvider = _userRoleProvider('isAdmin');
-final isOrganizerProvider = _userRoleProvider('isOrganizer');
+
+// `isOrganizer` is not a field — it was replaced by `organizerStatus`
+// (docs/FIRESTORE_SCHEMA.md), so this derives the same boolean from the real
+// field rather than reading a key that no document has written since.
+final isOrganizerProvider = StreamProvider<bool>((ref) {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return Stream.value(false);
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map((snap) => snap.data()?['organizerStatus'] == 'approved');
+});
 
 // ── Organizer request ─────────────────────────────────────────────────────────
 // Streams the status of the current user's organizer application:

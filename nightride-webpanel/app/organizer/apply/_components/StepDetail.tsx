@@ -96,8 +96,6 @@ function VenueAddressPanel({
   const [address, setAddress] = useState(draft?.address ?? "");
   const [city, setCity] = useState(draft?.city ?? "");
   const [countryCode, setCountryCode] = useState(draft?.countryCode ?? "");
-  const [lat, setLat] = useState(draft?.geo ? String(draft.geo.latitude) : "");
-  const [lng, setLng] = useState(draft?.geo ? String(draft.geo.longitude) : "");
 
   if (step.awaitingReview) {
     return (
@@ -124,17 +122,18 @@ function VenueAddressPanel({
       className="flex w-full flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        const latitude = lat.trim() ? Number(lat) : null;
-        const longitude = lng.trim() ? Number(lng) : null;
         onSubmit({
           address: address.trim(),
           city: city.trim(),
           countryCode: countryCode.trim().toUpperCase(),
-          geo:
-            latitude !== null && longitude !== null && !Number.isNaN(latitude) && !Number.isNaN(longitude)
-              ? { latitude, longitude }
-              : null,
-          placeId: "",
+          // Lat/long is captured on the Night Ride mobile app, which can use
+          // geolocator's mocked-location check (see StepId 'gps' doc comment
+          // in lib/organizer/types.ts) — this webpanel can't verify a manually
+          // typed pin, so it no longer collects one. Preserve whatever the
+          // mobile app already wrote rather than clobbering it back to null
+          // when the applicant only edits the street address here.
+          geo: draft?.geo ?? null,
+          placeId: draft?.placeId ?? "",
         });
       }}
     >
@@ -151,11 +150,6 @@ function VenueAddressPanel({
         value={countryCode}
         onChange={(e) => setCountryCode(e.target.value)}
       />
-      <div className="flex gap-2">
-        <TextField id="venue-lat" label="Latitude (optional)" mono value={lat} onChange={(e) => setLat(e.target.value)} />
-        <TextField id="venue-lng" label="Longitude (optional)" mono value={lng} onChange={(e) => setLng(e.target.value)} />
-      </div>
-
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <AccentButton type="submit" size="sm" loading={busy}>

@@ -9,7 +9,6 @@ import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/forgotPw/forgot_pw.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/pages/organizer/organizer_verify_page.dart';
-import 'package:nightride/pages/organizer_apply_page.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/organizer_service.dart';
 
@@ -165,10 +164,19 @@ class _OrganizerLoginPageState extends ConsumerState<OrganizerLoginPage> {
         });
 
       case OrganizerAccess.none:
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const OrganizerApplyPage()),
-        );
+        await _startApplication(user.uid);
     }
+  }
+
+  /// Bootstraps the organizerApplication/organizerReview docs and drops the
+  /// applicant straight into the verify checklist -- there is no separate
+  /// profile form to fill in first anymore.
+  Future<void> _startApplication(String uid) async {
+    await ref.read(organizerServiceProvider).beginApplication(uid);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const OrganizerVerifyPage()),
+    );
   }
 
   @override
@@ -307,10 +315,10 @@ class _OrganizerLoginPageState extends ConsumerState<OrganizerLoginPage> {
                   Center(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const OrganizerApplyPage()),
-                      ),
+                      onTap: () {
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user != null) _startApplication(user.uid);
+                      },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Text.rich(
@@ -324,7 +332,7 @@ class _OrganizerLoginPageState extends ConsumerState<OrganizerLoginPage> {
                             TextSpan(
                               text: l.applyHere.toUpperCase(),
                               style: const TextStyle(
-                                color: AppTheme.neonLime,
+                                color: AppTheme.primary,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.8,
                               ),
@@ -402,7 +410,7 @@ class _OrganizerField extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             border: _border(AppTheme.borderGray),
             enabledBorder: _border(AppTheme.borderGray),
-            focusedBorder: _border(AppTheme.neonLime),
+            focusedBorder: _border(AppTheme.primary),
           ),
         ),
       ],
@@ -410,7 +418,7 @@ class _OrganizerField extends StatelessWidget {
   }
 }
 
-/// Neon-lime primary action.
+/// Pink primary action, matching the organizer dashboard's accent.
 class _PrimaryButton extends StatelessWidget {
   const _PrimaryButton({
     required this.label,
@@ -430,8 +438,8 @@ class _PrimaryButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
           color: onTap == null
-              ? AppTheme.neonLime.withValues(alpha: 0.5)
-              : AppTheme.neonLime,
+              ? AppTheme.primary.withValues(alpha: 0.5)
+              : AppTheme.primary,
           borderRadius: BorderRadius.circular(8),
         ),
         alignment: Alignment.center,
@@ -440,7 +448,7 @@ class _PrimaryButton extends StatelessWidget {
                 height: 18,
                 width: 18,
                 child: CircularProgressIndicator(
-                  color: AppTheme.background,
+                  color: Colors.white,
                   strokeWidth: 2.5,
                 ),
               )
@@ -449,7 +457,7 @@ class _PrimaryButton extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.background,
+                  color: Colors.white,
                 ),
               ),
       ),

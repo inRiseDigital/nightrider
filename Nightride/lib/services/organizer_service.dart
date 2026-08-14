@@ -186,4 +186,105 @@ class OrganizerService {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
+
+  /// Writes the applicant's typed venue address. Matches the webpanel's
+  /// `saveVenueAddress` (lib/organizer/application-service.ts) exactly — the
+  /// whole `venueAddress` sub-object is replaced each time, so both platforms
+  /// must round-trip an existing `geo`/`placeId` rather than typing over it.
+  /// [geo] is only ever set here on this device via geolocator — the webpanel
+  /// no longer collects a manually-typed pin, since it can't run
+  /// `Position.isMocked` the way this app can.
+  Future<void> submitVenueAddress(
+    String uid, {
+    required String address,
+    required String city,
+    required String countryCode,
+    GeoPoint? geo,
+    String placeId = '',
+  }) {
+    return _userDoc(uid).set({
+      'organizerApplication': {
+        'submitted': true,
+        'submittedAt': FieldValue.serverTimestamp(),
+        'steps': {
+          'venueAddress': {
+            'address': address,
+            'city': city,
+            'countryCode': countryCode,
+            'geo': geo,
+            'placeId': placeId,
+          },
+        },
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Map<String, dynamic> _initialReviewStep(String status) => {
+        'status': status,
+        'attempt': 0,
+        'note': '',
+        'reviewedAt': null,
+        'reviewedBy': null,
+        'venueId': null,
+        'mediaDeletedAt': null,
+      };
+
+  /// Bootstraps the organizer pipeline for a signed-in account with no
+  /// application yet -- the create-once `organizerReview` verdict doc, plus an
+  /// advisory `organizerApplication` skeleton. There is no longer a separate
+  /// profile form collecting org name/event types/bio first: the applicant
+  /// goes straight into the verify checklist and fills in what it asks for
+  /// (venue address, ID, selfie, GPS, video) as they go.
+  Future<void> beginApplication(String uid) async {
+    await _userDoc(uid).set({
+      'organizerApplication': {
+        'submitted': true,
+        'submittedAt': FieldValue.serverTimestamp(),
+        'profile': {
+          'orgName': '',
+          'venueName': '',
+          'instagram': '',
+          'website': '',
+          'bio': '',
+          'eventTypes': <String>[],
+          'eventsPerMonth': 0,
+        },
+        'steps': {
+          'venueAddress': null,
+          'nic': {'uploaded': false},
+          'selfie': {'uploaded': false},
+          'video': {'uploaded': false},
+          'gps': {'attempts': <Map<String, dynamic>>[]},
+        },
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    // Create-once, and only in this exact shape -- a second bootstrap call
+    // for the same uid finds it already there, so the failure is expected
+    // rather than exceptional.
+    try {
+      await _reviewDoc(uid).set({
+        'status': 'none',
+        'appliedAt': FieldValue.serverTimestamp(),
+        'decidedAt': null,
+        'decidedBy': '',
+        'rejectionReason': '',
+        'phoneVerified': false,
+        'steps': {
+          'venueAddress': _initialReviewStep('active'),
+          'nic': _initialReviewStep('active'),
+          'selfie': _initialReviewStep('active'),
+          'video': _initialReviewStep('active'),
+          // gps cannot start until an admin has accepted a venue address
+          // for it to be measured against.
+          'gps': _initialReviewStep('pending'),
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') rethrow;
+    }
+  }
 }

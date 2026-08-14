@@ -13,31 +13,36 @@ import 'package:nightride/pages/organizer/verify/organizer_capture_screen.dart';
 import 'package:nightride/services/organizer_service.dart';
 import 'package:nightride/services/organizer_verification_service.dart';
 
-/// The real evidence steps, in the order the design's checklist shows them.
-/// `venueAddress` also exists in the schema but has no capture UI yet (it's
-/// admin-entered today), so it isn't part of this checklist.
-enum _StepId { nic, selfie, gps, video }
+/// The real evidence steps, in the order the checklist shows them.
+/// `venueAddress` gates `gps` — an admin must accept it before the on-site
+/// GPS check unlocks (see FIRESTORE_SCHEMA.md's ReviewStep docs) — so it
+/// leads the list.
+enum _StepId { venueAddress, nic, selfie, gps, video }
 
 extension on _StepId {
   String get key => switch (this) {
+        _StepId.venueAddress => 'venueAddress',
         _StepId.nic => 'nic',
         _StepId.selfie => 'selfie',
         _StepId.gps => 'gps',
         _StepId.video => 'video',
       };
   String get label => switch (this) {
+        _StepId.venueAddress => 'Venue address',
         _StepId.nic => 'ID scan',
         _StepId.selfie => 'Live selfie',
         _StepId.gps => 'On-site GPS check',
         _StepId.video => 'Video walkthrough',
       };
   String get sub => switch (this) {
+        _StepId.venueAddress => 'Street address, city, and a pinned location',
         _StepId.nic => 'Front and back of your government ID',
         _StepId.selfie => 'Match your face to your ID',
         _StepId.gps => "Confirm you're at the venue",
         _StepId.video => 'Entrance, bar, and POS terminal',
       };
   IconData get icon => switch (this) {
+        _StepId.venueAddress => Icons.storefront_outlined,
         _StepId.nic => Icons.badge_outlined,
         _StepId.selfie => Icons.face_retouching_natural_rounded,
         _StepId.gps => Icons.my_location_rounded,
@@ -145,6 +150,29 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
             );
         await ref.read(organizerServiceProvider).markStepUploaded(_uid, 'video');
       });
+
+  void _handleVenueAddress(Map<String, dynamic>? draft) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => _VenueAddressSheet(
+        draft: draft,
+        onSubmit: (address, city, countryCode, geo) => _run('venueAddress', () async {
+          await ref.read(organizerServiceProvider).submitVenueAddress(
+                _uid,
+                address: address,
+                city: city,
+                countryCode: countryCode,
+                geo: geo,
+              );
+        }),
+      ),
+    );
+  }
 
   Future<void> _handleGps(int attempt) => _run('gps', () async {
         var permission = await Geolocator.checkPermission();
@@ -358,6 +386,11 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
       return hasCurrent ? _RowStatus.submitted : _RowStatus.todo;
     }
 
+    if (id == _StepId.venueAddress) {
+      final address = (applied['venueAddress'] as Map?)?['address'] as String?;
+      return (address != null && address.isNotEmpty) ? _RowStatus.submitted : _RowStatus.todo;
+    }
+
     final uploaded = (applied[id.key] as Map?)?['uploaded'] == true;
     return uploaded ? _RowStatus.submitted : _RowStatus.todo;
   }
@@ -422,6 +455,9 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
                   onTap: r.status == _RowStatus.locked
                       ? null
                       : () => switch (r.id) {
+                            _StepId.venueAddress => _handleVenueAddress(
+                                applied['venueAddress'] as Map<String, dynamic>?,
+                              ),
                             _StepId.nic => _handleNic(r.attempt),
                             _StepId.selfie => _handleSelfie(r.attempt),
                             _StepId.gps => _handleGps(r.attempt),
@@ -484,6 +520,9 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
               icon: const Icon(Icons.arrow_forward_rounded),
               label: Text(doneCount == 0 ? 'Start verifying' : 'Continue: ${next.id.label}'),
               onPressed: () => switch (next.id) {
+                _StepId.venueAddress => _handleVenueAddress(
+                    applied['venueAddress'] as Map<String, dynamic>?,
+                  ),
                 _StepId.nic => _handleNic(next.attempt),
                 _StepId.selfie => _handleSelfie(next.attempt),
                 _StepId.gps => _handleGps(next.attempt),
@@ -636,6 +675,168 @@ class _DebugChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+      ),
+    );
+  }
+}
+
+/// Street address/city/country typed form + a "use current location" GPS
+/// pin — the mobile counterpart of the webpanel's venue-address step. Text
+/// stays manual (matches web); only the lat/long comes from the device,
+/// since a manually-typed pin can't be checked against
+/// `Position.isMocked` the way a live GPS fix can.
+class _VenueAddressSheet extends StatefulWidget {
+  const _VenueAddressSheet({required this.draft, required this.onSubmit});
+
+  final Map<String, dynamic>? draft;
+  final void Function(String address, String city, String countryCode, GeoPoint? geo) onSubmit;
+
+  @override
+  State<_VenueAddressSheet> createState() => _VenueAddressSheetState();
+}
+
+class _VenueAddressSheetState extends State<_VenueAddressSheet> {
+  late final _addressCtrl = TextEditingController(text: widget.draft?['address'] as String? ?? '');
+  late final _cityCtrl = TextEditingController(text: widget.draft?['city'] as String? ?? '');
+  late final _countryCtrl = TextEditingController(text: widget.draft?['countryCode'] as String? ?? '');
+  GeoPoint? _geo;
+  bool _locating = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.draft?['geo'];
+    if (existing is GeoPoint) _geo = existing;
+  }
+
+  @override
+  void dispose() {
+    _addressCtrl.dispose();
+    _cityCtrl.dispose();
+    _countryCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _useCurrentLocation() async {
+    setState(() {
+      _locating = true;
+      _error = null;
+    });
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        throw 'Location permission denied.';
+      }
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw 'Turn on location services and try again.';
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
+      );
+      if (!mounted) return;
+      setState(() => _geo = GeoPoint(position.latitude, position.longitude));
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  void _submit() {
+    final address = _addressCtrl.text.trim();
+    final city = _cityCtrl.text.trim();
+    final countryCode = _countryCtrl.text.trim().toUpperCase();
+    if (address.isEmpty) {
+      setState(() => _error = "Enter the venue's street address.");
+      return;
+    }
+    if (city.isEmpty) {
+      setState(() => _error = "Enter the venue's city.");
+      return;
+    }
+    if (!RegExp(r'^[A-Z]{2}$').hasMatch(countryCode)) {
+      setState(() => _error = 'Enter a 2-letter country code, for example AE.');
+      return;
+    }
+    widget.onSubmit(address, city, countryCode, _geo);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Venue address', style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 16),
+          _sheetField('Street address', _addressCtrl),
+          const SizedBox(height: 12),
+          _sheetField('City', _cityCtrl),
+          const SizedBox(height: 12),
+          _sheetField('Country code (ISO-2)', _countryCtrl, maxLength: 2),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _locating ? null : _useCurrentLocation,
+            icon: _locating
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+                  )
+                : const Icon(Icons.my_location_rounded, size: 18),
+            label: Text(_geo == null
+                ? 'Use current location'
+                : 'Pinned: ${_geo!.latitude.toStringAsFixed(5)}, ${_geo!.longitude.toStringAsFixed(5)}'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white70,
+              side: const BorderSide(color: AppTheme.borderGray),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!, style: const TextStyle(color: Color(0xFFF87171), fontSize: 12)),
+          ],
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            ),
+            child: const Text('Save address', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sheetField(String label, TextEditingController controller, {int? maxLength}) {
+    return TextField(
+      controller: controller,
+      maxLength: maxLength,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        counterText: '',
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        filled: true,
+        fillColor: AppTheme.darkGray,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
       ),
     );
   }

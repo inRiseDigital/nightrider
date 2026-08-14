@@ -1,34 +1,27 @@
-"use client";
+import { Roboto, Roboto_Mono } from "next/font/google";
+import { AdminAuthProvider } from "@/lib/admin/auth";
+import "./material.css";
 
-import { Anton } from "next/font/google";
-import { useState } from "react";
-import { AdminDataProvider } from "@/lib/admin/store";
-import { ToastProvider } from "@/components/admin/ui/Toast";
-import { Sidebar } from "@/components/admin/layout/Sidebar";
-import { Topbar } from "@/components/admin/layout/Topbar";
-
-const antonDisplay = Anton({
-  weight: "400",
+const roboto = Roboto({
+  weight: ["300", "400", "500", "700"],
   subsets: ["latin"],
-  variable: "--font-nr-display",
+  variable: "--font-roboto",
+});
+
+const robotoMono = Roboto_Mono({
+  weight: ["400", "500"],
+  subsets: ["latin"],
+  variable: "--font-roboto-mono",
 });
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-
   return (
-    <div className={`${antonDisplay.variable} min-h-screen bg-nr-bg text-nr-text-primary`}>
-      <AdminDataProvider>
-        <ToastProvider>
-          <div className="flex min-h-screen">
-            <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <Topbar onMenuClick={() => setMobileNavOpen(true)} />
-              <main className="flex-1 overflow-x-hidden p-4 sm:p-6">{children}</main>
-            </div>
-          </div>
-        </ToastProvider>
-      </AdminDataProvider>
+    <div className={`${roboto.variable} ${robotoMono.variable}`}>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap"
+        rel="stylesheet"
+      />
+      <AdminAuthProvider>{children}</AdminAuthProvider>
     </div>
   );
 }

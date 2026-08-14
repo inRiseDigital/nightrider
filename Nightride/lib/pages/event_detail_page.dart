@@ -824,7 +824,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                                     );
                                     ref
                                         .read(appNavProvider.notifier)
-                                        .setIndex(0);
+                                        .setIndex(1);
                                     Navigator.of(context)
                                         .popUntil((route) => route.isFirst);
                                   },

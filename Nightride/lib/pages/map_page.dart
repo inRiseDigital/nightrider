@@ -4,7 +4,6 @@ import 'package:flutter_map/flutter_map.dart' as fmap;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:permission_handler/permission_handler.dart';
@@ -122,11 +121,6 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   List<MapBottomCardData> _nearbyVenues   = [];
   bool _venueMarkersLoaded  = false;
-  bool _showPolaroids       = true;
-
-  // Draggable polaroid card positions (null = use defaults on first build)
-  final List<Offset?> _cardOffsets = [null, null, null];
-  int _draggingCard = -1;
 
   @override
   void dispose() {
@@ -205,13 +199,6 @@ class _MapPageState extends ConsumerState<MapPage> {
 
     final List<MapBottomCardData> displayEvents =
         _applyFilter(poolBeforeFilter);
-
-    // Lazy-initialize draggable polaroid positions on first build
-    final sw = MediaQuery.of(context).size.width;
-    final sh = MediaQuery.of(context).size.height;
-    _cardOffsets[0] ??= Offset(14, sh * 0.06);
-    _cardOffsets[1] ??= Offset(sw - 160, 0);
-    _cardOffsets[2] ??= Offset(sw - 168, sh * 0.46 - 210);
 
     return Scaffold(
       extendBody: true,
@@ -340,158 +327,51 @@ class _MapPageState extends ConsumerState<MapPage> {
             ),
           ),
 
-          // ── Floating polaroid cards (reference-style overlay) ────────────
+          // ── "SHOW CARDS" trigger — opens the venue cards as a modal ──────
+          // Cards are hidden until tapped; nothing is shown by default.
           if (_routeInfo == null && _selectedVenue == null && displayEvents.isNotEmpty)
             Positioned(
               top: MediaQuery.of(context).padding.top + 104,
               left: 0,
               right: 0,
-              height: MediaQuery.of(context).size.height * 0.46,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  if (_showPolaroids) ...[
-                    if (displayEvents.isNotEmpty)
-                      Positioned(
-                        left: _cardOffsets[0]!.dx,
-                        top:  _cardOffsets[0]!.dy,
-                        child: GestureDetector(
-                          onPanStart: (_) => setState(() => _draggingCard = 0),
-                          onPanUpdate: (d) => setState(
-                              () => _cardOffsets[0] = _cardOffsets[0]! + d.delta),
-                          onPanEnd: (_) => setState(() => _draggingCard = -1),
-                          child: AnimatedScale(
-                            scale: _draggingCard == 0 ? 1.06 : 1.0,
-                            duration: const Duration(milliseconds: 150),
-                            child: Transform.rotate(
-                              angle: -0.09,
-                              child: _PolaroidCard(
-                                data: displayEvents[0],
-                                onTap: () => _showVenueModal(context, displayEvents[0]),
-                              ),
-                            ),
-                          ),
-                        ),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () => _showCardsSheet(context, displayEvents),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF333333),
+                        width: 1,
                       ),
-                    if (displayEvents.length > 1)
-                      Positioned(
-                        left: _cardOffsets[1]!.dx,
-                        top:  _cardOffsets[1]!.dy,
-                        child: GestureDetector(
-                          onPanStart: (_) => setState(() => _draggingCard = 1),
-                          onPanUpdate: (d) => setState(
-                              () => _cardOffsets[1] = _cardOffsets[1]! + d.delta),
-                          onPanEnd: (_) => setState(() => _draggingCard = -1),
-                          child: AnimatedScale(
-                            scale: _draggingCard == 1 ? 1.06 : 1.0,
-                            duration: const Duration(milliseconds: 150),
-                            child: Transform.rotate(
-                              angle: 0.06,
-                              child: _PolaroidCard(
-                                data: displayEvents[1],
-                                onTap: () => _showVenueModal(context, displayEvents[1]),
-                              ),
-                            ),
-                          ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 8,
                         ),
-                      ),
-                    if (displayEvents.length > 2)
-                      Positioned(
-                        left: _cardOffsets[2]!.dx,
-                        top:  _cardOffsets[2]!.dy,
-                        child: GestureDetector(
-                          onPanStart: (_) => setState(() => _draggingCard = 2),
-                          onPanUpdate: (d) => setState(
-                              () => _cardOffsets[2] = _cardOffsets[2]! + d.delta),
-                          onPanEnd: (_) => setState(() => _draggingCard = -1),
-                          child: AnimatedScale(
-                            scale: _draggingCard == 2 ? 1.06 : 1.0,
-                            duration: const Duration(milliseconds: 150),
-                            child: Transform.rotate(
-                              angle: -0.05,
-                              child: _PolaroidCard(
-                                data: displayEvents[2],
-                                onTap: () => _showVenueModal(context, displayEvents[2]),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    // Close button
-                    Positioned(
-                      top: 0,
-                      left: MediaQuery.of(context).size.width / 2 - 16,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _showPolaroids = false),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1A1A),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF333333),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
-                  ] else
-                    // Re-open button when cards are dismissed
-                    Positioned(
-                      top: 0,
-                      left: MediaQuery.of(context).size.width / 2 - 52,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _showPolaroids = true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1A1A),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: const Color(0xFF333333),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.photo_library_rounded,
-                                  color: Colors.white54, size: 14),
-                              SizedBox(width: 5),
-                              Text(
-                                'SHOW CARDS',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ],
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.photo_library_rounded,
+                            color: Colors.white54, size: 14),
+                        SizedBox(width: 5),
+                        Text(
+                          'SHOW CARDS',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                ],
+                  ),
+                ),
               ),
             ),
 
@@ -1027,6 +907,32 @@ class _MapPageState extends ConsumerState<MapPage> {
     );
   }
 
+  void _showCardsSheet(BuildContext context, List<MapBottomCardData> events) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (BuildContext ctx) => _CardsSheet(
+        events: events,
+        onCardTap: (data) {
+          Navigator.of(ctx).pop();
+          _showVenueModal(context, data);
+        },
+        onMoreDetails: (data) {
+          Navigator.of(ctx).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => data.id.isNotEmpty
+                  ? EventDetailPage(id: data.id)
+                  : VenueDetailsPage(data: data),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showSearchSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -1413,150 +1319,108 @@ class _MapPageState extends ConsumerState<MapPage> {
   }
 }
 
-// ── Polaroid floating card (reference-style map overlay) ─────────────────
-class _PolaroidCard extends StatelessWidget {
-  const _PolaroidCard({required this.data, required this.onTap});
+// ── "SHOW CARDS" modal — draggable bottom sheet listing nearby venues ────
+class _CardsSheet extends StatelessWidget {
+  const _CardsSheet({
+    required this.events,
+    required this.onCardTap,
+    required this.onMoreDetails,
+  });
 
-  final MapBottomCardData data;
-  final VoidCallback onTap;
+  final List<MapBottomCardData> events;
+  final ValueChanged<MapBottomCardData> onCardTap;
+  final ValueChanged<MapBottomCardData> onMoreDetails;
 
   @override
   Widget build(BuildContext context) {
-    const Color cream   = Color(0xFFF3EAD6);
-    final bool isLive   = data.tags.any((t) => t == 'LIVE' || t == 'LIVE NOW');
-    final String badge  = isLive
-        ? 'LIVE NOW'
-        : (data.tags.isNotEmpty ? data.tags.first : 'VENUE');
-    final String distText = data.distanceKm > 0
-        ? '${data.distanceKm.toStringAsFixed(1)} km away'
-        : data.locationLine;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 150,
-        decoration: BoxDecoration(
-          color: cream,
-          borderRadius: BorderRadius.circular(4),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Photo area
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(4),
-                    topRight: Radius.circular(4),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      expand: false,
+      snap: true,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: _kSurface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: _kBorder),
+          ),
+          child: Column(
+            children: [
+              const Gap(10),
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  child: data.imageUrl.isNotEmpty
-                      ? Image.network(
-                          data.imageUrl,
-                          width: 150,
-                          height: 110,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _placeholder(),
-                        )
-                      : _placeholder(),
                 ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isLive
-                          ? _kHotPink
-                          : Colors.black.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      badge,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
+              ),
+              const Gap(16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: _kNeonLime,
+                        borderRadius: BorderRadius.circular(99),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-            // Polaroid label
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data.title,
-                    style: GoogleFonts.anton(
-                      fontSize: 13,
-                      color: const Color(0xFF1A1A1A),
-                      height: 1.1,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 5),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _kHotPink,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Text(
-                      data.subtitle.isNotEmpty
-                          ? data.subtitle.toUpperCase()
-                          : 'VENUE',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
+                    const SizedBox(width: 8),
+                    const Text(
+                      'NEARBY',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${events.length} spots',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.30),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    distText,
-                    style: TextStyle(
-                      color: const Color(0xFF1A1A1A).withValues(alpha: 0.55),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+              const Gap(12),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  itemCount: events.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = events[index];
+                    return SizedBox(
+                      height: AppResponsive.mapBottomCardHeight(context) + 6,
+                      child: VenueCard(
+                        data: item,
+                        onTap: () => onCardTap(item),
+                        onMoreDetails: () => onMoreDetails(item),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
-
-  Widget _placeholder() => Container(
-        width: 150,
-        height: 110,
-        color: const Color(0xFF1A1A2E),
-        child: const Icon(
-          Icons.nightlife_rounded,
-          color: Color(0xFF62D6C8),
-          size: 36,
-        ),
-      );
 }
 
 // ── Filter pill row (ALL | CLUBS | BARS | EVENTS) ─────────────────────────

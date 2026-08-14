@@ -45,7 +45,7 @@ export function StepChecklist({ steps }: { steps: StepView[] }) {
           </button>
 
           {step.isOpen && (
-            <div id={`${step.id}-panel`} className="border-t border-[#222222] px-4 pb-[18px] pt-3.5 sm:px-[18px]">
+            <div id={`${step.id}-panel`} className="border-t border-nr-border px-4 pb-[18px] pt-3.5 sm:px-[18px]">
               <StepDetail step={step} />
             </div>
           )}

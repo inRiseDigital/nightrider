@@ -18,7 +18,7 @@ export function PasswordRequirements({ password }: { password: string }) {
           key={rule.id}
           className={cn(
             "flex items-center gap-1.5 font-mono text-[10px] transition-colors",
-            rule.met ? "text-emerald-400" : "text-nr-text-hint"
+            rule.met ? "text-[var(--suc)]" : "text-nr-text-hint"
           )}
         >
           {rule.met ? (

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { AccentButton } from "@/components/organizer/ui/AccentButton";
-import { AuthCard, BrandMark, ErrorNote } from "@/components/organizer/ui/AuthCard";
+import { AuthCard, AuthCardTitle, ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { TextField } from "@/components/organizer/ui/TextField";
 import { cn } from "@/components/organizer/ui/cn";
 import { COPY_TONE, TONE_COPY } from "@/lib/organizer/constants";
@@ -16,7 +16,7 @@ export function SignupStage() {
 
   return (
     <AuthCard>
-      <BrandMark tagline="APPLY AS AN ORGANIZER" intro={TONE_COPY[COPY_TONE].intro} />
+      <AuthCardTitle title="Create your organizer account" description={TONE_COPY[COPY_TONE].intro} />
 
       {/* noValidate keeps the browser's native bubble from pre-empting our own error box. */}
       <form

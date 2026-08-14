@@ -62,7 +62,12 @@ export function StepDetail({ step }: { step: StepView }) {
 
 function AdminNote({ note }: { note: string }) {
   return (
-    <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">{note}</p>
+    <p
+      className="rounded-lg border px-3 py-2 text-xs"
+      style={{ borderColor: "var(--warn)", background: "var(--warnc)", color: "var(--onwarnc)" }}
+    >
+      {note}
+    </p>
   );
 }
 
@@ -98,7 +103,7 @@ function VenueAddressPanel({
     return (
       <div className="flex flex-col items-start gap-2">
         <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
-        <p className="text-xs text-nr-primary-light">Submitted — waiting on an admin to confirm this address.</p>
+        <p className="text-xs" style={{ color: "var(--ter)" }}>Submitted — waiting on an admin to confirm this address.</p>
         <AddressSummary draft={draft} />
       </div>
     );
@@ -109,7 +114,7 @@ function VenueAddressPanel({
       <div className="flex flex-col items-start gap-2">
         <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
         <AddressSummary draft={draft} />
-        {step.status === "accepted" && <p className="text-xs text-emerald-400">Accepted.</p>}
+        {step.status === "accepted" && <p className="text-xs" style={{ color: "var(--suc)" }}>Accepted.</p>}
       </div>
     );
   }
@@ -225,7 +230,7 @@ function UploadPanel({
     return (
       <div className="flex flex-col items-start gap-2">
         <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
-        <p className="text-xs text-nr-primary-light">This step is already submitted — wait for review.</p>
+        <p className="text-xs" style={{ color: "var(--ter)" }}>This step is already submitted — wait for review.</p>
         {step.note && <AdminNote note={step.note} />}
       </div>
     );
@@ -235,7 +240,7 @@ function UploadPanel({
     return (
       <div className="flex flex-col items-start gap-2">
         <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
-        {step.status === "accepted" && <p className="text-xs text-emerald-400">Accepted.</p>}
+        {step.status === "accepted" && <p className="text-xs" style={{ color: "var(--suc)" }}>Accepted.</p>}
       </div>
     );
   }

@@ -1,5 +1,10 @@
-import { redirect } from "next/navigation";
+import { AdminConsole } from "@/components/admin/m3/AdminConsole";
+import { AdminGate } from "@/components/admin/m3/AdminGate";
 
-export default function AdminIndexPage() {
-  redirect("/admin/dashboard");
+export default function AdminPage() {
+  return (
+    <AdminGate>
+      <AdminConsole />
+    </AdminGate>
+  );
 }

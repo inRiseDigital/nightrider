@@ -200,10 +200,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   }
 
   Future<void> _loadSession(ChatSession session) async {
+    // The session list carries titles and timestamps only; messages live in a
+    // subcollection and are fetched when a conversation is actually opened.
+    final messages = await _historyService.messagesFor(session.id);
+    if (!mounted) return;
+
     if (_isLoading) {
-      if (!mounted) return;
       setState(() {
-        _viewingMessages = List<ChatMessage>.from(session.messages);
+        _viewingMessages = List<ChatMessage>.from(messages);
       });
       Navigator.of(context).pop();
       return;
@@ -216,7 +220,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
       _currentSessionId = session.id;
       _messages
         ..clear()
-        ..addAll(session.messages);
+        ..addAll(messages);
       _isLoading = false;
       _statusText = null;
       _typingMessageId = null;
@@ -852,7 +856,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
               fontSize: 14, fontWeight: FontWeight.w600, color: _kWhite),
         ),
         subtitle: Text(
-          '${session.messages.length} messages · ${_formatSessionDate(session.createdAt)} · ${_formatSessionTime(session.createdAt)}',
+          '${_formatSessionDate(session.createdAt)} · ${_formatSessionTime(session.createdAt)}',
           style: GoogleFonts.poppins(fontSize: 12, color: _kMuted),
         ),
         trailing: IconButton(

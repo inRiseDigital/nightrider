@@ -328,6 +328,30 @@ abstract class AppLocalizations {
   /// **'Continue as Guest'**
   String get continueAsGuest;
 
+  /// No description provided for @ownAClub.
+  ///
+  /// In en, this message translates to:
+  /// **'Do you own a club?'**
+  String get ownAClub;
+
+  /// No description provided for @applyHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply here'**
+  String get applyHere;
+
+  /// No description provided for @organizerLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Organizer Login'**
+  String get organizerLogin;
+
+  /// No description provided for @logInWithFaceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in with Face ID'**
+  String get logInWithFaceId;
+
   /// No description provided for @noResultsFound.
   ///
   /// In en, this message translates to:

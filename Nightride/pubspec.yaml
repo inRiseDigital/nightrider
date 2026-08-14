@@ -35,10 +35,22 @@ dependencies:
   shared_preferences: ^2.2.2
   firebase_core: ^3.8.1
   firebase_auth: ^5.3.3
+  local_auth: ^2.3.0
   cloud_firestore: ^5.4.4
+  # Avatars and KYC evidence are Storage objects. Avatars used to be base64
+  # blobs inside Firestore documents, which capped a profile photo at 300 KB
+  # to keep the document under Firestore's 1 MiB limit.
+  firebase_storage: ^12.3.7
   url_launcher: ^6.3.1
   google_sign_in: ^6.2.2
   image_picker: ^1.1.2
+  # Live preview + capture for organizer KYC steps (NIC/selfie photos, the
+  # 60s walkthrough video) — image_picker only shells out to the OS camera
+  # app, which can't show the corner/oval capture guides the design calls for.
+  camera: ^0.11.0+2
+  # Extracts a poster frame from the walkthrough video for the review sheet
+  # and upload (kyc/{uid}/video/{attempt}/poster.jpg) without a Cloud Function.
+  video_thumbnail: ^0.5.3
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   flutter_local_notifications: ^21.0.0
@@ -68,4 +80,3 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - .env

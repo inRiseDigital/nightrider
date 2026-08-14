@@ -105,7 +105,7 @@ class AuthService {
         password: password,
       );
       if (cred.user != null) {
-        await _profileService.createIfAbsent(cred.user!, role: 'user');
+        await _profileService.createIfAbsent(cred.user!);
         await _flushOnboardingAnswers(cred.user!.uid);
         // Fire the verification email immediately. Best-effort: a send failure
         // (e.g. too-many-requests) must never block account creation — the user

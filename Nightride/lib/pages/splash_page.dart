@@ -132,9 +132,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       final svc = ref.read(userProfileServiceProvider);
       await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
       await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
-      final role = await svc.getUserRole(user.uid).timeout(const Duration(seconds: 5));
+      final isOrganizer = await svc.isApprovedOrganizer(user.uid).timeout(const Duration(seconds: 5));
       if (!mounted) return;
-      if (role == 'organizer') {
+      if (isOrganizer) {
         destination = const OrganizerShellPage();
       } else {
         final onboardingDone =
@@ -166,18 +166,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted || user == null) return;
 
     Widget destination;
-    try {
-      final svc = ref.read(userProfileServiceProvider);
-      await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
-      await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
-      final role = await svc.getUserRole(user.uid).timeout(const Duration(seconds: 5));
-      if (!mounted) return;
-      if (role == 'organizer') {
-        destination = const OrganizerShellPage();
-      } else {
-        final onboardingDone =
-            await svc.hasCompletedOnboarding(user.uid).timeout(const Duration(seconds: 5));
-        destination = onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage();
+    if (user != null) {
+      try {
+        final svc = ref.read(userProfileServiceProvider);
+        await svc.createIfAbsent(user).timeout(const Duration(seconds: 5));
+        await svc.cleanupDummyDataIfNeeded(user.uid).timeout(const Duration(seconds: 5));
+        final isOrganizer = await svc.isApprovedOrganizer(user.uid).timeout(const Duration(seconds: 5));
+        if (!mounted) return;
+        if (isOrganizer) {
+          destination = const OrganizerShellPage();
+        } else {
+          final onboardingDone =
+              await svc.hasCompletedOnboarding(user.uid).timeout(const Duration(seconds: 5));
+          destination = onboardingDone ? AppShellPage() : const OnboardQuestionnaireTemplatePage();
+        }
+      } catch (_) {
+        destination = AppShellPage();
       }
     } catch (_) {
       destination = AppShellPage();

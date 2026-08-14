@@ -114,6 +114,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get continueAsGuest => '以访客身份继续';
 
   @override
+  String get ownAClub => '你经营夜店吗？';
+
+  @override
+  String get applyHere => '在此申请';
+
+  @override
+  String get organizerLogin => '主办方登录';
+
+  @override
+  String get logInWithFaceId => '使用 Face ID 登录';
+
+  @override
   String get noResultsFound => '未找到结果';
 
   @override

@@ -1,0 +1,79 @@
+/* Material Design 3 admin console — scoped to .m3-scope so it never leaks
+   into the brand (Anton/pink-teal-lime) styling used by the rest of the site. */
+
+.m3-scope {
+  background: #141114;
+  color: #ede0e4;
+  font-family: "Roboto", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.m3-scope * {
+  box-sizing: border-box;
+}
+
+.m3-scope ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.m3-scope ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.m3-scope ::-webkit-scrollbar-thumb {
+  background: #453b41;
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.m3-scope ::-webkit-scrollbar-thumb:hover {
+  background: #5c4f55;
+  background-clip: content-box;
+}
+
+.m3-scope a {
+  color: #a5f2e5;
+  text-decoration: none;
+}
+.m3-scope a:hover {
+  color: #c6d96b;
+}
+
+.m3-scope input,
+.m3-scope select,
+.m3-scope textarea,
+.m3-scope button {
+  font-family: "Roboto", sans-serif;
+}
+.m3-scope input:focus,
+.m3-scope select:focus,
+.m3-scope textarea:focus {
+  outline: 2px solid #ffb1c4;
+  outline-offset: -2px;
+}
+
+.m3-icon {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+}
+
+@keyframes m3rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.m3-rise {
+  animation: m3rise 180ms cubic-bezier(0.2, 0, 0, 1);
+}

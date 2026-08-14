@@ -1,0 +1,26 @@
+[
+  {
+    "origin": [
+      "https://calm-semolina-fa27bc.netlify.app",
+      "http://localhost:3000"
+    ],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "Content-Range",
+      "Content-Disposition",
+      "Content-Encoding",
+      "Range",
+      "Authorization",
+      "ETag",
+      "x-goog-upload-url",
+      "x-goog-upload-status",
+      "x-goog-upload-size-received",
+      "x-goog-upload-chunk-granularity",
+      "x-goog-upload-control-url",
+      "x-firebase-storage-version"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

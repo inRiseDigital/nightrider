@@ -114,6 +114,18 @@ class AppLocalizationsNl extends AppLocalizations {
   String get continueAsGuest => 'Doorgaan als gast';
 
   @override
+  String get ownAClub => 'Heb je een club?';
+
+  @override
+  String get applyHere => 'Meld je hier aan';
+
+  @override
+  String get organizerLogin => 'Organisator-login';
+
+  @override
+  String get logInWithFaceId => 'Inloggen met Face ID';
+
+  @override
   String get noResultsFound => 'Geen resultaten gevonden';
 
   @override

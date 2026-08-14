@@ -3,6 +3,20 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Night Ride brand tokens, mirrored from Nightride/lib/core/theme (app_theme.dart, nr_design_system.dart) */
+  --nr-primary: #ff3d73;
+  --nr-primary-dark: #d63b7a;
+  --nr-primary-light: #62d6c8;
+  --nr-accent: #dfff2f;
+  --nr-bg: #070707;
+  --nr-surface: #0f0f0f;
+  --nr-surface-raised: #17171a;
+  --nr-text-primary: #fafafa;
+  --nr-text-secondary: #9eafa0;
+  --nr-text-hint: #6b7280;
+  --nr-cream: #f3ead6;
+  --nr-border: #333333;
 }
 
 @theme inline {
@@ -10,6 +24,20 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-nr-display);
+
+  --color-nr-primary: var(--nr-primary);
+  --color-nr-primary-dark: var(--nr-primary-dark);
+  --color-nr-primary-light: var(--nr-primary-light);
+  --color-nr-accent: var(--nr-accent);
+  --color-nr-bg: var(--nr-bg);
+  --color-nr-surface: var(--nr-surface);
+  --color-nr-surface-raised: var(--nr-surface-raised);
+  --color-nr-text-primary: var(--nr-text-primary);
+  --color-nr-text-secondary: var(--nr-text-secondary);
+  --color-nr-text-hint: var(--nr-text-hint);
+  --color-nr-cream: var(--nr-cream);
+  --color-nr-border: var(--nr-border);
 }
 
 @media (prefers-color-scheme: dark) {

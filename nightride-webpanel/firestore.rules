@@ -1,102 +1,345 @@
 rules_version = '2';
 
+// Night Ride / Night Rite — Firestore security rules.
+//
+// Privilege model: there are no Cloud Functions. Admin actions are ordinary
+// client writes authorised by users/{uid}.isAdmin, a field only the Admin SDK
+// can set. Four things still require an Admin SDK context (all of them live in
+// the webpanel's server side): setting isAdmin, deleting KYC objects from
+// Storage, deleting accounts, and the one-off document rewrite script.
+//
+// Two invariants carry most of the weight here:
+//
+//  1. An applicant never writes a verdict. Everything an admin decides about an
+//     organizer application lives in users/{uid}/private/organizerReview, which
+//     the applicant may create exactly once (in a pinned initial shape) and can
+//     never update. Nothing the applicant writes to their own user document is
+//     load-bearing for access control.
+//  2. The KYC attempt counter is admin-owned. Storage paths are keyed by
+//     organizerReview.steps.<id>.attempt, so the retry cap is structural: an
+//     applicant cannot mint new upload paths, because only an admin advances
+//     the number that appears in the path.
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Returns true when the authenticated user has isOrganizer:true in their profile.
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // get() returns null for a missing document, and .data on null is an
+    // evaluation error rather than false — so every read of the caller's own
+    // profile goes through this null-safe pair. Repeated get() calls on one
+    // path inside a single evaluation are cached and billed once.
+    function meDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function isAdmin() {
+      return signedIn() && meDoc() != null
+        && meDoc().data.get('isAdmin', false) == true;
+    }
     function isOrganizer() {
-      return request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isOrganizer', false) == true;
+      return signedIn() && meDoc() != null
+        && meDoc().data.get('organizerStatus', 'none') == 'approved';
     }
 
-    // ── Events ────────────────────────────────────────────────────────────────
-    // Public read for event discovery.
-    // Backend service account writes bypass rules (admin SDK).
-    // Verified organizers can manage their own events from the client.
-    match /events/{eventId} {
-      allow read: if true;
-      allow create: if isOrganizer()
-        && request.resource.data.organizerUid == request.auth.uid;
-      allow update: if isOrganizer()
-        && resource.data.organizerUid == request.auth.uid;
-      allow delete: if isOrganizer()
-        && resource.data.organizerUid == request.auth.uid;
+    function touched(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
+    }
+    function onlyTouched(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
 
-    // ── User profiles ─────────────────────────────────────────────────────────
-    // Each user can only read and write their own document.
-    // The rank field can only be incremented, never set to an arbitrary value,
-    // enforced by ensuring any rank change is positive and within a sane limit.
-    // Delete is allowed so users can permanently delete their own accounts.
+    // ── Users ────────────────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null && request.auth.uid == uid
-        // Prevent direct rank manipulation: if rank is being changed, it must
-        // only increase by at most 50 points in a single write.
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rank'])
-            || (request.resource.data.rank is int
-                && request.resource.data.rank >= resource.data.rank
-                && request.resource.data.rank <= resource.data.rank + 50));
-      // Users may delete their own account document (account deletion flow).
-      allow delete: if request.auth != null && request.auth.uid == uid;
 
-      // Favourites subcollection — owner only
-      match /favourites/{eventId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+      // Admin-owned fields on an otherwise self-writable document. Kept to a
+      // short list that can be read at a glance; all nested verdict state lives
+      // in the private/organizerReview document instead.
+      function adminOwned() { return ['isAdmin', 'organizerStatus']; }
+
+      // rank may only rise, by at most 50 per write. This bounds a single
+      // write, not a session — gamification counters on this document are
+      // client-authored by design and are not an access-control surface.
+      function rankOk() {
+        return !touched(['rank'])
+          || (request.resource.data.rank is int
+              && request.resource.data.rank >= resource.data.rank
+              && request.resource.data.rank <= resource.data.rank + 50);
       }
 
-      // Privacy / notification settings — owner only
-      match /settings/{doc} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+      // The application is advisory: profile answers, the typed venue address,
+      // and a record of which uploads the applicant believes they made. Only
+      // submittedAt is constrained, so the review queue cannot be re-ordered by
+      // backdating an application.
+      function applicationOk() {
+        return !touched(['organizerApplication'])
+          || (request.resource.data.organizerApplication.submitted is bool
+              && request.resource.data.organizerApplication.submittedAt == request.time);
       }
 
-      // Chat history — owner reads; writes require a verified email so the AI
-      // chat (which persists sessions here) is gated to verified users only.
-      match /chat_sessions/{sessionId} {
-        allow read: if request.auth != null && request.auth.uid == uid;
-        allow write: if request.auth != null && request.auth.uid == uid
-          && request.auth.token.email_verified == true;
+      function selfUpdate() {
+        return rankOk()
+          && applicationOk()
+          && !touched(adminOwned());
       }
-    }
 
-    // ── Avatars ───────────────────────────────────────────────────────────────
-    match /avatars/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
+      // Admins reach into other users only to move the organizer pipeline.
+      // isAdmin is Admin-SDK-only even here, so no admin can mint another admin.
+      function adminUpdate() {
+        return onlyTouched(['organizerStatus', 'updatedAt'])
+          && request.resource.data.organizerStatus
+               in ['none', 'pending', 'approved', 'rejected', 'revoked'];
+      }
 
-    // ── Live Hub — Clubs ──────────────────────────────────────────────────────
-    // Read requires auth. Writes go through backend only.
-    match /live_hub_clubs/{id} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
+      allow read: if isSelf(uid) || isAdmin();
 
-    // ── Live Hub — Reports ────────────────────────────────────────────────────
-    // Auth users can submit reports and upvote once per report.
-    // An upvote is the only allowed update (only 'upvotes' field changes by +1).
-    match /live_hub_reports/{id} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.comment is string
-        && request.resource.data.comment.size() <= 500
-        && request.resource.data.username is string
-        && request.resource.data.username.size() <= 64;
-      allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotes'])
-        && request.resource.data.upvotes == resource.data.upvotes + 1;
+      allow create: if isSelf(uid)
+        && request.resource.data.get('isAdmin', false) == false
+        && request.resource.data.get('rank', 0) == 0
+        && request.resource.data.organizerStatus == 'none';
+
+      allow update: if (isSelf(uid) && selfUpdate()) || (isAdmin() && adminUpdate());
+
+      // Account deletion is an Admin SDK path. A client delete would strand
+      // already-uploaded KYC objects — immutable by the Storage rules, and with
+      // no Firestore metadata left pointing at them, unreachable by any
+      // retention flow. That is a data-protection problem, not just abuse.
       allow delete: if false;
+
+      // ── Organizer review — the verdict document ────────────────────────────
+      // Created once by the applicant in a pinned shape so the flow can start
+      // without an admin round-trip; every mutation after that is admin-only.
+      match /private/organizerReview {
+
+        function initialShape() {
+          let d = request.resource.data;
+          return d.status == 'none'
+            && d.decidedBy == '' && d.rejectionReason == ''
+            && d.decidedAt == null
+            && d.phoneVerified == false
+            && d.steps.venueAddress.status == 'active'
+            && d.steps.nic.status == 'active'
+            && d.steps.selfie.status == 'active'
+            && d.steps.video.status == 'active'
+            // gps cannot start until an admin has accepted a venue address to
+            // measure against — that is the dependency this step exists for.
+            && d.steps.gps.status == 'pending'
+            && d.steps.venueAddress.attempt == 0
+            && d.steps.nic.attempt == 0
+            && d.steps.selfie.attempt == 0
+            && d.steps.video.attempt == 0
+            && d.steps.gps.attempt == 0;
+        }
+
+        function attemptsCapped() {
+          let s = request.resource.data.steps;
+          return s.nic.attempt is int && s.nic.attempt >= 0 && s.nic.attempt <= 3
+            && s.selfie.attempt is int && s.selfie.attempt >= 0 && s.selfie.attempt <= 3
+            && s.video.attempt is int && s.video.attempt >= 0 && s.video.attempt <= 3
+            && s.gps.attempt is int && s.gps.attempt >= 0 && s.gps.attempt <= 3;
+        }
+
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if isSelf(uid) && initialShape();
+        allow update: if isAdmin() && attemptsCapped();
+        allow delete: if false;
+      }
+
+      match /favourites/{eventId} { allow read, write: if isSelf(uid); }
+      match /settings/{docId}     { allow read, write: if isSelf(uid); }
+
+      // Chat history. Messages are a subcollection, not an array on the session
+      // document — an inline array grows without bound against the 1 MiB
+      // document limit and rewrites the whole document on every turn.
+      match /chat_sessions/{sessionId} {
+        allow read: if isSelf(uid);
+        allow write: if isSelf(uid) && request.auth.token.email_verified == true;
+
+        match /messages/{messageId} {
+          allow read: if isSelf(uid);
+          allow write: if isSelf(uid) && request.auth.token.email_verified == true;
+        }
+      }
     }
 
-    // ── Live Hub — Social Events ──────────────────────────────────────────────
-    match /live_hub_social/{id} {
-      allow read: if request.auth != null;
-      allow write: if false;
+    // ── Events ───────────────────────────────────────────────────────────────
+    match /events/{eventId} {
+
+      // Shape validation is the only thing standing between a client writer and
+      // a document that silently drops out of every indexed query: Firestore
+      // excludes documents missing an ordered field from the result set, and a
+      // null geo renders a map pin at (0,0). Three separate clients write here
+      // and there is no server-side ingest to normalise anything.
+      function shapeOk() {
+        let d = request.resource.data;
+        return d.keys().hasAll([
+              'name', 'status', 'source', 'startAt', 'countryCode',
+              'venueName', 'city', 'price'
+            ])
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 200
+          && d.startAt is timestamp
+          && (d.get('endAt', null) == null || d.endAt is timestamp)
+          && d.countryCode is string && d.countryCode.size() == 2
+          && d.countryCode.upper() == d.countryCode
+          && d.venueName is string && d.city is string
+          && (d.get('geo', null) == null || d.geo is latlng)
+          && (d.get('venueId', null) == null || d.venueId is string)
+          && d.status in ['draft', 'published', 'archived']
+          && d.source in ['organizer', 'admin', 'scraped']
+          && d.price.min is number && d.price.max is number
+          && d.price.currency is string && d.price.isFree is bool
+          && d.get('interestedCount', 0) is int
+          && d.get('popularityScore', 0) is number;
+      }
+
+      // popularityScore orders the scraped social feed and is written only by
+      // the Admin SDK ingest. interestedCount is maintained by the marker
+      // subcollection below. Neither is an organizer's to set.
+      function countersPinned() {
+        return request.resource.data.get('interestedCount', 0)
+                 == resource.data.get('interestedCount', 0)
+          && request.resource.data.get('popularityScore', 0)
+                 == resource.data.get('popularityScore', 0);
+      }
+
+      allow read: if resource.data.get('status', '') == 'published'
+        || (signedIn() && resource.data.get('organizerUid', '') == request.auth.uid)
+        || isAdmin();
+
+      allow create: if shapeOk()
+        && (isAdmin()
+            || (isOrganizer()
+                && request.resource.data.organizerUid == request.auth.uid
+                && request.resource.data.source == 'organizer'
+                && request.resource.data.status in ['draft', 'published']
+                && request.resource.data.get('interestedCount', 0) == 0
+                && request.resource.data.get('popularityScore', 0) == 0));
+
+      allow update: if isAdmin()
+        || (isOrganizer()
+            && shapeOk()
+            && countersPinned()
+            && resource.data.get('organizerUid', '') == request.auth.uid
+            && request.resource.data.organizerUid == resource.data.organizerUid
+            && request.resource.data.source == resource.data.source
+            && request.resource.data.status in ['draft', 'published', 'archived'])
+        // Any signed-in user may register interest. The marker document below
+        // is what makes this idempotent; without it the counter is a free-form
+        // integer any client can drive.
+        || (signedIn()
+            && onlyTouched(['interestedCount'])
+            && request.resource.data.interestedCount == resource.data.get('interestedCount', 0) + 1
+            && !exists(/databases/$(database)/documents/events/$(eventId)/interested/$(request.auth.uid)));
+
+      allow delete: if isAdmin()
+        || (isOrganizer() && resource.data.get('organizerUid', '') == request.auth.uid);
+
+      // Written in the same batch as the counter increment above. Order is
+      // load-bearing: committed on its own first, the increment is denied
+      // forever, because the rule refuses once the marker exists.
+      match /interested/{voterUid} {
+        allow read: if isSelf(voterUid) || isAdmin();
+        allow create: if isSelf(voterUid);
+        allow update, delete: if false;
+      }
     }
 
-    // ── Deny everything else by default ──────────────────────────────────────
-    match /{document=**} {
-      allow read, write: if false;
+    // ── Venues ───────────────────────────────────────────────────────────────
+    match /venues/{venueId} {
+
+      // Live door status is a map on the venue document, not a subcollection.
+      // A per-venue live/current document turns the Live Hub club list into
+      // 1 + N reads over a globally seeded collection.
+      function liveOk() {
+        let l = request.resource.data.live;
+        return l.status in ['open', 'closed', 'vipOnly', 'soldOut']
+          && l.crowdLevel in ['empty', 'quiet', 'moderate', 'busy', 'packed']
+          && l.queueStatus in ['noQueue', 'short', 'moderate', 'long', 'closed']
+          && l.ticketsAvailable is bool && l.tablesAvailable is bool
+          && l.get('tonightDj', '') is string && l.get('tonightDj', '').size() <= 120
+          && l.get('offer', '') is string && l.get('offer', '').size() <= 200
+          && l.updatedAt == request.time;
+      }
+
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        || (isOrganizer()
+            && resource.data.get('ownerUid', null) == request.auth.uid
+            && !touched(['ownerUid', 'verified', 'source', 'osmId', 'geo', 'geohash'])
+            && (!touched(['live']) || liveOk()));
+      allow delete: if isAdmin();
     }
+
+    // ── Venue reports ────────────────────────────────────────────────────────
+    match /venueReports/{reportId} {
+      // Public, to match venues and published events — the Live Hub otherwise
+      // half-loads for a signed-out reader.
+      allow read: if true;
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.venueId is string
+        // A slider yields 4.0, which `is int` rejects. Range and integrality
+        // are checked separately so the client is not forced to round.
+        && request.resource.data.vibeRating is number
+        && request.resource.data.vibeRating >= 1
+        && request.resource.data.vibeRating <= 5
+        && request.resource.data.get('comment', '') is string
+        && request.resource.data.get('comment', '').size() <= 500
+        && request.resource.data.get('username', '') is string
+        && request.resource.data.get('username', '').size() <= 64
+        && request.resource.data.upvoteCount == 0
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if signedIn()
+        && onlyTouched(['upvoteCount'])
+        && request.resource.data.upvoteCount == resource.data.get('upvoteCount', 0) + 1
+        && !exists(/databases/$(database)/documents/venueReports/$(reportId)/upvotes/$(request.auth.uid));
+
+      allow delete: if isAdmin() || (signedIn() && resource.data.get('uid', '') == request.auth.uid);
+
+      // Same batch requirement as events/interested above.
+      match /upvotes/{voterUid} {
+        allow read: if isSelf(voterUid) || isAdmin();
+        allow create: if isSelf(voterUid);
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Audit log ────────────────────────────────────────────────────────────
+    // Written by the admin client alongside the action it records. An
+    // accountability record, not a tamper-proof ledger: an admin with write
+    // access to the target also has write access to the log.
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.at == request.time
+        && request.resource.data.action in [
+             'event.publish', 'event.archive', 'organizer.approve',
+             'organizer.reject', 'organizer.revoke', 'venue.create',
+             'report.delete', 'kyc.needsInfo', 'kyc.accept'
+           ]
+        && request.resource.data.targetType in ['event', 'venue', 'user', 'report']
+        && request.resource.data.targetId is string
+        && request.resource.data.get('summary', '') is string
+        && request.resource.data.get('summary', '').size() <= 500;
+      allow update, delete: if false;
+    }
+
+    // ── Retired collections ──────────────────────────────────────────────────
+    // These blocks document intent only. Rules are OR'd across matching paths,
+    // so a deny cannot revoke an allow granted elsewhere; they take effect here
+    // purely because no other match covers these paths.
+    match /organizer_requests/{docId} { allow read, write: if false; }
+    match /avatars/{docId}            { allow read, write: if false; }
+    match /live_hub_clubs/{docId}     { allow read, write: if false; }
+    match /live_hub_reports/{docId}   { allow read, write: if false; }
+    match /live_hub_social/{docId}    { allow read, write: if false; }
+    match /approvals/{docId}          { allow read, write: if false; }
+
+    match /{document=**} { allow read, write: if false; }
   }
 }

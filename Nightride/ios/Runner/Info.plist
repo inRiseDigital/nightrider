@@ -68,6 +68,8 @@
 	<string>Nightride needs permission to save photos and screenshots to your library.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Nightride uses the microphone when you record videos to share from events.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Nightride uses Face ID to unlock your organizer account on this device.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -108,5 +110,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>

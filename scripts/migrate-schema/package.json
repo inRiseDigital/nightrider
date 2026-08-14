@@ -1,0 +1,14 @@
+{
+  "name": "migrate-schema",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One-off Admin SDK rewrite of pre-schema Firestore documents into the shape docs/FIRESTORE_SCHEMA.md decides. Dry-run by default.",
+  "scripts": {
+    "migrate": "node migrate.mjs",
+    "migrate:apply": "node migrate.mjs --apply"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

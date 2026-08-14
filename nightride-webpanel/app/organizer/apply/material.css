@@ -1,0 +1,102 @@
+/*
+ * Material 3 token set for the organizer application flow only, scoped under
+ * .apply-material[data-theme]. Redefining the nr- and org-accent variables
+ * here (rather than touching the shared UI kit in components/organizer/ui/)
+ * lets every existing nr- Tailwind utility already used by AccentButton,
+ * AuthCard, TextField and StepMedia re-theme automatically for this subtree,
+ * without affecting /organizer/login or the dashboard, which read the same
+ * utilities outside this scope.
+ */
+
+.apply-material[data-theme="dark"] {
+  --surf: #121212;
+  --surf1: #1a1a1b;
+  --surf2: #1f1f21;
+  --surf3: #282829;
+  --surf4: #323234;
+  --on: #e6e4e4;
+  --onv: #c6c4c5;
+  --outline: #8e8c8d;
+  --outlinev: #3e3e40;
+  --pri: #ff5c86;
+  --onpri: #4d0018;
+  --pric: #8c0035;
+  --onpric: #ffd9df;
+  --ter: #83d5ca;
+  --onter: #00382f;
+  --terc: #005046;
+  --onterc: #9ef2e4;
+  --err: #f2b8b5;
+  --errc: #8c1d18;
+  --onerrc: #f9dedc;
+  --suc: #7fd8a4;
+  --succ: #0f4f31;
+  --onsucc: #c8ebd5;
+  --warn: #ffb95c;
+  --warnc: #6b3e00;
+  --onwarnc: #ffddb3;
+  --track: #323234;
+
+  --nr-bg: var(--surf);
+  --nr-surface: var(--surf2);
+  --nr-surface-raised: var(--surf3);
+  --nr-text-primary: var(--on);
+  --nr-text-secondary: var(--onv);
+  --nr-text-hint: var(--outline);
+  --nr-border: var(--outlinev);
+  --nr-primary-light: var(--pri);
+
+  --org-accent: var(--pri);
+  --org-accent-hover: #e5527a;
+  --org-accent-ring: #ff5c864d;
+  --org-accent-fill: #ff5c861a;
+}
+
+.apply-material[data-theme="light"] {
+  --surf: #fbfafa;
+  --surf1: #f5f4f4;
+  --surf2: #ffffff;
+  --surf3: #eeeded;
+  --surf4: #e7e6e6;
+  --on: #1b1b1c;
+  --onv: #4a4a4c;
+  --outline: #777678;
+  --outlinev: #dcdbdc;
+  --pri: #ff3d73;
+  --onpri: #ffffff;
+  --pric: #ffd9df;
+  --onpric: #40000f;
+  --ter: #00695f;
+  --onter: #ffffff;
+  --terc: #9ef2e4;
+  --onterc: #00201c;
+  --err: #b3261e;
+  --errc: #f9dedc;
+  --onerrc: #410e0b;
+  --suc: #146c43;
+  --succ: #c8ebd5;
+  --onsucc: #05271a;
+  --warn: #8a5100;
+  --warnc: #ffddb3;
+  --onwarnc: #2c1600;
+  --track: #dcdbdc;
+
+  --nr-bg: var(--surf);
+  --nr-surface: var(--surf2);
+  --nr-surface-raised: var(--surf3);
+  --nr-text-primary: var(--on);
+  --nr-text-secondary: var(--onv);
+  --nr-text-hint: var(--outline);
+  --nr-border: var(--outlinev);
+  --nr-primary-light: var(--pri);
+
+  --org-accent: var(--pri);
+  --org-accent-hover: #d63b7a;
+  --org-accent-ring: #ff3d734d;
+  --org-accent-fill: #ff3d731a;
+}
+
+.apply-material {
+  background: var(--nr-bg);
+  color: var(--nr-text-primary);
+}

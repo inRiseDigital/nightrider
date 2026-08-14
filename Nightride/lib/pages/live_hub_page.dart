@@ -1,4 +1,5 @@
 // lib/pages/live_hub_page.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -609,6 +610,11 @@ class _UserReportsTabState extends ConsumerState<_UserReportsTab> {
   bool _submitting = false;
   final _commentCtrl = TextEditingController();
 
+  /// A report is about a specific venue now, not a name typed into the void.
+  /// The old form posted 'Your Club' / 'Your City' / 'Sri Lanka' as literals,
+  /// which no query could ever join back to anything.
+  String? _selectedVenueId;
+
   @override
   void dispose() {
     _commentCtrl.dispose();
@@ -616,15 +622,27 @@ class _UserReportsTabState extends ConsumerState<_UserReportsTab> {
   }
 
   Future<void> _submit() async {
-    if (_selectedTag == null || _vibeRating == 0) return;
+    if (_selectedTag == null || _vibeRating == 0 || _selectedVenueId == null) {
+      return;
+    }
+
+    final clubs = ref.read(clubUpdatesProvider).asData?.value ?? const [];
+    final matches = clubs.where((c) => c.id == _selectedVenueId);
+    if (matches.isEmpty) return;
+    final venue = matches.first;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     setState(() => _submitting = true);
     try {
       await ref.read(liveHubServiceProvider).submitReport(
-            clubName: 'Your Club',
-            city: 'Your City',
-            country: 'Sri Lanka',
-            username: 'You',
-            avatarUrl: 'https://i.pravatar.cc/150?img=70',
+            venueId: venue.id,
+            venueName: venue.clubName,
+            city: venue.city,
+            countryCode: venue.country,
+            username: user.displayName ?? 'Anonymous',
+            avatarUrl: user.photoURL ?? '',
             tag: _selectedTag!,
             vibeRating: _vibeRating,
             comment: _commentCtrl.text.trim().isEmpty
@@ -634,6 +652,7 @@ class _UserReportsTabState extends ConsumerState<_UserReportsTab> {
       setState(() {
         _selectedTag = null;
         _vibeRating  = 0;
+        _selectedVenueId = null;
         _commentCtrl.clear();
       });
       if (mounted) {
@@ -685,6 +704,42 @@ class _UserReportsTabState extends ConsumerState<_UserReportsTab> {
                           letterSpacing: 1.2)),
                 ],
               ),
+              const Gap(12),
+              // Which venue this report is about. Without it the report has no
+              // venueId, and a report that cannot be joined back to a venue
+              // cannot be shown on that venue or counted towards its vibe.
+              Builder(builder: (context) {
+                final clubs =
+                    ref.watch(clubUpdatesProvider).asData?.value ?? const [];
+                if (clubs.isEmpty) {
+                  return Text(
+                    'No venues loaded for this country yet.',
+                    style: GoogleFonts.inter(
+                        color: Colors.white54, fontSize: 12),
+                  );
+                }
+                return DropdownButtonFormField<String>(
+                  initialValue: _selectedVenueId,
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF15151B),
+                  decoration: const InputDecoration(
+                    labelText: 'Venue',
+                    labelStyle: TextStyle(color: Colors.white54),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24),
+                    ),
+                  ),
+                  style: GoogleFonts.inter(color: Colors.white, fontSize: 13),
+                  items: clubs
+                      .map((c) => DropdownMenuItem(
+                            value: c.id,
+                            child: Text('${c.clubName} · ${c.city}',
+                                overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (id) => setState(() => _selectedVenueId = id),
+                );
+              }),
               const Gap(12),
               Wrap(
                 spacing: 8,

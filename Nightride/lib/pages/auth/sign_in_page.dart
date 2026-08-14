@@ -13,6 +13,7 @@ import 'package:nightride/pages/app_shell_page.dart';
 import 'package:nightride/pages/auth/sign_up_page.dart';
 import 'package:nightride/pages/forgotPw/forgot_pw.dart';
 import 'package:nightride/pages/onboard_questionnaire_page.dart';
+import 'package:nightride/pages/organizer/organizer_login_page.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/user_profile_service.dart';
@@ -78,20 +79,20 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   }
 
   Future<void> _routeForUser(User? user) async {
-    String role = 'user';
+    bool isOrganizer = false;
     bool onboardingDone = true;
     if (user != null) {
       final svc = ref.read(userProfileServiceProvider);
       await svc.createIfAbsent(user);
-      role = await svc.getUserRole(user.uid);
-      if (role != 'organizer') {
+      isOrganizer = await svc.isApprovedOrganizer(user.uid);
+      if (!isOrganizer) {
         onboardingDone = await svc.hasCompletedOnboarding(user.uid);
       }
     }
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => role == 'organizer'
+        builder: (_) => isOrganizer
             ? const OrganizerShellPage()
             : onboardingDone
                 ? AppShellPage()
@@ -285,6 +286,44 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                             fontWeight: FontWeight.w500,
                             letterSpacing: 0.2,
                           ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: AuthDimensions.gapM(context)),
+
+                  // ── Organizer entry point ─────────────────────────────
+                  Center(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const OrganizerLoginPage(),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Own a club? ',
+                              style: TextStyle(
+                                fontSize: AuthDimensions.subtitleFontSize(context),
+                                color: Colors.white.withValues(alpha: 0.55),
+                              ),
+                            ),
+                            Text(
+                              l.organizerLogin.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: AuthDimensions.subtitleFontSize(context),
+                                color: AppTheme.teal,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

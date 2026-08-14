@@ -114,6 +114,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get continueAsGuest => 'المتابعة كضيف';
 
   @override
+  String get ownAClub => 'هل تملك ناديًا؟';
+
+  @override
+  String get applyHere => 'قدّم طلبك هنا';
+
+  @override
+  String get organizerLogin => 'دخول المنظّمين';
+
+  @override
+  String get logInWithFaceId => 'تسجيل الدخول بـ Face ID';
+
+  @override
   String get noResultsFound => 'لم يتم العثور على نتائج';
 
   @override

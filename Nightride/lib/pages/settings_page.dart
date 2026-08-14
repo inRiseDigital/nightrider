@@ -11,7 +11,8 @@ import 'package:nightride/data/services/privacy_service.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/admin/admin_panel_page.dart';
 import 'package:nightride/pages/auth/sign_in_page.dart';
-import 'package:nightride/pages/organizer_apply_page.dart';
+import 'package:nightride/pages/organizer/organizer_verify_page.dart';
+import 'package:nightride/services/organizer_service.dart';
 import 'package:nightride/pages/edit_profile_page.dart';
 import 'package:nightride/providers/home_providers.dart';
 import 'package:nightride/providers/settings_providers.dart';
@@ -339,9 +340,13 @@ class _OrganizerSection extends ConsumerWidget {
   const _OrganizerSection({required this.ref});
   final WidgetRef ref;
 
-  void _openApply(BuildContext context) {
+  Future<void> _openApply(BuildContext context) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await ref.read(organizerServiceProvider).beginApplication(uid);
+    if (!context.mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const OrganizerApplyPage()),
+      MaterialPageRoute(builder: (_) => const OrganizerVerifyPage()),
     );
   }
 

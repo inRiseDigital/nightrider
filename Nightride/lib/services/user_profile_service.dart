@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:nightride/domain/profile_models.dart';
@@ -24,15 +24,23 @@ final userProfileDocProvider = StreamProvider<Map<String, dynamic>?>((ref) {
       .map((s) => s.data());
 });
 
-/// Streams the base64 avatar string for the current user (stored separately).
-final avatarBase64Provider = StreamProvider<String?>((ref) {
+/// The current user's avatar URL, or null when they have none.
+///
+/// This used to stream a base64 blob out of an `avatars` collection, which is
+/// why profile photos were capped at 300 KB: the encoded string had to fit
+/// inside a Firestore document alongside everything else. Avatars are Storage
+/// objects now, and the document holds only the public URL.
+final avatarUrlProvider = StreamProvider<String?>((ref) {
   final uid = ref.watch(authStateProvider).asData?.value?.uid;
   if (uid == null) return Stream.value(null);
   return FirebaseFirestore.instance
-      .collection('avatars')
+      .collection('users')
       .doc(uid)
       .snapshots()
-      .map((s) => s.data()?['data'] as String?);
+      .map((s) {
+    final url = s.data()?['avatarUrl'];
+    return (url is String && url.isNotEmpty) ? url : null;
+  });
 });
 
 class UserProfileService {
@@ -41,14 +49,19 @@ class UserProfileService {
 
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('users');
 
-  /// Get the role ('user' or 'organizer') for a given uid.
-  Future<String> getUserRole(String uid) async {
+  /// Whether this account is an approved organizer.
+  ///
+  /// `role` is gone. It carried three values in practice (user, organizer,
+  /// admin) across three writers that never agreed, and none of them was the
+  /// field the security rules actually read. Organizer access is
+  /// `organizerStatus == 'approved'` and nothing else; admin is `isAdmin`.
+  Future<bool> isApprovedOrganizer(String uid) async {
     final snap = await _col.doc(uid).get();
-    return snap.data()?['role'] as String? ?? 'user';
+    return snap.data()?['organizerStatus'] == 'approved';
   }
 
   /// Create a profile document if it doesn't already exist.
-  Future<void> createIfAbsent(User firebaseUser, {String role = 'user'}) async {
+  Future<void> createIfAbsent(User firebaseUser) async {
     final ref = _col.doc(firebaseUser.uid);
     final snap = await ref.get(const GetOptions(source: Source.server));
     if (snap.exists) return;
@@ -84,8 +97,14 @@ class UserProfileService {
       'friendsCount': 0,
       'streakDays': 0,
       'rank': 0,
-      'role': role,
+      // Admin-owned fields. The create rule requires both to be present and at
+      // their starting values, and every later self-update is denied if it
+      // touches either — only the Admin SDK sets isAdmin, and only an admin
+      // moves organizerStatus.
+      'isAdmin': false,
+      'organizerStatus': 'none',
       'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
@@ -146,15 +165,25 @@ class UserProfileService {
     }, SetOptions(merge: true));
   }
 
-  /// Save a profile photo as base64 in a separate Firestore document.
-  /// Enforces a 300 KB limit to keep Firestore document size sane.
-  Future<void> saveAvatarBase64(String uid, File imageFile) async {
+  /// Upload a profile photo to `avatars/{uid}.jpg` and record its URL.
+  ///
+  /// The 2 MB ceiling is the Storage rule's, checked here too so the user gets
+  /// a real message rather than a permission error. The old 300 KB limit was an
+  /// artefact of base64-encoding the image into a Firestore document.
+  Future<void> saveAvatar(String uid, File imageFile) async {
     final bytes = await imageFile.readAsBytes();
-    if (bytes.length > 307200) { // 300 KB
-      throw Exception('Image is too large. Please choose a smaller photo (max 300 KB).');
+    if (bytes.length > 2 * 1024 * 1024) {
+      throw Exception('Image is too large. Please choose one under 2 MB.');
     }
-    final base64Str = base64Encode(bytes);
-    await _db.collection('avatars').doc(uid).set({'data': base64Str});
+
+    final object = FirebaseStorage.instance.ref('avatars/$uid.jpg');
+    await object.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+    final url = await object.getDownloadURL();
+
+    await _col.doc(uid).set({
+      'avatarUrl': url,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   static String _sanitizeText(String value, {int maxLength = 200}) {

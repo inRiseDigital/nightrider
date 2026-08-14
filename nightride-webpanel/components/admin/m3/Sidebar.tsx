@@ -1,8 +1,19 @@
 import { Icon } from "./Icon";
 import { Hoverable } from "./Hoverable";
-import type { AdminConsoleValues } from "@/lib/admin/useAdminConsole";
+import { initialsFor } from "@/lib/admin/present";
+import type { AdminNav } from "@/lib/admin/useAdminNav";
 
-export function Sidebar({ nav }: { nav: AdminConsoleValues["navGroups"] }) {
+export function Sidebar({
+  nav,
+  adminName,
+  adminEmail,
+  onSignOut,
+}: {
+  nav: AdminNav["navGroups"];
+  adminName: string | null;
+  adminEmail: string | null;
+  onSignOut: () => void;
+}) {
   return (
     <div
       style={{
@@ -95,7 +106,9 @@ export function Sidebar({ nav }: { nav: AdminConsoleValues["navGroups"] }) {
         </div>
       ))}
 
-      <div
+      <Hoverable
+        onClick={onSignOut}
+        title="Sign out"
         style={{
           marginTop: "auto",
           display: "flex",
@@ -104,7 +117,9 @@ export function Sidebar({ nav }: { nav: AdminConsoleValues["navGroups"] }) {
           padding: 12,
           borderRadius: 16,
           background: "#1F1B1F",
+          cursor: "pointer",
         }}
+        hoverStyle={{ background: "#2A252A" }}
       >
         <div
           style={{
@@ -121,10 +136,10 @@ export function Sidebar({ nav }: { nav: AdminConsoleValues["navGroups"] }) {
             flexShrink: 0,
           }}
         >
-          AD
+          {initialsFor(adminName ?? "", adminEmail ?? "")}
         </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500 }}>Aisha Darwish</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{adminName || "Admin"}</div>
           <div
             style={{
               fontSize: 11,
@@ -135,10 +150,11 @@ export function Sidebar({ nav }: { nav: AdminConsoleValues["navGroups"] }) {
               whiteSpace: "nowrap",
             }}
           >
-            admin@nightride.app
+            {adminEmail || ""}
           </div>
         </div>
-      </div>
+        <Icon name="logout" size={18} color="#9A8C91" />
+      </Hoverable>
     </div>
   );
 }

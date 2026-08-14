@@ -1,4 +1,5 @@
 import { Roboto, Roboto_Mono } from "next/font/google";
+import { AdminAuthProvider } from "@/lib/admin/auth";
 import "./material.css";
 
 const roboto = Roboto({
@@ -20,7 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..0&display=swap"
         rel="stylesheet"
       />
-      {children}
+      <AdminAuthProvider>{children}</AdminAuthProvider>
     </div>
   );
 }

@@ -1,60 +1,48 @@
+"use client";
+
 import { Icon } from "../Icon";
 import { Hoverable } from "../Hoverable";
-import type { AdminConsoleValues } from "@/lib/admin/useAdminConsole";
+import { osmTileUrl } from "@/lib/admin/geo";
+import { initialsFor } from "@/lib/admin/present";
+import { useVenueDetail } from "@/lib/admin/useVenueDetail";
 
-export function VenueDetail({
-  venue,
-  backToOrg,
-  toggleTransferHandler,
-}: Pick<AdminConsoleValues, "venue" | "backToOrg" | "toggleTransferHandler">) {
+export function VenueDetail({ venueId, onBack }: { venueId: string; onBack: () => void }) {
+  const { loading, venue, owner, candidates, transferOpen, setTransferOpen, openTransfer, transferTo, toggleSuspend, busy, actionError } = useVenueDetail(venueId);
+
+  if (loading || !venue) return <div style={{ color: "#9A8C91", fontSize: 14 }}>Loading venue…</div>;
+
+  const suspended = venue.status !== "active";
+
   return (
     <>
-      {venue.transferOpen ? (
-        <div
-          onClick={toggleTransferHandler}
-          style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 380, background: "#2A252A", borderRadius: 28, padding: "24px 0 12px", boxShadow: "0 8px 12px 6px rgba(0,0,0,0.3), 0 4px 4px rgba(0,0,0,0.5)" }}
-          >
+      {transferOpen ? (
+        <div onClick={() => setTransferOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#2A252A", borderRadius: 28, padding: "24px 0 12px" }}>
             <div style={{ padding: "0 24px 10px" }}>
               <div style={{ fontSize: 20 }}>Transfer {venue.name}</div>
-              <div style={{ fontSize: 13, color: "#CFC0C5", marginTop: 6 }}>
-                Pick the organizer who should manage this venue. Published events stay with the venue.
-              </div>
+              <div style={{ fontSize: 13, color: "#CFC0C5", marginTop: 6 }}>Pick the approved organizer who should manage this venue.</div>
             </div>
-            {venue.transferTargets.map((t: any) => (
-              <Hoverable
-                key={t.name}
-                onClick={t.pick}
-                style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 24px", fontSize: 15, cursor: "pointer" }}
-                hoverStyle={{ background: "#FFFFFF14" }}
-              >
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background: "#1F4F49",
-                    color: "#A5F2E5",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    flexShrink: 0,
-                  }}
+            {candidates.length === 0 ? (
+              <div style={{ padding: "12px 24px", fontSize: 13, color: "#9A8C91" }}>No other approved organizers yet.</div>
+            ) : (
+              candidates.map((c) => (
+                <Hoverable
+                  key={c.uid}
+                  onClick={() => void transferTo(c.uid)}
+                  style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 24px", fontSize: 15, cursor: "pointer" }}
+                  hoverStyle={{ background: "#FFFFFF14" }}
                 >
-                  {t.initials}
-                </div>
-                {t.name}
-              </Hoverable>
-            ))}
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1F4F49", color: "#A5F2E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 500, flexShrink: 0 }}>
+                    {initialsFor(c.displayName, c.email)}
+                  </div>
+                  {c.displayName || c.email}
+                </Hoverable>
+              ))
+            )}
             <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 16px 4px" }}>
               <Hoverable
                 as="button"
-                onClick={toggleTransferHandler}
+                onClick={() => setTransferOpen(false)}
                 style={{ height: 40, padding: "0 18px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "transparent", color: "#FFB1C4", border: "none", cursor: "pointer" }}
                 hoverStyle={{ background: "#FFFFFF14" }}
               >
@@ -67,33 +55,47 @@ export function VenueDetail({
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "4px 0 16px" }}>
         <Hoverable
-          onClick={backToOrg}
+          onClick={onBack}
           style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px 0 12px", borderRadius: 20, cursor: "pointer", color: "#CFC0C5", fontSize: 14, fontWeight: 500 }}
           hoverStyle={{ background: "#2A252A", color: "#EDE0E4" }}
         >
           <Icon name="arrow_back" size={20} />
-          {venue.organizerName}
+          {owner?.displayName || owner?.email || "Organizer"}
         </Hoverable>
         <div style={{ minWidth: 0, marginLeft: 4 }}>
           <div style={{ fontSize: 20, lineHeight: 1.2 }}>{venue.name}</div>
           <div style={{ fontSize: 13, color: "#CFC0C5", marginTop: 2 }}>
-            {venue.city} · managed by {venue.organizerName}
+            {venue.city} · managed by {owner?.displayName || owner?.email || "no one"}
           </div>
         </div>
-        <div style={{ display: "inline-flex", alignItems: "center", height: 32, padding: "0 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: venue.stateBg, color: venue.stateFg, marginLeft: 4 }}>
-          {venue.stateLabel}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            height: 32,
+            padding: "0 12px",
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 500,
+            background: suspended ? "#42320A" : "#0F3D28",
+            color: suspended ? "#F5C452" : "#7BE0A8",
+            marginLeft: 4,
+          }}
+        >
+          {suspended ? "Closed" : "Live"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexShrink: 0 }}>
           <Hoverable
             as="button"
-            onClick={venue.toggleSuspend}
+            onClick={() => void toggleSuspend()}
+            disabled={busy}
             style={{ height: 40, padding: "0 20px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "transparent", color: "#EDE0E4", border: "1px solid #524549", cursor: "pointer" }}
             hoverStyle={{ background: "#FFFFFF14" }}
           >
-            {venue.suspendLabel}
+            {suspended ? "Reopen venue" : "Close venue"}
           </Hoverable>
           <button
-            onClick={toggleTransferHandler}
+            onClick={() => void openTransfer()}
             style={{ height: 40, padding: "0 20px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "#1F4F49", color: "#A5F2E5", border: "none", cursor: "pointer" }}
           >
             Transfer venue
@@ -101,36 +103,43 @@ export function VenueDetail({
         </div>
       </div>
 
-      {venue.suspended ? (
+      {actionError ? <div style={{ color: "#FFB4AB", fontSize: 13, marginBottom: 12 }}>{actionError}</div> : null}
+
+      {suspended ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#42320A", color: "#F5C452", borderRadius: 12, padding: "14px 16px", marginBottom: 16, fontSize: 13 }}>
           <Icon name="pause_circle" size={20} />
-          This venue is suspended — no new events can be published here. The organizer&apos;s other venues are unaffected.
+          This venue is closed — no new events can be published here.
         </div>
       ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16, alignItems: "start" }}>
         <div style={{ background: "#1B181B", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ position: "relative", width: "100%", height: 220, background: "#2A252A", backgroundImage: `url('${venue.mapUrl}')`, backgroundSize: "cover", backgroundPosition: "center" }}>
-            <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -100%)", color: "#FFB1C4" }}>
-              <Icon name="location_on" size={36} filled style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.6))" }} />
+          {venue.geo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={osmTileUrl(venue.geo.latitude, venue.geo.longitude)} alt={venue.name} style={{ width: "100%", height: 220, objectFit: "cover" }} />
+          ) : (
+            <div style={{ width: "100%", height: 220, background: "#2A252A", display: "flex", alignItems: "center", justifyContent: "center", color: "#9A8C91" }}>
+              <Icon name="location_off" size={32} />
             </div>
-            <div style={{ position: "absolute", right: 8, bottom: 6, fontSize: 9, color: "#EDE0E4", background: "rgba(0,0,0,0.55)", padding: "2px 6px", borderRadius: 6 }}>
-              © OpenStreetMap
-            </div>
-          </div>
-          <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: venue.gpsColor }}>
-            <Icon name={venue.gpsIcon} size={18} />
-            {venue.gpsLabel}
-          </div>
+          )}
         </div>
 
         <div style={{ background: "#1B181B", borderRadius: 16, padding: 20 }}>
           <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 12 }}>Venue record</div>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {venue.rows.map((r: any, i: number) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "9px 0", borderBottom: "1px solid #241F23", fontSize: 14 }}>
+            {[
+              { label: "City", value: venue.city },
+              { label: "Country", value: venue.countryCode },
+              { label: "Address", value: venue.address },
+              { label: "Opening hours", value: venue.openingHours || "—" },
+              { label: "Contact phone", value: venue.phone || "—", mono: true },
+              { label: "Website", value: venue.website || "—" },
+              { label: "Source", value: venue.source },
+              { label: "Verified", value: venue.verified ? "Yes" : "No" },
+            ].map((r) => (
+              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "9px 0", borderBottom: "1px solid #241F23", fontSize: 14 }}>
                 <span style={{ color: "#9A8C91", flexShrink: 0 }}>{r.label}</span>
-                <span style={{ textAlign: "right", fontFamily: r.font, minWidth: 0, wordBreak: "break-word" }}>{r.value}</span>
+                <span style={{ textAlign: "right", fontFamily: r.mono ? "'Roboto Mono', monospace" : "inherit", minWidth: 0, wordBreak: "break-word" }}>{r.value}</span>
               </div>
             ))}
           </div>

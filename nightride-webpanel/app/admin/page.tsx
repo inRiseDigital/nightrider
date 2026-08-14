@@ -1,5 +1,10 @@
 import { AdminConsole } from "@/components/admin/m3/AdminConsole";
+import { AdminGate } from "@/components/admin/m3/AdminGate";
 
 export default function AdminPage() {
-  return <AdminConsole />;
+  return (
+    <AdminGate>
+      <AdminConsole />
+    </AdminGate>
+  );
 }

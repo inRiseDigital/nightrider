@@ -1,7 +1,7 @@
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
+import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
+import { connectStorageEmulator, getStorage, type FirebaseStorage } from "firebase/storage";
 
 /**
  * Firebase web config for the `nightride-a9173` project — the same project the
@@ -36,12 +36,41 @@ export function getFirebaseApp(): FirebaseApp {
   return getApps().length ? getApp() : initializeApp(firebaseConfig);
 }
 
+/**
+ * Local Firebase emulator suite (see Nightride/scripts/emulators.sh). Off by
+ * default — set NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true in .env.local to point
+ * this webpanel at localhost instead of the real `nightride-a9173` project.
+ * Guarded by a module-scoped flag because connect*Emulator() throws if called
+ * more than once per SDK instance, and Next's client-side fast refresh can
+ * re-run this module.
+ */
+const USE_EMULATOR = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true";
+let emulatorsConnected = false;
+
+function connectEmulatorsOnce(auth: Auth, db: Firestore, storage: FirebaseStorage) {
+  if (!USE_EMULATOR || emulatorsConnected) return;
+  emulatorsConnected = true;
+  try {
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectStorageEmulator(storage, "127.0.0.1", 9199);
+  } catch {
+    // Already connected in this SDK instance (e.g. fast-refresh re-run) — ignore.
+  }
+}
+
 export function getFirebaseAuth(): Auth {
-  return getAuth(getFirebaseApp());
+  const app = getFirebaseApp();
+  const auth = getAuth(app);
+  connectEmulatorsOnce(auth, getFirestore(app), getStorage(app));
+  return auth;
 }
 
 export function getDb(): Firestore {
-  return getFirestore(getFirebaseApp());
+  const app = getFirebaseApp();
+  const db = getFirestore(app);
+  connectEmulatorsOnce(getAuth(app), db, getStorage(app));
+  return db;
 }
 
 /**
@@ -51,5 +80,8 @@ export function getDb(): Firestore {
  * `/api/admin/kyc`, which holds the Admin SDK.
  */
 export function getBucket(): FirebaseStorage {
-  return getStorage(getFirebaseApp());
+  const app = getFirebaseApp();
+  const storage = getStorage(app);
+  connectEmulatorsOnce(getAuth(app), getFirestore(app), storage);
+  return storage;
 }

@@ -18,7 +18,9 @@ Firebase (Auth + Firestore + Storage) is the shared source of truth across all t
 ## How the pieces connect
 
 - The Flutter app's **chat tab streams from the PartyAgent backend** over Server-Sent Events: `POST {BACKEND_URL}/chat/stream` (see `Nightride/lib/data/services/chat_service.dart`). `BACKEND_URL` is compiled in via `--dart-define` and defaults to a devtunnel URL — override it for real builds.
-- All three projects read/write the same **Firestore collections**: `users`, `venues`, `events`, `approvals`, `logs`. Schema and workflow (KYC, approval queues, duplicate detection, auto-scan) are documented in `nightride-webpanel/README.md` — read it before touching any Firestore data model.
+- All three projects read/write the same **Firestore collections**: `users`, `events`, `venues`, `venueReports`, `logs`. **`docs/FIRESTORE_SCHEMA.md` is the authoritative schema — read it before touching any Firestore data model**, and treat `firestore.rules` as the tiebreaker if the two ever disagree. `firestore-tests/` is the executable form of that document (105 cases, `npm test`).
+- Two older schema specs still exist and are **superseded**: the "Data Schema" sections of `nightride-webpanel/README.md` (which describe `kycStatus`, `kycDetails`, `appeals`, an `approvals` subcollection with dual sign-off, and Cloud Functions triggers) and the root `db.mwb` / "Party App Db Schema" PDFs. None of those collections or fields exist. Neither does `role`, `isOrganizer`, `organizer_requests`, `avatars`, or `live_hub_*`.
+- **There are no Cloud Functions.** Admin actions are ordinary client writes authorised by `users/{uid}.isAdmin`, which only the Admin SDK can set. The four operations that cannot be client writes — setting `isAdmin`, deleting KYC objects, deleting an account, migrating documents — live in `nightride-webpanel/netlify/functions/` and `scripts/`.
 - The Flutter app talks to Firestore directly (`Nightride/lib/services/`) for auth, profiles, favourites, notifications; the agent backend has its own Firestore/Postgres access for events and memory.
 
 ## PartyAgent (AI backend)

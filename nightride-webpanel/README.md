@@ -21,7 +21,13 @@ Backend: Firebase (Auth, Firestore DB, Functions for serverless logic, Storage f
 Deployment: Vercel (optimized for Next.js, integrates with Firebase).
 Additional: Google Maps API for venue mapping; CAPTCHA (reCAPTCHA via Firebase); ID verification (e.g., Stripe Identity or manual via uploads).
 
-Data Schema (Firestore Collections)
+Data Schema (Firestore Collections) — SUPERSEDED, see docs/FIRESTORE_SCHEMA.md
+
+The authoritative schema is `docs/FIRESTORE_SCHEMA.md`. This block is the
+original product spec and does not describe the database: no `kycStatus`,
+`kycDetails`, `appeals`, `approvals` subcollection, or Cloud Functions exist.
+Also note the deployment line above — the panel ships to Netlify as a static
+export, not Vercel.
 
 users (Document ID: userId from Firebase Auth)
 Fields:
@@ -148,7 +154,23 @@ Testing: Unit (Jest) for components; Integration for workflows
 5. Use in forms: Wrap API calls with App Check token (getToken()).
 6. Verify in Functions: Check context.app in onRequest.
 
-### Data Schema (Firestore Collections)
+### Data Schema (Firestore Collections) — SUPERSEDED
+
+> **This section is a historical product spec, not the schema.** The
+> authoritative schema is [`docs/FIRESTORE_SCHEMA.md`](../docs/FIRESTORE_SCHEMA.md),
+> enforced by `firestore.rules` and pinned by the 105 cases in
+> `firestore-tests/`.
+>
+> Nothing below exists in Firestore: `type: 'explorer' | 'publisher'`,
+> `kycStatus`, `kycDetails`, `appeals`, `banned`, `loginHistory`, the
+> `approvals` subcollection with dual sign-off and cron escalation, and the
+> Cloud Functions triggers. Verification is `users/{uid}/private/organizerReview`;
+> suspension is the Firebase Auth `disabled` flag rather than a Firestore
+> boolean nothing checks; and there are no Cloud Functions at all.
+>
+> Kept because it records what the product was asked for, which is still
+> useful when deciding what to build next. It is not a description of the
+> database.
 - **users** (ID: userId from Auth)
   - type: string ('explorer' | 'publisher')
   - email: string

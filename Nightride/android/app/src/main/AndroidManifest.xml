@@ -2,6 +2,11 @@
     <!-- LOCATION PERMISSIONS  -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- CAMERA — organizer KYC capture (NIC/selfie photos, walkthrough video) -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <application
         android:label="nightride"
         android:name="${applicationName}"

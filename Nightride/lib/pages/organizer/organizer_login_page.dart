@@ -8,6 +8,7 @@ import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/forgotPw/forgot_pw.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
+import 'package:nightride/pages/organizer/organizer_verify_page.dart';
 import 'package:nightride/pages/organizer_apply_page.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/organizer_service.dart';
@@ -137,11 +138,9 @@ class _OrganizerLoginPageState extends ConsumerState<OrganizerLoginPage> {
         );
 
       case OrganizerAccess.pending:
-        setState(() {
-          _error = '';
-          _notice = 'Your application is under review. '
-              "We'll email you as soon as it's approved.";
-        });
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const OrganizerVerifyPage()),
+        );
 
       case OrganizerAccess.rejected:
         final reason = await service.rejectionReasonFor(user.uid);

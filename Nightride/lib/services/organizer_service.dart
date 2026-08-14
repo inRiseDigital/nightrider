@@ -111,4 +111,79 @@ class OrganizerService {
     final steps = review?['steps'];
     return steps is Map ? Map<String, dynamic>.from(steps) : <String, dynamic>{};
   }
+
+  /// Live per-step review state — so the checklist unlocks `gps` the moment
+  /// an admin accepts the venue address, or reopens a step with
+  /// `needs_info`, without the applicant needing to re-open the screen.
+  Stream<Map<String, dynamic>> watchReviewSteps(String uid) =>
+      _reviewDoc(uid).snapshots().map((snapshot) {
+        final steps = snapshot.data()?['steps'];
+        return steps is Map ? Map<String, dynamic>.from(steps) : <String, dynamic>{};
+      });
+
+  /// The applicant's own `organizerApplication.steps` claims (`uploaded`
+  /// flags) — separate from [watchReviewSteps] because only an admin can ever
+  /// write the review document, so "I uploaded something" and "an admin
+  /// looked at it" are necessarily two different streams.
+  Stream<Map<String, dynamic>> watchApplicationSteps(String uid) =>
+      _userDoc(uid).snapshots().map((snapshot) {
+        final steps = snapshot.data()?['organizerApplication']?['steps'];
+        return steps is Map ? Map<String, dynamic>.from(steps) : <String, dynamic>{};
+      });
+
+  /// The applicant's claim that they uploaded evidence for [stepId]. This is
+  /// advisory only (see `OrganizerApplication` in FIRESTORE_SCHEMA.md) — the
+  /// review UI derives the real object paths from Storage directly. Storage's
+  /// own rules are what actually gate the upload this flag merely records.
+  ///
+  /// `applicationOk()` in firestore.rules requires `submittedAt == request.time`
+  /// on *every* write that touches `organizerApplication` at all — not just the
+  /// initial submission — so this resubmits `submitted`/`submittedAt` alongside
+  /// the step flag rather than patching the step in isolation.
+  Future<void> markStepUploaded(String uid, String stepId) {
+    return _userDoc(uid).set({
+      'organizerApplication': {
+        'submitted': true,
+        'submittedAt': FieldValue.serverTimestamp(),
+        'steps': {
+          stepId: {'uploaded': true},
+        },
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Records one GPS fix against the current gps attempt. `attempt` must be
+  /// the admin-owned `organizerReview.steps.gps.attempt` the caller read just
+  /// before capturing — it is not chosen here. Timestamps inside array
+  /// elements must be the client clock: Firestore rejects a `serverTimestamp`
+  /// sentinel inside an array.
+  Future<void> appendGpsObservation(
+    String uid, {
+    required GeoPoint point,
+    required double accuracyM,
+    required bool mocked,
+    required int attempt,
+  }) {
+    return _userDoc(uid).set({
+      'organizerApplication': {
+        'submitted': true,
+        'submittedAt': FieldValue.serverTimestamp(),
+        'steps': {
+          'gps': {
+            'attempts': FieldValue.arrayUnion([
+              {
+                'point': point,
+                'accuracyM': accuracyM,
+                'mocked': mocked,
+                'capturedAt': Timestamp.now(),
+                'attempt': attempt,
+              },
+            ]),
+          },
+        },
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 }

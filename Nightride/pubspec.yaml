@@ -44,6 +44,13 @@ dependencies:
   url_launcher: ^6.3.1
   google_sign_in: ^6.2.2
   image_picker: ^1.1.2
+  # Live preview + capture for organizer KYC steps (NIC/selfie photos, the
+  # 60s walkthrough video) — image_picker only shells out to the OS camera
+  # app, which can't show the corner/oval capture guides the design calls for.
+  camera: ^0.11.0+2
+  # Extracts a poster frame from the walkthrough video for the review sheet
+  # and upload (kyc/{uid}/video/{attempt}/poster.jpg) without a Cloud Function.
+  video_thumbnail: ^0.5.3
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   flutter_local_notifications: ^21.0.0

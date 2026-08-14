@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nightride/core/theme/app_theme.dart';
+import 'package:nightride/pages/organizer/organizer_account_page.dart';
 import 'package:nightride/pages/organizer/organizer_home_page.dart';
-import 'package:nightride/pages/profile_page.dart';
+import 'package:nightride/pages/organizer/organizer_tonight_page.dart';
+import 'package:nightride/pages/organizer/organizer_venue_page.dart';
 
+/// Four-tab organizer dashboard shell — Home/Events/Venue/Account, matching
+/// the Organizer Mobile App Material design. Events keeps the real,
+/// Firestore-backed CRUD in [OrganizerHomePage]; Home/Venue/Account are
+/// local/mock UI (see those files for why).
 class OrganizerShellPage extends ConsumerStatefulWidget {
   const OrganizerShellPage({super.key});
 
@@ -15,9 +21,10 @@ class _OrganizerShellPageState extends ConsumerState<OrganizerShellPage> {
   int _index = 0;
 
   static const _pages = [
+    OrganizerTonightPage(),
     OrganizerHomePage(),
-    _StatsPage(),
-    ProfilePage(),
+    OrganizerVenuePage(),
+    OrganizerAccountPage(),
   ];
 
   @override
@@ -38,46 +45,26 @@ class _OrganizerShellPageState extends ConsumerState<OrganizerShellPage> {
           onDestinationSelected: (i) => setState(() => _index = i),
           destinations: const [
             NavigationDestination(
+              icon: Icon(Icons.space_dashboard_outlined, color: Colors.white54),
+              selectedIcon: Icon(Icons.space_dashboard_rounded, color: Colors.white),
+              label: 'Home',
+            ),
+            NavigationDestination(
               icon: Icon(Icons.event_outlined, color: Colors.white54),
               selectedIcon: Icon(Icons.event_rounded, color: Colors.white),
-              label: 'My Events',
+              label: 'Events',
             ),
             NavigationDestination(
-              icon: Icon(Icons.bar_chart_outlined, color: Colors.white54),
-              selectedIcon: Icon(Icons.bar_chart_rounded, color: Colors.white),
-              label: 'Stats',
+              icon: Icon(Icons.storefront_outlined, color: Colors.white54),
+              selectedIcon: Icon(Icons.storefront_rounded, color: Colors.white),
+              label: 'Venue',
             ),
             NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded, color: Colors.white54),
-              selectedIcon: Icon(Icons.person_rounded, color: Colors.white),
-              label: 'Profile',
+              icon: Icon(Icons.manage_accounts_outlined, color: Colors.white54),
+              selectedIcon: Icon(Icons.manage_accounts_rounded, color: Colors.white),
+              label: 'Account',
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatsPage extends StatelessWidget {
-  const _StatsPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.scaffold,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.bar_chart_rounded, size: 64, color: AppTheme.primary.withValues(alpha: 0.4)),
-              const SizedBox(height: 16),
-              const Text('Analytics', style: TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              const Text('Coming soon', style: TextStyle(color: Colors.white38, fontSize: 13)),
-            ],
-          ),
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/pages/onboard_questionnaire_page.dart';
+import 'package:nightride/pages/organizer/organizer_login_page.dart';
 import 'package:nightride/services/auth_service.dart';
 
 import 'package:nightride/l10n/app_localizations.dart';
@@ -15,6 +16,7 @@ const _kCream = Color(0xFFF3EAD6);
 const _kNeonLime = Color(0xFFDFFF2F);
 const _kDarkGray = Color(0xFF151515);
 const _kBorderGray = Color(0xFF333333);
+const _kTeal = Color(0xFF62D6C8);
 
 class SignUpPage extends ConsumerStatefulWidget {
   const SignUpPage({super.key});
@@ -261,6 +263,47 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+
+                  const Gap(20),
+
+                  // ── Organizer entry point ────────────────────────────────
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const OrganizerLoginPage(),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '${AppLocalizations.of(context)!.ownAClub} ',
+                              style: GoogleFonts.inter(
+                                fontSize: AppResponsive.font(context, 13.5),
+                                color: Colors.white.withValues(alpha: 0.55),
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            TextSpan(
+                              text: AppLocalizations.of(context)!
+                                  .applyHere
+                                  .toUpperCase(),
+                              style: GoogleFonts.inter(
+                                fontSize: AppResponsive.font(context, 13.5),
+                                color: _kTeal,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nightride/core/responsive/app_responsive.dart';
 import 'package:nightride/core/theme/app_theme.dart';
+import 'package:nightride/pages/organizer/organizer_verify_page.dart';
 
 class OrganizerApplyPage extends StatefulWidget {
   const OrganizerApplyPage({super.key});
@@ -147,12 +148,8 @@ class _OrganizerApplyPageState extends State<OrganizerApplyPage> {
         if (error.code != 'permission-denied') rethrow;
       }
       if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Application submitted! An admin will review it.'),
-            backgroundColor: Colors.green,
-          ),
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const OrganizerVerifyPage()),
         );
       }
     } catch (_) {

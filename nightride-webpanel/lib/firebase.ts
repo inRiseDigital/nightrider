@@ -1,7 +1,7 @@
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
+import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
+import { connectStorageEmulator, getStorage, type FirebaseStorage } from "firebase/storage";
 
 /**
  * Firebase web config for the `nightride-a9173` project — the same project the
@@ -23,6 +23,16 @@ export function isFirebaseConfigured() {
 }
 
 /**
+ * Mirrors the Flutter app's `--dart-define=USE_FIREBASE_EMULATOR=true` (see
+ * root LOCAL_DEV.md) — same `nightride-a9173` project id either way, only the
+ * transport changes. `NEXT_PUBLIC_` so it's readable client-side; set it in
+ * `.env.local`, not `.env.example`, since it should never be on by default.
+ */
+function isUsingEmulator() {
+  return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true";
+}
+
+/**
  * Initialised lazily rather than at module scope so that importing anything
  * from this file stays safe during SSR and static prerendering — `/organizer`
  * pages are prerendered at build time, where no Firebase config is needed.
@@ -36,12 +46,29 @@ export function getFirebaseApp(): FirebaseApp {
   return getApps().length ? getApp() : initializeApp(firebaseConfig);
 }
 
+// connectXEmulator() throws if called twice on the same instance — Next's Fast
+// Refresh (and StrictMode double-invocation) can re-run these getters, so each
+// service tracks whether it's already been pointed at the emulator.
+let authEmulatorConnected = false;
+let firestoreEmulatorConnected = false;
+let storageEmulatorConnected = false;
+
 export function getFirebaseAuth(): Auth {
-  return getAuth(getFirebaseApp());
+  const auth = getAuth(getFirebaseApp());
+  if (isUsingEmulator() && !authEmulatorConnected) {
+    connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
+    authEmulatorConnected = true;
+  }
+  return auth;
 }
 
 export function getDb(): Firestore {
-  return getFirestore(getFirebaseApp());
+  const db = getFirestore(getFirebaseApp());
+  if (isUsingEmulator() && !firestoreEmulatorConnected) {
+    connectFirestoreEmulator(db, "localhost", 8080);
+    firestoreEmulatorConnected = true;
+  }
+  return db;
 }
 
 /**
@@ -51,5 +78,10 @@ export function getDb(): Firestore {
  * `/api/admin/kyc`, which holds the Admin SDK.
  */
 export function getBucket(): FirebaseStorage {
-  return getStorage(getFirebaseApp());
+  const storage = getStorage(getFirebaseApp());
+  if (isUsingEmulator() && !storageEmulatorConnected) {
+    connectStorageEmulator(storage, "localhost", 9199);
+    storageEmulatorConnected = true;
+  }
+  return storage;
 }

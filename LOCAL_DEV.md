@@ -67,6 +67,20 @@ Real physical device needs your Mac's LAN IP instead — not wired in yet.
 
 Drop the flag entirely to go back to real Firebase — that's the default.
 
+### Web panel (nightride-webpanel) against the emulator
+
+```bash
+cd nightride-webpanel
+cp .env.example .env.local        # once
+echo NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true >> .env.local
+npm run dev
+```
+
+Wired in `lib/firebase.ts`'s `getFirebaseAuth`/`getDb`/`getBucket` — same
+`nightride-a9173` project id, only the transport changes, same as the
+Flutter app above. Remove the env var (or delete `.env.local`) to go back
+to real Firebase.
+
 ## 4. Run the backend (PartyAgent) locally and point the app at it
 
 **The app does NOT actually read `.env` at runtime** — `Nightride/.env`

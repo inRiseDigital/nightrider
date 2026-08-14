@@ -8,6 +8,7 @@ import 'package:nightride/core/theme/app_theme.dart';
 import 'package:nightride/l10n/app_localizations.dart';
 import 'package:nightride/pages/forgotPw/forgot_pw.dart';
 import 'package:nightride/pages/organizer/organizer_shell_page.dart';
+import 'package:nightride/pages/organizer/organizer_apply_flow_page.dart';
 import 'package:nightride/pages/organizer/organizer_verify_page.dart';
 import 'package:nightride/services/auth_service.dart';
 import 'package:nightride/services/organizer_service.dart';
@@ -317,7 +318,13 @@ class _OrganizerLoginPageState extends ConsumerState<OrganizerLoginPage> {
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
                         final user = FirebaseAuth.instance.currentUser;
-                        if (user != null) _startApplication(user.uid);
+                        if (user != null) {
+                          _startApplication(user.uid);
+                        } else {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const OrganizerApplyFlowPage()),
+                          );
+                        }
                       },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),

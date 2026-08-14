@@ -13,7 +13,7 @@ The Nightride platform consists of four components that require infrastructure:
 |---|---|---|
 | Mobile App (Flutter) | iOS & Android | App Store / Google Play |
 | AI Chat Backend (Python) | Server | VPS / Cloud |
-| Web Admin Panel (Next.js) | Web | Firebase Hosting |
+| Web Admin Panel (Next.js) | Web | Netlify (static export; Firebase remains the data backend) |
 | Database & Auth | Cloud | Firebase (Google) |
 
 ---

@@ -24,6 +24,8 @@ The six specialists, each in `src/party_agent/agents/`:
 
 ## Quick start
 
+Requires Python 3.11+.
+
 ```bash
 # 1. Set up the environment
 cp .env.example .env
@@ -39,8 +41,12 @@ docker-compose up -d
 python scripts/run_local.py
 
 # 5. Start the FastAPI server
-uvicorn party_agent.api.main:app --reload --port 8000
+python run_server.py
 ```
+
+**Use `python run_server.py`, not the bare `uvicorn` CLI.** On Windows, psycopg's async pool requires a `SelectorEventLoop`, which the script forces before anything else imports asyncio (see its module docstring) — bare `uvicorn party_agent.api.main:app` resets the loop to Proactor and breaks the async Postgres pool.
+
+By default `/chat` and `/chat/stream` require a verified-email Firebase ID token (`AUTH_ENFORCED=true`, checked in `api/auth.py`). For local dev without a `firebase_service_account.json`, set `AUTH_ENFORCED=false` in `.env`, or point at a local Auth emulator via `FIREBASE_AUTH_EMULATOR_HOST`/`GOOGLE_CLOUD_PROJECT` (real shell env vars, not `.env` — see the root `LOCAL_DEV.md`).
 
 ## Folder map
 
@@ -56,8 +62,8 @@ uvicorn party_agent.api.main:app --reload --port 8000
 | `src/party_agent/data/`           | DB models, vector index                      |
 | `src/party_agent/integrations/`   | External API clients (raw)                   |
 | `src/party_agent/safety/`         | Privacy, stealth mode, content filters       |
-| `src/party_agent/api/`            | FastAPI HTTP layer                           |
-| `scripts/`                        | One-off CLI tools (seed, migrate, run)       |
+| `src/party_agent/api/`            | FastAPI HTTP layer — chat streaming (`routes/chat.py`, Firebase-auth gated), maps proxy (`routes/maps.py`) |
+| `scripts/`                        | `run_local.py` (CLI sanity check), `seed_events.py`, `refresh_events.py`, `migrate_db.py`, `dump_events.py`, `check_crawler.py` |
 | `tests/`                          | Unit + integration tests                     |
 | `evals/`                          | LangSmith eval datasets and runners          |
 
@@ -67,15 +73,6 @@ Every model call is tallied by `core.cost_tracker.CostTracker`, which is attache
 as a callback to every `ChatAnthropic` instance. Run `python scripts/run_local.py`
 and you'll see a per-model breakdown at the end.
 
-## Build order
+## Status
 
-1. Verify your key works: `python scripts/run_local.py`
-2. Implement one specialist end-to-end (start with `event_discovery`)
-3. Hook up real Postgres checkpointer in `memory/checkpointer.py`
-4. Add the supervisor with handoff tools
-5. Add the remaining 5 specialists, one at a time
-6. Wire human-in-the-loop interrupts for RSVP/stealth-mode confirmations
-7. Add the FastAPI HTTP layer
-8. Deploy
-
-See `docs/architecture.md` for the full design.
+The backend is fully built: all 6 specialists, supervisor routing, the Postgres checkpointer, the FastAPI HTTP layer (chat streaming + maps proxy), and Firebase auth gating are implemented and running. `docs/architecture.md` describes the original design and build plan — read it for the full design, but treat any of its still-open steps as historical rather than an active to-do list.

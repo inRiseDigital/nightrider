@@ -4,6 +4,7 @@ import { AccentButton } from "@/components/organizer/ui/AccentButton";
 import { AuthCard, AuthCardTitle, ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { TextField } from "@/components/organizer/ui/TextField";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
+import { RecaptchaContainer } from "./RecaptchaContainer";
 import { SessionFooter } from "./SessionFooter";
 
 export function PhoneStage() {
@@ -37,6 +38,9 @@ export function PhoneStage() {
         <AccentButton type="submit" fullWidth loading={busy}>
           {busy ? "Sending…" : "Send code"}
         </AccentButton>
+
+        {/* Must be in the DOM before submitPhone constructs the verifier. */}
+        <RecaptchaContainer />
       </form>
 
       <SessionFooter />

@@ -81,6 +81,57 @@ Wired in `lib/firebase.ts`'s `getFirebaseAuth`/`getDb`/`getBucket` — same
 Flutter app above. Remove the env var (or delete `.env.local`) to go back
 to real Firebase.
 
+### Phone OTP (organizer apply flow)
+
+The organizer apply flow at `/organizer/apply` links a real phone
+credential onto the email/password account (`linkWithPhoneNumber` in
+`lib/organizer/store.tsx`). **Against the emulator no SMS is sent and
+nothing is billed** — the Auth emulator swaps in a mock reCAPTCHA loader,
+so the `RecaptchaVerifier` object is still constructed and still required,
+but it never challenges. Read the code the flow is waiting for out of the
+emulator instead:
+
+```bash
+curl -s localhost:9099/emulator/v1/projects/nightride-a9173/verificationCodes \
+  | jq -r '.verificationCodes[-1].code'
+```
+
+Notes for working against the emulator:
+
+- Every send appends to that list, so `[-1]` is the newest code — after a
+  resend, the earlier code is dead and only the newest one confirms.
+- **Use a fresh phone number per test run.** Once a number is linked to an
+  account the emulator refuses to link it to a second one, so a reused
+  number fails with `auth/credential-already-in-use` /
+  `auth/account-exists-with-different-credential` — which is the rule
+  working, not a bug in the flow.
+- The emulator does not implement `identitytoolkit.getRecaptchaConfig`, so
+  every send logs one `501 (Not Implemented)` in the browser console and
+  the SDK falls back to its (mocked) v2 path. Expected, and harmless.
+- The flow caps sends at 3 per page load with a 60s cooldown between them
+  (`OTP_MAX_SENDS` / `OTP_RESEND_COOLDOWN_SECONDS` in
+  `lib/organizer/constants.ts`) — real cooldowns, so exercising the cap
+  takes about two minutes. Reload the page to reset the counter.
+- Verification state is **never** written from the client:
+  `users/{uid}/private/organizerReview.phoneVerified` is create-once for
+  the applicant and pinned to `false` by `firestore.rules`. The flow's
+  source of truth is `auth.currentUser.phoneNumber`, which is also why a
+  reload with a phone already linked skips the phone and OTP stages.
+
+**The real `nightride-a9173` project needs three things configured before
+this works outside the emulator**, none of which the emulator exercises:
+
+1. **Phone** enabled under Authentication > Sign-in method. Without it
+   every send fails `auth/operation-not-allowed`.
+2. **An SMS region policy allowlist** under Authentication > Settings >
+   SMS region policy. The default policy blocks every country, so a
+   correctly-wired flow still fails until Dubai/Tokyo/London/Melbourne
+   (and wherever else applicants dial from) are explicitly allowed.
+3. **The Netlify domain** in Authentication > Settings > Authorized
+   domains. reCAPTCHA and the phone-auth handler both refuse an
+   unlisted origin with `auth/unauthorized-domain` — `localhost` is
+   allowed by default, the deployed site is not.
+
 ## 4. Run the backend (PartyAgent) locally and point the app at it
 
 **The app does NOT actually read `.env` at runtime** — `Nightride/.env`

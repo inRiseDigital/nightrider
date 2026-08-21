@@ -166,5 +166,25 @@ export const OVERALL_STATUS_STYLES: Record<OverallStatusKey, OverallStatusStyle>
 
 export const OTP_LENGTH = 6;
 
-/** Minimum digits accepted before the OTP screen will submit. */
-export const OTP_MIN_LENGTH = 4;
+/**
+ * Seconds the "Resend code" control stays locked after a send. Firebase does
+ * not rate-limit resends at this granularity and reCAPTCHA does not stop a
+ * human clicking twice, so the cooldown is ours to enforce — every send is a
+ * billed SMS.
+ */
+export const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
+/**
+ * Hard cap on SMS sends per page load, cooldown elapsed or not. It lives in
+ * memory, so a reload resets it — this is a brake on a frustrated applicant
+ * running up an SMS bill, not an abuse control (that is Firebase's own
+ * per-number/per-IP quota, which the client cannot see).
+ */
+export const OTP_MAX_SENDS = 3;
+
+/**
+ * The element invisible reCAPTCHA renders into. `RecaptchaVerifier` resolves
+ * it at construction time, so whichever stage is about to send has to already
+ * have it in the DOM (see _components/RecaptchaContainer.tsx).
+ */
+export const RECAPTCHA_CONTAINER_ID = "organizer-recaptcha";

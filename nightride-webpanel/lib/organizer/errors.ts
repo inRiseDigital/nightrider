@@ -28,11 +28,25 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   "auth/missing-phone-number": "Enter a phone number.",
   "auth/quota-exceeded": "The SMS quota for this project has been used up. Try again later.",
   "auth/invalid-verification-code": "That code is incorrect. Check it and try again.",
+  "auth/missing-verification-code": "Enter the code sent to your phone.",
   "auth/code-expired": "That code expired. Request a new one.",
+  // Same cause as code-expired — the verification session, not the SMS, timed
+  // out. Some SDK builds report one and some the other.
+  "auth/session-expired": "That code expired. Request a new one.",
+  "auth/invalid-verification-id": "That verification attempt is no longer valid. Request a new code.",
+  "auth/missing-verification-id": "That verification attempt is no longer valid. Request a new code.",
+  // Both mean the same thing to an applicant: the number belongs to somebody
+  // else's account. Firebase picks between them by which provider collides.
   "auth/credential-already-in-use": "That phone number is already linked to another account.",
+  "auth/account-exists-with-different-credential":
+    "That phone number is already linked to another account.",
   "auth/provider-already-linked": "A phone number is already linked to this account.",
   "auth/requires-recent-login": "For security, sign in again before linking a phone number.",
   "auth/captcha-check-failed": "The reCAPTCHA check failed. Reload the page and try again.",
+  // Firebase's catch-all, so the copy has to stay generic. One way to reach it
+  // is calling verify() on a RecaptchaVerifier that clear() already destroyed;
+  // reloading rebuilds the widget, which is the useful advice either way.
+  "auth/internal-error": "Something went wrong on Firebase's side. Reload the page and try again.",
   "permission-denied": "You don't have permission to write this record. Check firestore.rules.",
   unavailable: "Can't reach Firestore right now. Check your connection and try again.",
 };

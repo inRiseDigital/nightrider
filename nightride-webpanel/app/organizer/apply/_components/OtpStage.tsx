@@ -6,6 +6,7 @@ import { AuthCard, AuthCardTitle, ErrorNote } from "@/components/organizer/ui/Au
 import { TextField } from "@/components/organizer/ui/TextField";
 import { OTP_LENGTH, OTP_MAX_SENDS } from "@/lib/organizer/constants";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
+import { MockPhoneAuthNote } from "./MockPhoneAuthNote";
 import { RecaptchaContainer } from "./RecaptchaContainer";
 import { SessionFooter } from "./SessionFooter";
 
@@ -65,6 +66,8 @@ export function OtpStage() {
       {/* A resend builds a brand-new verifier, so the container has to be
           mounted on this stage too, not only on the phone stage. */}
       <RecaptchaContainer />
+
+      <MockPhoneAuthNote />
 
       <p className="mt-3 text-center text-xs text-nr-text-hint">
         {sendsLeft > 0 ? (

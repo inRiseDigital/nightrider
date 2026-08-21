@@ -37,6 +37,7 @@ import {
   OTP_LENGTH,
   OTP_MAX_SENDS,
   OTP_RESEND_COOLDOWN_SECONDS,
+  PHONE_AUTH_MOCK,
   RECAPTCHA_CONTAINER_ID,
 } from "./constants";
 import { describeAuthError } from "./errors";
@@ -67,6 +68,11 @@ import type { ApplicantApplication, ApplicationStage, ReviewDoc, VenueAddressDra
  * applicant and admin-only on update — firestore.rules pins it to `false` at
  * create — so the source of truth this flow reads is
  * `auth.currentUser.phoneNumber`, i.e. whether a phone credential is linked.
+ *
+ * `PHONE_AUTH_MOCK` (see ./constants) short-circuits the two Firebase calls
+ * and nothing else: the E.164 check, the cooldown, the send cap and every
+ * stage transition run identically either way. The mock is announced on both
+ * stages — it must never be mistaken for real verification.
  */
 
 /** E.164, which is the only shape Firebase phone auth accepts. */
@@ -392,7 +398,11 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
             throw new Error(`Wait ${Math.ceil(waitMs / 1000)}s before requesting another code.`);
           }
 
-          await sendOtp(phone);
+          // The only thing the mock skips. The cooldown below still applies:
+          // nothing is billed, but keeping one code path means the resend UI
+          // behaves the same in a demo as it will in production.
+          if (!PHONE_AUTH_MOCK) await sendOtp(phone);
+
           dispatch({
             type: "otpSent",
             cooldownUntil: Date.now() + OTP_RESEND_COOLDOWN_SECONDS * 1000,
@@ -407,22 +417,32 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
             throw new Error(`Enter the ${OTP_LENGTH}-digit code sent to your phone.`);
           }
 
-          const confirmation = confirmationRef.current;
-          if (!confirmation) {
-            throw new Error("That verification attempt is no longer valid. Request a new code.");
+          const typedPhone = normalizePhone(state.phone.trim());
+          let verifiedPhone = typedPhone;
+
+          if (!PHONE_AUTH_MOCK) {
+            const confirmation = confirmationRef.current;
+            if (!confirmation) {
+              throw new Error("That verification attempt is no longer valid. Request a new code.");
+            }
+
+            // A wrong code throws here and leaves `confirmation` intact, so
+            // the retry reuses the same verification session and sends no new
+            // SMS.
+            const credential = await confirmation.confirm(code);
+
+            // The verifier was spent the moment the SMS went out and nothing
+            // past this point needs it; the next send builds its own.
+            discardVerifier();
+
+            // Firebase's own E.164 rendering of the credential it just linked,
+            // in preference to whatever was typed into the field.
+            verifiedPhone = credential.user.phoneNumber ?? typedPhone;
           }
 
-          // A wrong code throws here and leaves `confirmation` intact, so the
-          // retry reuses the same verification session and sends no new SMS.
-          const credential = await confirmation.confirm(code);
-
-          // The verifier was spent the moment the SMS went out and nothing
-          // past this point needs it; the next send builds its own.
-          discardVerifier();
-
-          // Firebase's own E.164 rendering of the credential it just linked,
-          // in preference to whatever was typed into the field.
-          await savePhone(uid, credential.user.phoneNumber ?? normalizePhone(state.phone.trim()));
+          // Mocked or not, this writes only `users/{uid}.phone` — a dialable
+          // number the applicant claims, never a verification claim.
+          await savePhone(uid, verifiedPhone);
           // First entry into the flow: creates the review doc (once) and
           // marks the application submitted.
           await beginReview(uid);

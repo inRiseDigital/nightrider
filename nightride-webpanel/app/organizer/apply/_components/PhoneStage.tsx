@@ -3,7 +3,9 @@
 import { AccentButton } from "@/components/organizer/ui/AccentButton";
 import { AuthCard, AuthCardTitle, ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { TextField } from "@/components/organizer/ui/TextField";
+import { PHONE_AUTH_MOCK } from "@/lib/organizer/constants";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
+import { MockPhoneAuthNote } from "./MockPhoneAuthNote";
 import { RecaptchaContainer } from "./RecaptchaContainer";
 import { SessionFooter } from "./SessionFooter";
 
@@ -13,7 +15,14 @@ export function PhoneStage() {
 
   return (
     <AuthCard>
-      <AuthCardTitle title="Verify your phone" description="We'll text a code to confirm it's you." />
+      <AuthCardTitle
+        title="Verify your phone"
+        description={
+          PHONE_AUTH_MOCK
+            ? "Phone verification isn't live yet — no text will be sent."
+            : "We'll text a code to confirm it's you."
+        }
+      />
 
       <form
         className="flex flex-col gap-3.5"
@@ -42,6 +51,8 @@ export function PhoneStage() {
         {/* Must be in the DOM before submitPhone constructs the verifier. */}
         <RecaptchaContainer />
       </form>
+
+      <MockPhoneAuthNote />
 
       <SessionFooter />
     </AuthCard>

@@ -188,3 +188,26 @@ export const OTP_MAX_SENDS = 3;
  * have it in the DOM (see _components/RecaptchaContainer.tsx).
  */
 export const RECAPTCHA_CONTAINER_ID = "organizer-recaptcha";
+
+/**
+ * Mocks phone verification: no reCAPTCHA, no SMS, and any OTP_LENGTH digits
+ * are accepted. Everything else — the E.164 check, the cooldown, the send cap,
+ * the stage transitions — behaves exactly as it does for real, so what gets
+ * demoed is what ships once this is off.
+ *
+ * It exists because real phone auth needs billing enabled on the Firebase
+ * project (`auth/billing-not-enabled` until it is), and the apply flow has to
+ * be walkable before that happens.
+ *
+ * Two consequences worth knowing:
+ *
+ *  - No phone credential is linked, so `auth.currentUser.phoneNumber` stays
+ *    null and the resume path falls back to `organizerApplication.submitted`.
+ *  - Nothing writes `phoneVerified`. It stays `false` in the admin-owned
+ *    review doc, which is the honest answer: an applicant who came through
+ *    the mock has *not* been verified, and the admin reviewing them sees that.
+ *
+ * `next.config.mjs` sets `output: "export"`, so this is inlined at build time.
+ * Changing it on Netlify needs a redeploy, not just an env edit.
+ */
+export const PHONE_AUTH_MOCK = process.env.NEXT_PUBLIC_PHONE_AUTH_MOCK === "true";

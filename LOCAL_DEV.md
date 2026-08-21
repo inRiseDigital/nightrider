@@ -85,11 +85,30 @@ to real Firebase.
 
 The organizer apply flow at `/organizer/apply` links a real phone
 credential onto the email/password account (`linkWithPhoneNumber` in
-`lib/organizer/store.tsx`). **Against the emulator no SMS is sent and
-nothing is billed** — the Auth emulator swaps in a mock reCAPTCHA loader,
-so the `RecaptchaVerifier` object is still constructed and still required,
-but it never challenges. Read the code the flow is waiting for out of the
-emulator instead:
+`lib/organizer/store.tsx`).
+
+> **Currently mocked.** Real phone auth needs billing enabled on
+> `nightride-a9173` — it fails `auth/billing-not-enabled` until then — so
+> `NEXT_PUBLIC_PHONE_AUTH_MOCK=true` is set in `.env.example` and in
+> deploys. With it on, no reCAPTCHA runs, no SMS is sent, and any 6 digits
+> pass; everything else (E.164 check, 60s resend cooldown, 3-send cap,
+> stage transitions) is identical to the real path, and both stages show an
+> amber "verification is mocked" note. Set it to `false` — or drop it — once
+> the project prerequisites at the end of this section are done, then
+> redeploy: `output: "export"` inlines the flag at build time, so an env
+> edit alone changes nothing.
+>
+> While mocked, no phone credential is ever linked, so
+> `auth.currentUser.phoneNumber` stays null and the resume path falls back
+> to `organizerApplication.submitted`. Applicants who came through the mock
+> are genuinely unverified and their review doc's admin-owned
+> `phoneVerified` stays `false` — which is the honest record, not a bug.
+
+The rest of this section covers the **real** path, i.e. with the mock off.
+**Against the emulator no SMS is sent and nothing is billed** — the Auth
+emulator swaps in a mock reCAPTCHA loader, so the `RecaptchaVerifier`
+object is still constructed and still required, but it never challenges.
+Read the code the flow is waiting for out of the emulator instead:
 
 ```bash
 curl -s localhost:9099/emulator/v1/projects/nightride-a9173/verificationCodes \
@@ -118,19 +137,39 @@ Notes for working against the emulator:
   source of truth is `auth.currentUser.phoneNumber`, which is also why a
   reload with a phone already linked skips the phone and OTP stages.
 
-**The real `nightride-a9173` project needs three things configured before
-this works outside the emulator**, none of which the emulator exercises:
+**The real `nightride-a9173` project needs these configured before the
+unmocked flow works**, none of which the emulator exercises. They are also
+the checklist for turning `NEXT_PUBLIC_PHONE_AUTH_MOCK` off:
 
-1. **Phone** enabled under Authentication > Sign-in method. Without it
+1. **Billing (Blaze).** Phone verification bills per SMS under Identity
+   Platform pricing; on Spark every send fails
+   `auth/billing-not-enabled`. Set a budget alert at the same time — phone
+   auth is a standard SMS-pumping target, and the flow's 3-send cap is
+   in-memory (a reload resets it), so it is a brake on a frustrated
+   applicant, not on a script. The real controls are Firebase's own
+   per-IP / per-number SMS quotas under Authentication > Settings.
+2. **Phone** enabled under Authentication > Sign-in method. Without it
    every send fails `auth/operation-not-allowed`.
-2. **An SMS region policy allowlist** under Authentication > Settings >
-   SMS region policy. The default policy blocks every country, so a
-   correctly-wired flow still fails until Dubai/Tokyo/London/Melbourne
-   (and wherever else applicants dial from) are explicitly allowed.
-3. **The Netlify domain** in Authentication > Settings > Authorized
-   domains. reCAPTCHA and the phone-auth handler both refuse an
-   unlisted origin with `auth/unauthorized-domain` — `localhost` is
-   allowed by default, the deployed site is not.
+3. **An SMS region policy** under Authentication > Settings > SMS region
+   policy, allowing Dubai/Tokyo/London/Melbourne and wherever else
+   applicants dial from. Read what the project actually has set rather
+   than assuming a default in either direction.
+4. **The deploy domain** in Authentication > Settings > Authorized
+   domains. reCAPTCHA and the phone-auth handler both refuse an unlisted
+   origin with `auth/unauthorized-domain` — `localhost` is allowed by
+   default, the Netlify site is not.
+5. **The browser API key's HTTP-referrer restrictions**, in the Google
+   Cloud console under APIs & Services > Credentials. Separate from the
+   Firebase authorized-domains list above and easy to miss: if the key is
+   referrer-restricted, the deploy domain has to be in that list too, or
+   the flow works locally and fails only once deployed.
+
+To test the real path without sending SMS, add a number under
+Authentication > Sign-in method > Phone > **Phone numbers for testing**
+with a fixed 6-digit code. Those pairs skip delivery but still run real
+reCAPTCHA and the real authorized-domain check — exactly the gap both the
+emulator and the mock leave open. Do it from the deployed URL, not
+localhost, so the domain config is under test at the same time.
 
 ## 4. Run the backend (PartyAgent) locally and point the app at it
 

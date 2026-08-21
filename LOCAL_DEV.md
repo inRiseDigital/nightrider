@@ -4,6 +4,34 @@ This covers running the Nightride Flutter app against a **local Firebase
 emulator suite** (no real `nightride-a9173` data touched) and a **local
 PartyAgent backend**, instead of real Firebase / the devtunnel default.
 
+## 0. One command for all of it
+
+`scripts/dev-stack.sh` runs everything below in four Terminal.app windows, one
+per service, so each keeps its own live log:
+
+```bash
+scripts/dev-stack.sh                 # emulators + PartyAgent + webpanel + Flutter app
+scripts/dev-stack.sh --seed          # ...seeding the emulator first (section 5)
+scripts/dev-stack.sh --no-app        # ...without the Flutter app
+scripts/dev-stack.sh --web           # ...running the app on Chrome instead of a simulator
+scripts/dev-stack.sh --stop          # stop everything, emulator SIGTERMed last so the export completes
+```
+
+It preflights what the sections below cover (Java, `Nightride/.env`,
+`GoogleService-Info.plist`, `Debug.xcconfig`, `node_modules`,
+`NEXT_PUBLIC_USE_FIREBASE_EMULATOR`), reuses any service already listening
+rather than starting a second copy, boots an iOS simulator if none is booted,
+and passes the `--dart-define`s from section 4 for you.
+
+Two failure modes it handles that the manual steps do not: an **orphaned
+Firestore emulator JVM** (parent CLI died, port 8080 still held, no UI on 4000)
+is detected and reported with the exact `kill` to run instead of the confusing
+"port taken" error; and `--stop` sends SIGTERM to the emulator CLI and waits for
+it, instead of leaving `--export-on-exit` half-done.
+
+The rest of this document is the manual equivalent, and is still what to read
+when something breaks.
+
 ## 1. One-time setup: Java
 
 The Firestore/Storage emulators need a JVM. This machine didn't have one.

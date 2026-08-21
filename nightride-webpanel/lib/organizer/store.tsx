@@ -21,8 +21,6 @@ import {
   saveVenueAddress,
   savePhone,
   subscribeToApplication,
-  uploadNicFiles,
-  uploadSelfieFile,
   uploadVideoFile,
 } from "./application-service";
 import { OTP_MIN_LENGTH } from "./constants";
@@ -138,8 +136,7 @@ export interface ApplicationActions {
   submitOtp: () => Promise<void>;
   toggleStep: (id: string) => void;
   submitVenueAddress: (draft: VenueAddressDraft) => Promise<void>;
-  uploadNic: (front: File, back: File) => Promise<void>;
-  uploadSelfie: (file: File) => Promise<void>;
+  /** The walkthrough is the only step still uploaded here — nic and selfie are captured in the app. */
   uploadVideo: (file: File) => Promise<void>;
   signOutApplicant: () => Promise<void>;
 }
@@ -280,32 +277,6 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
           const validationError = validateVenueAddress(draft);
           if (validationError) throw new Error(validationError);
           await saveVenueAddress(uid, draft);
-        }),
-
-      uploadNic: (front, back) =>
-        run(async () => {
-          const uid = requireUid();
-          const attempt = state.review.steps.nic.attempt;
-          try {
-            await uploadNicFiles(uid, attempt, front, back, (progress) =>
-              dispatch({ type: "setUploadProgress", id: "nic", progress })
-            );
-          } finally {
-            dispatch({ type: "clearUploadProgress", id: "nic" });
-          }
-        }),
-
-      uploadSelfie: (file) =>
-        run(async () => {
-          const uid = requireUid();
-          const attempt = state.review.steps.selfie.attempt;
-          try {
-            await uploadSelfieFile(uid, attempt, file, (progress) =>
-              dispatch({ type: "setUploadProgress", id: "selfie", progress })
-            );
-          } finally {
-            dispatch({ type: "clearUploadProgress", id: "selfie" });
-          }
         }),
 
       uploadVideo: (file) =>

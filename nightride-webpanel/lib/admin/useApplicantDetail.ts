@@ -12,12 +12,15 @@ import {
   listTransferCandidates,
   listVenuesByOwner,
   pickUpApplication,
+  publishVideoScript,
   rejectApplication,
   requestStepInfo,
 } from "./firestore";
 import { getNicEvidence, getSelfieEvidence, getVideoEvidence, computeGpsCheck, type GpsCheck } from "./kyc-evidence";
 import { deriveDisplayStepStatus } from "./schema";
 import type { AdminReviewDoc, StepId, UserRecord, Venue } from "./schema";
+import { VIDEO_SCRIPT_TEMPLATES } from "@/lib/organizer/constants";
+import type { VideoScript } from "@/lib/organizer/types";
 
 export interface StepEvidence {
   nic: { front: string | null; back: string | null };
@@ -45,6 +48,10 @@ export function useApplicantDetail(uid: string | null) {
   const [rejectDraft, setRejectDraft] = useState("");
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [photoRevealed, setPhotoRevealed] = useState(false);
+  const [scriptEditorOpen, setScriptEditorOpen] = useState(false);
+  const [scriptFormat, setScriptFormat] = useState<VideoScript["format"]>("list");
+  // One line of the textarea per script entry — the split happens on submit.
+  const [scriptDraft, setScriptDraft] = useState("");
 
   const load = useCallback(async () => {
     if (!uid) return;
@@ -96,6 +103,7 @@ export function useApplicantDetail(uid: string | null) {
     setRejectBoxOpen(false);
     setMoreMenuOpen(false);
     setPhotoRevealed(false);
+    setScriptEditorOpen(false);
     void load();
   }, [load]);
 
@@ -136,6 +144,31 @@ export function useApplicantDetail(uid: string | null) {
     return runAction(async () => {
       await requestStepInfo(uid, stepId, askAgainDraft.trim(), review.steps[stepId].attempt);
       setAskAgainOpenFor(null);
+    });
+  }
+
+  /** Seeds the editor from whatever is already published, or from nothing. */
+  function openScriptEditor() {
+    const existing = review?.steps.video.script ?? null;
+    setScriptFormat(existing?.format ?? "list");
+    setScriptDraft(existing ? existing.lines.join("\n") : "");
+    setScriptEditorOpen(true);
+  }
+  function closeScriptEditor() {
+    setScriptEditorOpen(false);
+  }
+  /** Replaces the draft wholesale — the admin edits from there. */
+  function applyScriptTemplate(templateId: string) {
+    const template = VIDEO_SCRIPT_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    setScriptFormat(template.format);
+    setScriptDraft(template.lines.join("\n"));
+  }
+  function submitScript() {
+    if (!uid || !review) return;
+    return runAction(async () => {
+      await publishVideoScript(uid, review, { format: scriptFormat, lines: scriptDraft.split("\n") });
+      setScriptEditorOpen(false);
     });
   }
 
@@ -188,6 +221,15 @@ export function useApplicantDetail(uid: string | null) {
     setMoreMenuOpen,
     photoRevealed,
     setPhotoRevealed,
+    scriptEditorOpen,
+    scriptFormat,
+    setScriptFormat,
+    scriptDraft,
+    setScriptDraft,
+    openScriptEditor,
+    closeScriptEditor,
+    applyScriptTemplate,
+    submitScript,
     verifyStep,
     approve,
     ban,
@@ -208,4 +250,17 @@ export function stepApplicantClaim(user: UserRecord, stepId: StepId): boolean {
 
 export function displayStatusFor(user: UserRecord, review: AdminReviewDoc, stepId: StepId) {
   return deriveDisplayStepStatus(review.steps[stepId].status, stepApplicantClaim(user, stepId));
+}
+
+/**
+ * Whether the applicant has finished everything a script is normally written
+ * after — mirrors `videoPrerequisitesMet` in lib/organizer/derive.ts, which is
+ * what makes the applicant's own video step say "waiting for an admin". This is
+ * advice, not a gate: an admin who wants to send a script early still can.
+ */
+export function videoScriptReady(user: UserRecord, review: AdminReviewDoc): boolean {
+  const prerequisites: StepId[] = ["nic", "selfie", "venueAddress", "gps"];
+  return prerequisites.every(
+    (id) => stepApplicantClaim(user, id) || review.steps[id].status === "accepted",
+  );
 }

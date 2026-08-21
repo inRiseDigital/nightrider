@@ -857,12 +857,22 @@ function mapReviewStepStatus(oldStatus) {
   return OLD_STEP_TO_REVIEW_STATUS[oldStatus] ?? "active";
 }
 
+/**
+ * The video step's post-migration status. Anything that had not already been
+ * submitted or decided drops to 'pending', because there is no script to record
+ * against and an 'active' video step would invite a recording nobody asked for.
+ */
+function migratedVideoStatus(oldStatus) {
+  const mapped = mapReviewStepStatus(oldStatus);
+  return mapped === "active" ? "pending" : mapped;
+}
+
 function stepWasUploaded(oldStatus) {
   return oldStatus === "needs_info" || oldStatus === "scheduled" || oldStatus === "done";
 }
 
 function reviewStep(overrides) {
-  return { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, ...overrides };
+  return { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null, ...overrides };
 }
 
 function parseEventsPerMonth(v) {
@@ -985,7 +995,12 @@ async function migrateUsersAndOrganizerRequests() {
               venueAddress: reviewStep({ status: "active" }),
               nic: reviewStep({ status: mapReviewStepStatus(oldApp?.steps?.nic) }),
               selfie: reviewStep({ status: mapReviewStepStatus(oldApp?.steps?.selfie) }),
-              video: reviewStep({ status: mapReviewStepStatus(oldApp?.steps?.video_request) }),
+              // An old 'video_request' that was never actioned maps to 'pending',
+              // not 'active': the video step is now gated on an admin-published
+              // walkthrough script, and this migration has no script to carry
+              // forward. Evidence the applicant already sent is kept — that
+              // status is a fact about the past, not an open invitation.
+              video: reviewStep({ status: migratedVideoStatus(oldApp?.steps?.video_request) }),
               gps: reviewStep({ status: "pending" }), // gated on venueAddress being accepted, which it never was here
             },
             updatedAt: Timestamp.now(),

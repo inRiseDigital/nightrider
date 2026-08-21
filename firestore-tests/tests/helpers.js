@@ -74,7 +74,11 @@ export function baseUser(overrides = {}) {
   };
 }
 
-/** The exact pinned initial shape for users/{uid}/private/organizerReview. */
+/**
+ * The exact pinned initial shape for users/{uid}/private/organizerReview. Two
+ * steps start locked: gps waits on an admin-accepted venue address, video on an
+ * admin-published walkthrough script.
+ */
 export function initialOrganizerReview(overrides = {}) {
   return {
     status: 'none',
@@ -84,13 +88,25 @@ export function initialOrganizerReview(overrides = {}) {
     rejectionReason: '',
     phoneVerified: false,
     steps: {
-      venueAddress: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-      nic: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-      selfie: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-      video: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-      gps: { status: 'pending', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
+      venueAddress: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+      nic: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+      selfie: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+      gps: { status: 'pending', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+      video: { status: 'pending', attempt: 0, note: '', reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
     },
     updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** A schema-valid `steps.video.script` — what an admin publishes to unlock the step. */
+export function videoScript(overrides = {}) {
+  return {
+    format: 'list',
+    lines: ['Start outside with the signage visible.', 'Walk in and show the door check.'],
+    revision: 0,
+    updatedAt: new Date(),
+    updatedBy: 'admin-uid',
     ...overrides,
   };
 }

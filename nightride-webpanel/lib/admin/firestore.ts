@@ -29,7 +29,9 @@ import type {
   Venue,
   VenueStatus,
 } from "./schema";
-import { parseApplication } from "@/lib/organizer/application-service";
+import { parseApplication, parseVideoScript } from "@/lib/organizer/application-service";
+import { VIDEO_SCRIPT_MAX_LINES, VIDEO_SCRIPT_MAX_LINE_CHARS } from "@/lib/organizer/constants";
+import type { VideoScript } from "@/lib/organizer/types";
 
 function userDocRef(uid: string): DocumentReference {
   return doc(getDb(), "users", uid);
@@ -75,6 +77,7 @@ const DEFAULT_ADMIN_REVIEW_STEP: AdminReviewStep = {
   reviewedBy: null,
   venueId: null,
   mediaDeletedAt: null,
+  script: null,
 };
 
 function parseAdminReviewStep(raw: unknown, fallbackStatus: AdminReviewStep["status"]): AdminReviewStep {
@@ -88,6 +91,7 @@ function parseAdminReviewStep(raw: unknown, fallbackStatus: AdminReviewStep["sta
     reviewedBy: typeof r.reviewedBy === "string" ? r.reviewedBy : null,
     venueId: typeof r.venueId === "string" ? r.venueId : null,
     mediaDeletedAt: toTimestampOrNull(r.mediaDeletedAt),
+    script: parseVideoScript(r.script),
   };
 }
 
@@ -105,7 +109,7 @@ export function parseAdminReviewDoc(data: Record<string, unknown> | undefined): 
       venueAddress: parseAdminReviewStep(rawSteps.venueAddress, "active"),
       nic: parseAdminReviewStep(rawSteps.nic, "active"),
       selfie: parseAdminReviewStep(rawSteps.selfie, "active"),
-      video: parseAdminReviewStep(rawSteps.video, "active"),
+      video: parseAdminReviewStep(rawSteps.video, "pending"),
       gps: parseAdminReviewStep(rawSteps.gps, "pending"),
     },
     updatedAt: toTimestampOrNull(data.updatedAt),
@@ -319,6 +323,62 @@ export async function acceptVenueAddressStep(user: UserRecord, review: AdminRevi
 
   await batch.commit();
   return venueId;
+}
+
+/**
+ * Publishes (or revises) the walkthrough script for one applicant, which is
+ * what unlocks their video step — until a script exists there is nothing for
+ * them to record against, so `steps.video.status` sits at 'pending'.
+ *
+ * A revision deliberately leaves `steps.video.attempt` alone: re-scripting is
+ * the admin changing their own mind, and it must not spend one of the
+ * applicant's three upload attempts. It also leaves a step that is already
+ * open, submitted, or accepted exactly where it is — only the initial 'pending'
+ * is flipped.
+ */
+export async function publishVideoScript(
+  uid: string,
+  review: AdminReviewDoc,
+  draft: { format: VideoScript["format"]; lines: string[] },
+): Promise<void> {
+  const adminUid = currentAdminUid();
+  const lines = draft.lines.map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) throw new Error("A script needs at least one line.");
+  if (lines.length > VIDEO_SCRIPT_MAX_LINES) {
+    throw new Error(`A script can have at most ${VIDEO_SCRIPT_MAX_LINES} lines.`);
+  }
+  if (lines.some((line) => line.length > VIDEO_SCRIPT_MAX_LINE_CHARS)) {
+    throw new Error(`Each line has to be under ${VIDEO_SCRIPT_MAX_LINE_CHARS} characters.`);
+  }
+
+  const existing = review.steps.video.script;
+  const revision = existing ? existing.revision + 1 : 0;
+  const now = serverTimestamp();
+  const batch = writeBatch(getDb());
+
+  batch.update(reviewDocRef(uid), {
+    "steps.video.script": {
+      format: draft.format,
+      lines,
+      revision,
+      updatedAt: now,
+      updatedBy: adminUid,
+    },
+    ...(review.steps.video.status === "pending" ? { "steps.video.status": "active" } : {}),
+    updatedAt: now,
+  });
+
+  const logRef = doc(collection(getDb(), "logs"));
+  batch.set(logRef, {
+    action: "kyc.script",
+    actorUid: adminUid,
+    targetType: "user",
+    targetId: uid,
+    summary: revision === 0 ? "Published the walkthrough script" : `Revised the walkthrough script (revision ${revision})`,
+    at: now,
+  });
+
+  await batch.commit();
 }
 
 /**

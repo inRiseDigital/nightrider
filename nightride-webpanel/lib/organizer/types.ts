@@ -29,13 +29,19 @@ export type StepStatus = "pending" | "active" | "submitted" | "needs_info" | "ac
 /** Matches `OrganizerApplication.steps` / `organizerReview.steps` keys exactly. */
 export type StepId = "venueAddress" | "nic" | "selfie" | "video" | "gps";
 
-/** The two Storage-uploaded identity steps plus the walkthrough video. */
+/**
+ * The steps whose advisory `uploaded` flag exists in the schema. All three are
+ * Storage-backed; only `video` is uploaded from the browser — nic and selfie
+ * are captured and uploaded by the mobile app, which then sets their flag.
+ */
 export type UploadStepId = "nic" | "selfie" | "video";
 
 /**
  * How a step is cleared: a typed form (venueAddress), a browser upload
- * (nic/selfie/video), or the Night Ride mobile app (gps — captured with
- * geolocator's mocked-location check, which this webpanel cannot do).
+ * (video), or the Night Ride mobile app (nic/selfie/gps — live captures this
+ * webpanel cannot make: a file picker cannot prove an ID scan or a selfie was
+ * taken on the spot, and a browser cannot run geolocator's mocked-location
+ * check).
  */
 export type StepKind = "address" | "upload" | "app";
 
@@ -44,7 +50,7 @@ export interface BaseStepDef {
   label: string;
   detail: string;
   kind: StepKind;
-  /** Placeholder tile copy — only the mobile-app-only gps step still uses one. */
+  /** Placeholder tile copy — the mobile-app-only steps stand in with one. */
   thumbLabel?: string;
 }
 

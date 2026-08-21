@@ -121,15 +121,22 @@ service cloud.firestore {
             && d.steps.venueAddress.status == 'active'
             && d.steps.nic.status == 'active'
             && d.steps.selfie.status == 'active'
-            && d.steps.video.status == 'active'
             // gps cannot start until an admin has accepted a venue address to
             // measure against — that is the dependency this step exists for.
             && d.steps.gps.status == 'pending'
+            // video cannot start until an admin has published a walkthrough
+            // script for this venue: there is nothing to record against until
+            // then, and the walkthrough is the most expensive artefact in the
+            // flow to waste on an application that fails on identity.
+            && d.steps.video.status == 'pending'
             && d.steps.venueAddress.attempt == 0
             && d.steps.nic.attempt == 0
             && d.steps.selfie.attempt == 0
             && d.steps.video.attempt == 0
-            && d.steps.gps.attempt == 0;
+            && d.steps.gps.attempt == 0
+            // the script is admin-authored; an applicant never creates one.
+            && noStrayScripts()
+            && d.steps.video.get('script', null) == null;
         }
 
         function attemptsCapped() {
@@ -140,9 +147,39 @@ service cloud.firestore {
             && s.gps.attempt is int && s.gps.attempt >= 0 && s.gps.attempt <= 3;
         }
 
+        // Only the video step carries a script — the uniform ReviewStep shape
+        // keeps the key present and null on the other four.
+        // `get(..., null)` rather than a plain lookup: review documents created
+        // before this field existed have no `script` key at all, and a missing
+        // map key is an evaluation error that would deny every admin write to
+        // them.
+        function noStrayScripts() {
+          let s = request.resource.data.steps;
+          return s.venueAddress.get('script', null) == null
+            && s.nic.get('script', null) == null
+            && s.selfie.get('script', null) == null
+            && s.gps.get('script', null) == null;
+        }
+
+        // A published walkthrough script: an ordered set of lines the applicant
+        // records against, rendered as paragraphs or as a numbered shot list.
+        // Per-line length is a client-side check — rules cannot iterate a list,
+        // so the 1 MB document limit is the only server-side backstop for it.
+        function scriptShaped() {
+          let sc = request.resource.data.steps.video.get('script', null);
+          return sc == null || (
+            sc.keys().hasOnly(['format', 'lines', 'revision', 'updatedAt', 'updatedBy'])
+            && sc.keys().hasAll(['format', 'lines', 'revision', 'updatedAt', 'updatedBy'])
+            && (sc.format == 'text' || sc.format == 'list')
+            && sc.lines is list && sc.lines.size() >= 1 && sc.lines.size() <= 20
+            && sc.revision is int && sc.revision >= 0
+            && sc.updatedBy is string && sc.updatedBy != ''
+          );
+        }
+
         allow read: if isSelf(uid) || isAdmin();
         allow create: if isSelf(uid) && initialShape();
-        allow update: if isAdmin() && attemptsCapped();
+        allow update: if isAdmin() && attemptsCapped() && scriptShaped() && noStrayScripts();
         allow delete: if false;
       }
 
@@ -320,7 +357,7 @@ service cloud.firestore {
         && request.resource.data.action in [
              'event.publish', 'event.archive', 'organizer.approve',
              'organizer.reject', 'organizer.revoke', 'venue.create',
-             'report.delete', 'kyc.needsInfo', 'kyc.accept'
+             'report.delete', 'kyc.needsInfo', 'kyc.accept', 'kyc.script'
            ]
         && request.resource.data.targetType in ['event', 'venue', 'user', 'report']
         && request.resource.data.targetId is string

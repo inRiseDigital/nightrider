@@ -7,7 +7,8 @@ import { STEP_DEFS, STEP_ORDER, stepStatusChrome } from "@/lib/admin/present";
 import { mockDuplicateChecks, mockFaceMatch, mockNicOcr, mockSignupSignals, type MockDuplicateCheck, type MockFaceMatch, type MockNicOcr, type MockSignupSignals } from "@/lib/admin/mock-overlay";
 import { osmTileUrl } from "@/lib/admin/geo";
 import { deriveDisplayStepStatus, type StepId, type UserRecord } from "@/lib/admin/schema";
-import { stepApplicantClaim, type ApplicantDetail, type StepEvidence } from "@/lib/admin/useApplicantDetail";
+import { stepApplicantClaim, videoScriptReady, type ApplicantDetail, type StepEvidence } from "@/lib/admin/useApplicantDetail";
+import { VIDEO_SCRIPT_MAX_LINES, VIDEO_SCRIPT_TEMPLATES } from "@/lib/organizer/constants";
 
 function stepMeta(stepId: StepId, user: UserRecord): string {
   const app = user.organizerApplication;
@@ -173,6 +174,199 @@ function DuplicateChecksCard({ items }: { items: MockDuplicateCheck[] }) {
   );
 }
 
+/**
+ * The walkthrough script for this applicant. Publishing one is what unlocks
+ * their video step, so this panel is the only way that step ever opens — see
+ * docs/FIRESTORE_SCHEMA.md on `steps.video`.
+ */
+function VideoScriptPanel({ detail }: { detail: ApplicantDetail }) {
+  const {
+    user,
+    review,
+    busy,
+    scriptEditorOpen,
+    scriptFormat,
+    setScriptFormat,
+    scriptDraft,
+    setScriptDraft,
+    openScriptEditor,
+    closeScriptEditor,
+    applyScriptTemplate,
+    submitScript,
+  } = detail;
+  if (!user || !review) return null;
+
+  const script = review.steps.video.script;
+  const locked = review.steps.video.status === "pending";
+  const ready = videoScriptReady(user, review);
+  const draftLines = scriptDraft.split("\n").map((l) => l.trim()).filter(Boolean);
+  const overLimit = draftLines.length > VIDEO_SCRIPT_MAX_LINES;
+
+  if (!scriptEditorOpen) {
+    return (
+      <div style={{ background: "#1B181B", borderRadius: 16, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 15, fontWeight: 500 }}>
+            Walkthrough script
+            {script && script.revision > 0 ? (
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: "#F5C452" }}>
+                revised {script.revision} time{script.revision === 1 ? "" : "s"}
+              </span>
+            ) : null}
+          </div>
+          <Hoverable
+            as="button"
+            onClick={openScriptEditor}
+            disabled={busy}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              height: 36,
+              padding: "0 16px 0 12px",
+              borderRadius: 18,
+              fontSize: 13,
+              fontWeight: 500,
+              background: script ? "transparent" : "#42320A",
+              color: script ? "#A5F2E5" : "#F5C452",
+              border: script ? "1px solid #3E5F5A" : "none",
+              cursor: "pointer",
+              opacity: busy ? 0.5 : 1,
+            }}
+            hoverStyle={{ background: "#FFFFFF14" }}
+          >
+            <Icon name={script ? "edit" : "post_add"} size={18} />
+            {script ? "Revise script" : "Write script"}
+          </Hoverable>
+        </div>
+
+        {script ? (
+          <ol
+            style={{
+              margin: 0,
+              paddingLeft: script.format === "list" ? 22 : 0,
+              listStyleType: script.format === "list" ? "decimal" : "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              fontSize: 13,
+              color: "#CFC0C5",
+              lineHeight: 1.5,
+            }}
+          >
+            {script.lines.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ol>
+        ) : (
+          <div style={{ fontSize: 13, color: "#9A8C91", lineHeight: 1.5 }}>
+            No script published yet, so the applicant&apos;s video step is locked. Write one and it
+            unlocks — they record against these lines.
+          </div>
+        )}
+
+        {locked && !ready ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12, color: "#9A8C91" }}>
+            <Icon name="info" size={16} color="#9A8C91" />
+            <div>
+              One of the other four steps is still outstanding. You can send a script now anyway — this
+              is a note, not a block.
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: "#1B181B", borderRadius: 16, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 500 }}>{script ? "Revise the script" : "Write the script"}</div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#9A8C91" }}>Start from</span>
+        {VIDEO_SCRIPT_TEMPLATES.map((t) => (
+          <Hoverable
+            key={t.id}
+            as="button"
+            onClick={() => applyScriptTemplate(t.id)}
+            style={{ height: 32, padding: "0 14px", borderRadius: 16, fontSize: 13, background: "transparent", color: "#CFC0C5", border: "1px solid #524549", cursor: "pointer" }}
+            hoverStyle={{ background: "#FFFFFF0A", color: "#EDE0E4" }}
+          >
+            {t.label}
+          </Hoverable>
+        ))}
+      </div>
+
+      <textarea
+        rows={10}
+        value={scriptDraft}
+        onChange={(e) => setScriptDraft(e.target.value)}
+        placeholder={"One shot per line.\nStart outside with the signage visible.\nWalk in and show the door check."}
+        style={{ width: "100%", background: "#2A252A", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 14, lineHeight: 1.55, color: "#EDE0E4", resize: "vertical" }}
+      />
+
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, fontSize: 12, color: "#9A8C91" }}>
+        <span>One line per entry.</span>
+        <span style={{ color: overLimit ? "#FFB4AB" : "#9A8C91" }}>
+          {draftLines.length}/{VIDEO_SCRIPT_MAX_LINES}
+        </span>
+        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+          {(["list", "text"] as const).map((f) => (
+            <Hoverable
+              key={f}
+              as="button"
+              onClick={() => setScriptFormat(f)}
+              style={{
+                height: 30,
+                padding: "0 12px",
+                borderRadius: 15,
+                fontSize: 12,
+                fontWeight: 500,
+                background: scriptFormat === f ? "#1F4F49" : "transparent",
+                color: scriptFormat === f ? "#A5F2E5" : "#CFC0C5",
+                border: scriptFormat === f ? "none" : "1px solid #524549",
+                cursor: "pointer",
+              }}
+              hoverStyle={{ background: "#FFFFFF14" }}
+            >
+              {f === "list" ? "Numbered list" : "Paragraphs"}
+            </Hoverable>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => void submitScript()}
+          disabled={busy || draftLines.length === 0 || overLimit}
+          style={{
+            height: 40,
+            padding: "0 20px",
+            borderRadius: 20,
+            fontSize: 14,
+            fontWeight: 500,
+            background: "#1F4F49",
+            color: "#A5F2E5",
+            border: "none",
+            cursor: "pointer",
+            opacity: busy || draftLines.length === 0 || overLimit ? 0.5 : 1,
+          }}
+        >
+          {script ? "Publish revision" : "Publish and unlock"}
+        </button>
+        <Hoverable
+          as="button"
+          onClick={closeScriptEditor}
+          style={{ height: 40, padding: "0 18px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "transparent", color: "#CFC0C5", border: "none", cursor: "pointer" }}
+          hoverStyle={{ background: "#FFFFFF14" }}
+        >
+          Cancel
+        </Hoverable>
+      </div>
+    </div>
+  );
+}
+
 export function VerificationFlow({ detail }: { detail: ApplicantDetail }) {
   const { user, review, evidence, openStepId, setOpenStepId, askAgainOpenFor, askAgainDraft, setAskAgainDraft, openAskAgain, cancelAskAgain, submitAskAgain, verifyStep, busy, actionError } = detail;
   if (!user || !review || !evidence) return null;
@@ -263,6 +457,8 @@ export function VerificationFlow({ detail }: { detail: ApplicantDetail }) {
             </div>
 
             <StepEvidenceView stepId={activeStep.id} user={user} evidence={evidence} />
+
+            {activeStep.id === "video" ? <VideoScriptPanel detail={detail} /> : null}
 
             {activeStep.raw.note ? (
               <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 12, background: "#2A252A", fontSize: 13, color: "#CFC0C5" }}>

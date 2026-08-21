@@ -163,13 +163,26 @@ ReviewStep {
   reviewedBy: string | null
   venueId: string | null             // venueAddress only, set when a venue is created
   mediaDeletedAt: Timestamp | null   // stamped when the objects are deleted
+  script: VideoScript | null         // video only, null on the other four
+}
+
+VideoScript {
+  format: 'text' | 'list'            // paragraphs, or a numbered shot list
+  lines: string[]                    // 1..20 entries; one paragraph or one shot each
+  revision: number                   // 0 on first publish, +1 on each admin edit
+  updatedAt: Timestamp
+  updatedBy: string                  // admin uid
 }
 ```
 
 Required initial shape, checked by the create rule: `status: 'none'`,
 `decidedBy: ''`, `rejectionReason: ''`, `decidedAt: null`,
-`phoneVerified: false`, every `attempt: 0`, and step statuses
-`venueAddress/nic/selfie/video: 'active'` with `gps: 'pending'`.
+`phoneVerified: false`, every `attempt: 0`, every `script: null`, and step
+statuses `venueAddress/nic/selfie: 'active'` with `gps: 'pending'` and
+`video: 'pending'`.
+
+Two of the five steps therefore start locked, each waiting on something an
+admin has to do first.
 
 `gps` starts `'pending'` and only an admin moves it to `'active'`, after
 accepting `venueAddress` — a gps fix is only worth capturing once there is an
@@ -177,6 +190,30 @@ admin-verified address to measure it against. Accepting `venueAddress` is also
 what creates the venue document: an admin reads the applicant's address data
 together with `organizerApplication.profile.venueName`, creates
 `venues/{venueId}`, and stamps the id into `steps.venueAddress.venueId`.
+
+`video` starts `'pending'` too, and what moves it to `'active'` is an admin
+publishing a walkthrough script into `steps.video.script`. The walkthrough is
+not a generic recording — the admin decides what this particular venue has to
+show on camera, and the applicant records against that list. So there is
+nothing for the applicant to do until the script exists, and the step stays
+locked until it does. In practice the admin writes the script once the other
+four steps have been submitted: the applicant's own advisory claims
+(`organizerApplication.steps.nic/selfie.uploaded`, the `venueAddress` draft,
+and a non-empty `gps.attempts`) are what tell the panel the application is
+ready for a script, which is why the applicant-facing UI can show "waiting for
+your script" without any write of its own.
+
+The script may be revised after publishing. Each revision bumps
+`script.revision` and restamps `updatedAt`/`updatedBy`, and both the applicant
+and the admin see a "revised" marker once `revision > 0`. A revision is not an
+attempt: it never touches `steps.video.attempt`, so re-scripting does not
+consume one of the applicant's three upload slots. As with the rest of this
+document there is no history array — only the current script is stored, and the
+trail of who changed it when is the `logs` entry each publish writes.
+
+`script.lines` is capped at 20 entries by the rules. Per-entry length is
+checked client-side only: rules cannot iterate a list, so the backstop for a
+pathological script is Firestore's own 1 MB document limit.
 
 A `needs_info` cycle on a file step means the admin advances `attempt`, which
 opens exactly one fresh set of Storage paths. `attempt` is capped at 3 by the
@@ -205,8 +242,9 @@ design rather than an omission.
 Three shape questions this document was silent on, settled:
 
 - Every step carries the full `ReviewStep` key set, including `venueId: null` on
-  the four steps that will never use it. A uniform shape means the review UI and
-  the migration script index it the same way for all five.
+  the four steps that will never use it and `script: null` on the four that will
+  never carry one. A uniform shape means the review UI and the migration script
+  index it the same way for all five.
 - There is no per-attempt history array. `ReviewStep` holds only the current
   attempt, status and note. The trail is recoverable without one: each prior
   attempt's evidence still sits at its own immutable `kyc/{uid}/{step}/{n}/…`
@@ -411,6 +449,7 @@ logs/{logId} {
   action: 'event.publish' | 'event.archive' | 'organizer.approve'
         | 'organizer.reject' | 'organizer.revoke' | 'venue.create'
         | 'report.delete' | 'kyc.needsInfo' | 'kyc.accept'
+        | 'kyc.script'                // a walkthrough script published or revised
   actorUid: string
   targetType: 'event' | 'venue' | 'user' | 'report'
   targetId: string

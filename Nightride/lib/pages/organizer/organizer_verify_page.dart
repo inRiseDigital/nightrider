@@ -39,7 +39,7 @@ extension on _StepId {
         _StepId.nic => 'Front and back of your government ID',
         _StepId.selfie => 'Match your face to your ID',
         _StepId.gps => "Confirm you're at the venue",
-        _StepId.video => 'Entrance, bar, and POS terminal',
+        _StepId.video => 'Record the walkthrough an admin scripts for you',
       };
   IconData get icon => switch (this) {
         _StepId.venueAddress => Icons.storefront_outlined,
@@ -134,22 +134,46 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
         await ref.read(organizerServiceProvider).markStepUploaded(_uid, 'selfie');
       });
 
-  Future<void> _handleVideo(int attempt) => _run('video', () async {
-        final video = await captureOrganizerVideo(
-          context,
-          title: 'Walkthrough',
-          prompt: 'Frame the entrance, the bar, and the POS terminal',
-          maxSeconds: 60,
-        );
-        if (video == null) return;
+  /// The walkthrough is recorded against a script an admin wrote for this
+  /// venue, so the script is shown first and the camera only opens once the
+  /// applicant has read it. A missing script means an admin unlocked the step
+  /// by hand -- rare, and no reason to block the recording.
+  Future<void> _handleVideo(int attempt, Map<String, dynamic>? script) async {
+    final lines = (script?['lines'] as List?)?.whereType<String>().where((l) => l.isNotEmpty).toList();
+    if (lines != null && lines.isNotEmpty) {
+      final proceed = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppTheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        builder: (_) => _WalkthroughScriptSheet(
+          lines: lines,
+          numbered: script?['format'] != 'text',
+          revision: script?['revision'] as int? ?? 0,
+        ),
+      );
+      if (proceed != true || !mounted) return;
+    }
 
-        await ref.read(organizerVerificationServiceProvider).uploadWalkthrough(
-              uid: _uid,
-              attempt: attempt,
-              video: video,
-            );
-        await ref.read(organizerServiceProvider).markStepUploaded(_uid, 'video');
-      });
+    await _run('video', () async {
+      final video = await captureOrganizerVideo(
+        context,
+        title: 'Walkthrough',
+        prompt: 'Follow the script an admin sent you',
+        maxSeconds: 60,
+      );
+      if (video == null) return;
+
+      await ref.read(organizerVerificationServiceProvider).uploadWalkthrough(
+            uid: _uid,
+            attempt: attempt,
+            video: video,
+          );
+      await ref.read(organizerServiceProvider).markStepUploaded(_uid, 'video');
+    });
+  }
 
   void _handleVenueAddress(Map<String, dynamic>? draft) {
     showModalBottomSheet(
@@ -373,7 +397,11 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
 
   _RowStatus _statusFor(_StepId id, Map<String, dynamic> review, Map<String, dynamic> applied) {
     final reviewStep = (review[id.key] as Map?) ?? const {};
-    final status = reviewStep['status'] as String? ?? 'active';
+    // gps and video both start 'pending' in the create shape -- gps waits on an
+    // accepted venue address, video on an admin's walkthrough script -- so a
+    // missing status for either means locked, not open.
+    final fallback = (id == _StepId.gps || id == _StepId.video) ? 'pending' : 'active';
+    final status = reviewStep['status'] as String? ?? fallback;
     if (status == 'accepted') return _RowStatus.accepted;
     if (status == 'pending') return _RowStatus.locked;
     if (status == 'needs_info') return _RowStatus.action;
@@ -402,23 +430,36 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
   ) {
     final rows = _StepId.values.map((id) {
       final reviewStep = (review[id.key] as Map?) ?? const {};
+      final rawScript = reviewStep['script'];
       return (
         id: id,
         status: _statusFor(id, review, applied),
         attempt: reviewStep['attempt'] as int? ?? 0,
         note: reviewStep['note'] as String? ?? '',
+        script: rawScript is Map ? Map<String, dynamic>.from(rawScript) : null,
       );
     }).toList();
+
+    // The video step is locked until an admin publishes a script for this
+    // venue. Once the other four are done that lock is entirely on us, and the
+    // row says so instead of sitting there as an unexplained "Locked".
+    final videoLocked = rows.any((r) => r.id == _StepId.video && r.status == _RowStatus.locked);
+    final othersSettled = rows
+        .where((r) => r.id != _StepId.video)
+        .every((r) => r.status == _RowStatus.submitted || r.status == _RowStatus.accepted);
+    final awaitingScript = videoLocked && othersSettled;
 
     final doneCount = rows.where((r) => r.status == _RowStatus.accepted || r.status == _RowStatus.submitted).length +
         _extraSteps.where((s) => s.status != _ExtraStatus.active).length;
     final totalCount = rows.length + _extraSteps.length;
     final pct = totalCount == 0 ? 0 : ((doneCount / totalCount) * 100).round();
 
-    final next = rows.firstWhere(
-      (r) => r.status == _RowStatus.todo || r.status == _RowStatus.action,
-      orElse: () => rows.first,
-    );
+    // Deliberately nullable: with the video step locked behind a script the
+    // applicant can genuinely have nothing left to do, and offering them the
+    // first step again would be a lie.
+    final next = rows
+        .where((r) => r.status == _RowStatus.todo || r.status == _RowStatus.action)
+        .firstOrNull;
     final allRealDone = rows.every((r) => r.status == _RowStatus.accepted || r.status == _RowStatus.submitted);
     final anyExtraActive = _extraSteps.any((s) => s.status == _ExtraStatus.active);
 
@@ -446,24 +487,32 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
               ),
             ),
             const SizedBox(height: 20),
-            ...rows.map((r) => _StepRow(
-                  icon: r.id.icon,
-                  label: r.id.label,
-                  sub: r.note.isNotEmpty ? r.note : r.id.sub,
-                  status: r.status,
-                  busy: _busy.contains(r.id.key),
-                  onTap: r.status == _RowStatus.locked
-                      ? null
-                      : () => switch (r.id) {
-                            _StepId.venueAddress => _handleVenueAddress(
-                                applied['venueAddress'] as Map<String, dynamic>?,
-                              ),
-                            _StepId.nic => _handleNic(r.attempt),
-                            _StepId.selfie => _handleSelfie(r.attempt),
-                            _StepId.gps => _handleGps(r.attempt),
-                            _StepId.video => _handleVideo(r.attempt),
-                          },
-                )),
+            ...rows.map((r) {
+              final waiting = r.id == _StepId.video && awaitingScript;
+              return _StepRow(
+                icon: r.id.icon,
+                label: r.id.label,
+                sub: waiting
+                    ? 'An admin is writing your script -- this unlocks when it lands'
+                    : r.note.isNotEmpty
+                        ? r.note
+                        : r.id.sub,
+                status: r.status,
+                statusLabel: waiting ? 'Waiting' : null,
+                busy: _busy.contains(r.id.key),
+                onTap: r.status == _RowStatus.locked
+                    ? null
+                    : () => switch (r.id) {
+                          _StepId.venueAddress => _handleVenueAddress(
+                              applied['venueAddress'] as Map<String, dynamic>?,
+                            ),
+                          _StepId.nic => _handleNic(r.attempt),
+                          _StepId.selfie => _handleSelfie(r.attempt),
+                          _StepId.gps => _handleGps(r.attempt),
+                          _StepId.video => _handleVideo(r.attempt, r.script),
+                        },
+              );
+            }),
             ..._extraSteps.map((s) => _StepRow(
                   icon: switch (s.type) {
                     _ExtraType.moreInfo => Icons.priority_high_rounded,
@@ -494,6 +543,7 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
             _OverallBanner(
               allDone: allRealDone && !anyExtraActive,
               actionNeeded: anyExtraActive || rows.any((r) => r.status == _RowStatus.action),
+              awaitingScript: awaitingScript && !anyExtraActive,
             ),
             if (kDebugMode) ...[
               const SizedBox(height: 24),
@@ -510,7 +560,7 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
             ],
           ],
         ),
-        if (!allRealDone || anyExtraActive)
+        if (next != null)
           Positioned(
             right: 16,
             bottom: 24,
@@ -526,11 +576,11 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
                 _StepId.nic => _handleNic(next.attempt),
                 _StepId.selfie => _handleSelfie(next.attempt),
                 _StepId.gps => _handleGps(next.attempt),
-                _StepId.video => _handleVideo(next.attempt),
+                _StepId.video => _handleVideo(next.attempt, next.script),
               },
             ),
           )
-        else
+        else if (allRealDone && !anyExtraActive)
           Positioned(
             left: 16,
             right: 16,
@@ -560,6 +610,7 @@ class _StepRow extends StatelessWidget {
     required this.status,
     required this.busy,
     required this.onTap,
+    this.statusLabel,
   });
 
   final IconData icon;
@@ -569,15 +620,21 @@ class _StepRow extends StatelessWidget {
   final bool busy;
   final VoidCallback? onTap;
 
+  /// Overrides the chip text without changing the chip's colours -- a video
+  /// step waiting on an admin's script is locked, but "Locked" alone reads as
+  /// the applicant's problem to solve.
+  final String? statusLabel;
+
   @override
   Widget build(BuildContext context) {
-    final (chipBg, chipFg, chipLabel) = switch (status) {
+    final (chipBg, chipFg, defaultChipLabel) = switch (status) {
       _RowStatus.accepted => (const Color(0xFF0F4F31), const Color(0xFFC8EBD5), 'Done'),
       _RowStatus.submitted => (const Color(0xFF005046), const Color(0xFF9EF2E4), 'Submitted'),
       _RowStatus.action => (const Color(0xFF6B3E00), const Color(0xFFFFDDB3), 'Action'),
       _RowStatus.locked => (AppTheme.darkGray, Colors.white38, 'Locked'),
       _RowStatus.todo => (AppTheme.darkGray, Colors.white60, 'To do'),
     };
+    final chipLabel = statusLabel ?? defaultChipLabel;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -629,9 +686,17 @@ class _StepRow extends StatelessWidget {
 }
 
 class _OverallBanner extends StatelessWidget {
-  const _OverallBanner({required this.allDone, required this.actionNeeded});
+  const _OverallBanner({
+    required this.allDone,
+    required this.actionNeeded,
+    this.awaitingScript = false,
+  });
   final bool allDone;
   final bool actionNeeded;
+
+  /// Everything the applicant can do is done, and the only thing left is an
+  /// admin writing the walkthrough script.
+  final bool awaitingScript;
 
   @override
   Widget build(BuildContext context) {
@@ -641,8 +706,11 @@ class _OverallBanner extends StatelessWidget {
         : allDone
             ? (const Color(0xFF005046), const Color(0xFF9EF2E4), 'Under review',
                 "You're all set. We'll notify you as soon as an admin approves your venue.")
-            : (const Color(0xFF8C0035), const Color(0xFFFFD9DF), 'Verification in progress',
-                'Finish the remaining steps to submit your application.');
+            : awaitingScript
+                ? (const Color(0xFF005046), const Color(0xFF9EF2E4), 'Waiting on us',
+                    "That's your part done. An admin is writing your walkthrough script -- the video step unlocks as soon as it lands.")
+                : (const Color(0xFF8C0035), const Color(0xFFFFD9DF), 'Verification in progress',
+                    'Finish the remaining steps to submit your application.');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -654,6 +722,106 @@ class _OverallBanner extends StatelessWidget {
           const SizedBox(height: 4),
           Text(detail, style: TextStyle(color: fg.withValues(alpha: 0.85), fontSize: 13, height: 1.4)),
         ],
+      ),
+    );
+  }
+}
+
+/// The walkthrough script an admin wrote for this venue, shown before the
+/// camera opens. Read-only -- the applicant records against it.
+class _WalkthroughScriptSheet extends StatelessWidget {
+  const _WalkthroughScriptSheet({
+    required this.lines,
+    required this.numbered,
+    required this.revision,
+  });
+
+  final List<String> lines;
+  final bool numbered;
+  final int revision;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Your walkthrough script',
+                    style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (revision > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6B3E00),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('REVISED',
+                        style: TextStyle(
+                            color: Color(0xFFFFDDB3),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text('Record one take that covers all of it, up to 60 seconds.',
+                style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4)),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final (index, line) in lines.indexed)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (numbered) ...[
+                              Text('${index + 1}.',
+                                  style: GoogleFonts.jetBrainsMono(
+                                      color: AppTheme.primary, fontSize: 13, height: 1.45)),
+                              const SizedBox(width: 10),
+                            ],
+                            Expanded(
+                              child: Text(line,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.45)),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).pop(true),
+                icon: const Icon(Icons.videocam_rounded),
+                label: const Text('Start recording'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

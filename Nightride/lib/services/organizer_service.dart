@@ -228,6 +228,10 @@ class OrganizerService {
         'reviewedBy': null,
         'venueId': null,
         'mediaDeletedAt': null,
+        // Only the video step ever carries a walkthrough script, and only an
+        // admin can write one -- the key stays present and null everywhere so
+        // every step keeps the same shape.
+        'script': null,
       };
 
   /// Bootstraps the organizer pipeline for a signed-in account with no
@@ -276,10 +280,12 @@ class OrganizerService {
           'venueAddress': _initialReviewStep('active'),
           'nic': _initialReviewStep('active'),
           'selfie': _initialReviewStep('active'),
-          'video': _initialReviewStep('active'),
           // gps cannot start until an admin has accepted a venue address
           // for it to be measured against.
           'gps': _initialReviewStep('pending'),
+          // video cannot start until an admin has published a walkthrough
+          // script for this venue -- there is nothing to record against yet.
+          'video': _initialReviewStep('pending'),
         },
         'updatedAt': FieldValue.serverTimestamp(),
       });

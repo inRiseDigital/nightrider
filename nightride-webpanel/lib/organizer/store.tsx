@@ -68,7 +68,9 @@ const INITIAL_STATE: ApplicationState = {
   phone: "",
   otp: "",
   error: "",
-  openStepId: "venueAddress",
+  // The first step in BASE_STEPS, so the flow opens on the step the applicant
+  // is meant to start with.
+  openStepId: "nic",
   application: EMPTY_APPLICATION,
   review: EMPTY_REVIEW,
   uploadProgress: {},

@@ -102,12 +102,35 @@ export interface ApplicantApplication {
   steps: ApplicantSteps;
 }
 
+/**
+ * `organizerReview.steps.video.script` — the walkthrough script an admin
+ * publishes for one venue. Admin-authored, applicant-readable, and the thing
+ * that unlocks the video step: until it exists there is nothing to record
+ * against, so `steps.video.status` stays 'pending'.
+ *
+ * The stored `updatedAt` is omitted here for the same reason the review
+ * timestamps are — nothing in this flow renders it. `revision` is enough to
+ * mark a script as revised.
+ */
+export interface VideoScript {
+  /** 'text' renders the lines as paragraphs, 'list' as a numbered shot list. */
+  format: "text" | "list";
+  /** One paragraph or one shot per entry. Capped by VIDEO_SCRIPT_MAX_LINES. */
+  lines: string[];
+  /** 0 on first publish, +1 on each admin edit. > 0 means "revised". */
+  revision: number;
+  /** Admin uid. */
+  updatedBy: string;
+}
+
 /** `users/{uid}/private/organizerReview.steps.<id>` — admin-owned. */
 export interface ReviewStep {
   status: StepStatus;
   attempt: number;
   note: string;
   venueId: string | null;
+  /** video only — null on the four steps that never carry a script. */
+  script: VideoScript | null;
 }
 
 export type ReviewStatus = "none" | "pending" | "approved" | "rejected" | "revoked";
@@ -164,6 +187,14 @@ export interface StepView {
   note: string;
   /** The admin-owned attempt counter this step's Storage paths are keyed by. */
   attempt: number;
+  /** video only: the published walkthrough script, null until an admin sends one. */
+  script: VideoScript | null;
+  /**
+   * video only: the applicant has done the other four steps, so the only thing
+   * standing between them and recording is an admin writing the script. Lets
+   * the locked step say "waiting on us" rather than an unexplained "Locked".
+   */
+  awaitingScript: boolean;
   thumbLabel?: string;
 }
 

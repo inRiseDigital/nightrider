@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, afterEach, describe, it } from 'vitest';
 import { assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { createTestEnv, baseUser, initialOrganizerReview, uid } from './helpers.js';
+import { createTestEnv, baseUser, initialOrganizerReview, videoScript, uid } from './helpers.js';
 
 let testEnv;
 
@@ -62,6 +62,24 @@ describe('users/{uid}/private/organizerReview', () => {
     await assertFails(setDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), bad));
   });
 
+  it("14b. owner creates it with steps.video.status 'active' -> DENY (video must start pending)", async () => {
+    const u = uid('u');
+    await seedUsers({ [u]: baseUser() });
+    const ctx = testEnv.authenticatedContext(u);
+    const bad = initialOrganizerReview();
+    bad.steps.video.status = 'active';
+    await assertFails(setDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), bad));
+  });
+
+  it('14c. owner creates it with a walkthrough script already attached -> DENY', async () => {
+    const u = uid('u');
+    await seedUsers({ [u]: baseUser() });
+    const ctx = testEnv.authenticatedContext(u);
+    const bad = initialOrganizerReview();
+    bad.steps.video.script = videoScript();
+    await assertFails(setDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), bad));
+  });
+
   it('15. owner creates it with any attempt != 0 -> DENY', async () => {
     const u = uid('u');
     await seedUsers({ [u]: baseUser() });
@@ -117,6 +135,152 @@ describe('users/{uid}/private/organizerReview', () => {
       updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), {
         steps: nextSteps,
       }),
+    );
+  });
+
+  it('19b. admin publishes a walkthrough script and unlocks the video step -> ALLOW', async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    const review = initialOrganizerReview();
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(admin);
+    const nextSteps = {
+      ...review.steps,
+      video: { ...review.steps.video, status: 'active', script: videoScript() },
+    };
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it('19c. admin revises a published script without touching video.attempt -> ALLOW', async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    const review = initialOrganizerReview();
+    review.steps.video = { ...review.steps.video, status: 'active', script: videoScript() };
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(admin);
+    const nextSteps = {
+      ...review.steps,
+      video: {
+        ...review.steps.video,
+        script: videoScript({ revision: 1, lines: ['Show the fire exit too.'] }),
+      },
+    };
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it('19d. applicant writes their own script -> DENY', async () => {
+    const u = uid('u');
+    await seedUsers({ [u]: baseUser() });
+    const review = initialOrganizerReview();
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(u);
+    const nextSteps = {
+      ...review.steps,
+      video: { ...review.steps.video, status: 'active', script: videoScript() },
+    };
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it('19e. admin publishes a 21-line script -> DENY (capped at 20)', async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    const review = initialOrganizerReview();
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(admin);
+    const lines = Array.from({ length: 21 }, (_, i) => `Shot ${i + 1}`);
+    const nextSteps = {
+      ...review.steps,
+      video: { ...review.steps.video, status: 'active', script: videoScript({ lines }) },
+    };
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it('19f. admin publishes an empty script -> DENY (needs at least one line)', async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    const review = initialOrganizerReview();
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(admin);
+    const nextSteps = {
+      ...review.steps,
+      video: { ...review.steps.video, status: 'active', script: videoScript({ lines: [] }) },
+    };
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it("19g. admin publishes a script with an unknown format -> DENY", async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    const review = initialOrganizerReview();
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(admin);
+    const nextSteps = {
+      ...review.steps,
+      video: { ...review.steps.video, status: 'active', script: videoScript({ format: 'storyboard' }) },
+    };
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it('19h. admin publishes a script with an extra key -> DENY', async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    const review = initialOrganizerReview();
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(admin);
+    const nextSteps = {
+      ...review.steps,
+      video: { ...review.steps.video, status: 'active', script: videoScript({ dueAt: new Date() }) },
+    };
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it('19i. admin attaches a script to a step other than video -> DENY', async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    const review = initialOrganizerReview();
+    await seedReview(u, review);
+    const ctx = testEnv.authenticatedContext(admin);
+    const nextSteps = { ...review.steps, nic: { ...review.steps.nic, script: videoScript() } };
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
+    );
+  });
+
+  it('19j. admin updates a review document written before `script` existed -> ALLOW', async () => {
+    const u = uid('u');
+    const admin = uid('admin');
+    await seedUsers({ [u]: baseUser(), [admin]: baseUser({ isAdmin: true }) });
+    // The shape production had before this field: no `script` key anywhere. A
+    // missing map key is an evaluation error in rules, so this is what keeps
+    // the `get(..., null)` guards honest.
+    const legacy = initialOrganizerReview();
+    for (const step of Object.values(legacy.steps)) delete step.script;
+    await seedReview(u, legacy);
+    const ctx = testEnv.authenticatedContext(admin);
+    const nextSteps = { ...legacy.steps, nic: { ...legacy.steps.nic, status: 'accepted' } };
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), `users/${u}/private/organizerReview`), { steps: nextSteps }),
     );
   });
 

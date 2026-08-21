@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Check } from "lucide-react";
 import { AccentButton } from "@/components/organizer/ui/AccentButton";
 import { AuthCard, AuthCardTitle, ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { TextField } from "@/components/organizer/ui/TextField";
@@ -11,8 +10,8 @@ import { useApplicationActions, useApplicationState } from "@/lib/organizer/stor
 import { PasswordRequirements } from "./PasswordRequirements";
 
 export function SignupStage() {
-  const { email, password, captcha, error, busy } = useApplicationState();
-  const { setCredential, toggleCaptcha, submitSignup } = useApplicationActions();
+  const { email, password, error, busy } = useApplicationState();
+  const { setCredential, submitSignup } = useApplicationActions();
 
   return (
     <AuthCard>
@@ -49,24 +48,6 @@ export function SignupStage() {
           />
           {password && <PasswordRequirements password={password} />}
         </div>
-
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={captcha}
-          onClick={toggleCaptcha}
-          className="mt-0.5 flex items-center gap-2.5 rounded-lg border border-nr-border bg-nr-surface-raised p-3 text-left transition-colors hover:border-nr-text-hint"
-        >
-          <span
-            className={cn(
-              "flex h-5 w-5 shrink-0 items-center justify-center rounded border border-nr-text-hint",
-              captcha && "border-[var(--org-accent)] bg-[var(--org-accent)]"
-            )}
-          >
-            {captcha && <Check size={13} strokeWidth={3} className="text-nr-bg" />}
-          </span>
-          <span className="text-[13px] text-nr-text-secondary">I&apos;m not a robot</span>
-        </button>
 
         {error && <ErrorNote>{error}</ErrorNote>}
 

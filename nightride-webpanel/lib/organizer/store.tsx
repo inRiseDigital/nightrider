@@ -50,7 +50,6 @@ export interface ApplicationState {
   stage: ApplicationStage;
   email: string;
   password: string;
-  captcha: boolean;
   phone: string;
   otp: string;
   error: string;
@@ -68,7 +67,6 @@ const INITIAL_STATE: ApplicationState = {
   stage: "signup",
   email: "",
   password: "",
-  captcha: false,
   phone: "",
   otp: "",
   error: "",
@@ -80,7 +78,6 @@ const INITIAL_STATE: ApplicationState = {
 
 type Action =
   | { type: "setCredential"; field: "email" | "password" | "phone" | "otp"; value: string }
-  | { type: "toggleCaptcha" }
   | { type: "setBusy"; busy: boolean }
   | { type: "setError"; error: string }
   | { type: "setStage"; stage: ApplicationStage }
@@ -95,8 +92,6 @@ function reducer(state: ApplicationState, action: Action): ApplicationState {
   switch (action.type) {
     case "setCredential":
       return { ...state, [action.field]: action.value, error: "" };
-    case "toggleCaptcha":
-      return { ...state, captcha: !state.captcha, error: "" };
     case "setBusy":
       return { ...state, busy: action.busy };
     case "setError":
@@ -138,7 +133,6 @@ function reducer(state: ApplicationState, action: Action): ApplicationState {
 
 export interface ApplicationActions {
   setCredential: (field: "email" | "password" | "phone" | "otp", value: string) => void;
-  toggleCaptcha: () => void;
   submitSignup: () => Promise<void>;
   submitPhone: () => Promise<void>;
   submitOtp: () => Promise<void>;
@@ -231,7 +225,6 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
 
     return {
       setCredential: (field, value) => dispatch({ type: "setCredential", field, value }),
-      toggleCaptcha: () => dispatch({ type: "toggleCaptcha" }),
       toggleStep: (id) => dispatch({ type: "toggleStep", id }),
 
       submitSignup: () =>
@@ -241,8 +234,6 @@ export function OrganizerApplicationProvider({ children }: { children: ReactNode
 
           const passwordError = validatePassword(state.password);
           if (passwordError) throw new Error(passwordError);
-
-          if (!state.captcha) throw new Error("Please confirm the captcha.");
 
           const email = state.email.trim();
           const credential = await createUserWithEmailAndPassword(

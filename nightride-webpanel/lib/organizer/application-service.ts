@@ -11,7 +11,7 @@ import {
 import { ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { getBucket, getDb } from "@/lib/firebase";
 import { describeUploadError } from "./errors";
-import { validateKycImage, validateKycVideo } from "./validation";
+import { validateKycVideo } from "./validation";
 import type {
   ApplicantApplication,
   ApplicantProfile,
@@ -362,7 +362,11 @@ export async function saveVenueAddress(uid: string, draft: VenueAddressDraft): P
   });
 }
 
-/** The applicant's own claim that they uploaded something — advisory, never gates access. */
+/**
+ * The applicant's own claim that they uploaded something — advisory, never
+ * gates access. Only the video step calls this from the browser; the mobile
+ * app writes the same flag for nic and selfie.
+ */
 async function markStepUploaded(uid: string, stepId: UploadStepId): Promise<void> {
   await patchApplication(uid, { steps: { [stepId]: { uploaded: true } } });
 }
@@ -389,50 +393,6 @@ async function uploadResumable(
       resolve
     );
   });
-}
-
-/**
- * `{attempt}` always comes from the review doc, read live — never invented or
- * incremented here. Only an admin advances it, and the Storage rule compares
- * the path segment against it, so writing to the wrong attempt is a
- * structural denial, not just bad UX.
- */
-export async function uploadNicFiles(
-  uid: string,
-  attempt: number,
-  front: File,
-  back: File,
-  onProgress?: UploadProgressHandler
-): Promise<void> {
-  const frontError = validateKycImage(front);
-  if (frontError) throw new Error(frontError);
-  const backError = validateKycImage(back);
-  if (backError) throw new Error(backError);
-
-  try {
-    await uploadResumable(kycPath(uid, "nic", attempt, "front.jpg"), front, front.type, (f) => onProgress?.(f * 0.5));
-    await uploadResumable(kycPath(uid, "nic", attempt, "back.jpg"), back, back.type, (f) => onProgress?.(0.5 + f * 0.5));
-  } catch (error) {
-    throw new Error(describeUploadError(error));
-  }
-  await markStepUploaded(uid, "nic");
-}
-
-export async function uploadSelfieFile(
-  uid: string,
-  attempt: number,
-  capture: File,
-  onProgress?: UploadProgressHandler
-): Promise<void> {
-  const captureError = validateKycImage(capture);
-  if (captureError) throw new Error(captureError);
-
-  try {
-    await uploadResumable(kycPath(uid, "selfie", attempt, "capture.jpg"), capture, capture.type, onProgress);
-  } catch (error) {
-    throw new Error(describeUploadError(error));
-  }
-  await markStepUploaded(uid, "selfie");
 }
 
 /**
@@ -494,6 +454,12 @@ export function extractPosterFrame(videoFile: File): Promise<Blob> {
  * — so a retry after a genuine partial failure can still land on the
  * "already submitted" message for the file that did make it through; an
  * admin bumping the attempt is the recovery path for that edge case.
+ */
+/**
+ * `{attempt}` always comes from the review doc, read live — never invented or
+ * incremented here. Only an admin advances it, and the Storage rule compares
+ * the path segment against it, so writing to the wrong attempt is a
+ * structural denial, not just bad UX.
  */
 export async function uploadVideoFile(
   uid: string,

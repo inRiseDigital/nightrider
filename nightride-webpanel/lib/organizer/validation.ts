@@ -1,4 +1,4 @@
-import { KYC_IMAGE_MAX_BYTES, KYC_IMAGE_TYPES, KYC_VIDEO_MAX_BYTES, KYC_VIDEO_TYPE } from "./constants";
+import { KYC_VIDEO_MAX_BYTES, KYC_VIDEO_TYPE } from "./constants";
 import type { VenueAddressDraft } from "./types";
 
 export const PASSWORD_MIN_LENGTH = 8;
@@ -76,13 +76,9 @@ const MB = 1024 * 1024;
  * Client-side pre-check so a bad file gets a real message instead of a
  * Storage permission error — the rule enforces the same size/type limits
  * server-side (nightride-webpanel/storage.rules, kyc/{uid}/{stepId}/... block).
+ * Images are no longer picked in the browser (nic and selfie are captured in
+ * the mobile app), so only the walkthrough video needs one here.
  */
-export function validateKycImage(file: File): string | null {
-  if (!KYC_IMAGE_TYPES.includes(file.type)) return "Use a JPEG or PNG image.";
-  if (file.size > KYC_IMAGE_MAX_BYTES) return `Image must be under ${KYC_IMAGE_MAX_BYTES / MB} MB.`;
-  return null;
-}
-
 export function validateKycVideo(file: File): string | null {
   if (file.type !== KYC_VIDEO_TYPE) return "Use an MP4 video.";
   if (file.size > KYC_VIDEO_MAX_BYTES) return `Video must be under ${KYC_VIDEO_MAX_BYTES / MB} MB.`;

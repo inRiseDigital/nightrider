@@ -1,14 +1,20 @@
 import { Smartphone } from "lucide-react";
 
-/** Teal chip marking a step that can only be cleared from the mobile app. */
-export function RequiresAppPill() {
+/**
+ * Static marker on a step that can only be cleared in the Night Ride app —
+ * nic, selfie, and gps. Deliberately not a button: this panel has nothing to
+ * navigate to (the app has no deep-link scheme, see Info.plist /
+ * AndroidManifest.xml), so a control here would be a dead end. It tells the
+ * applicant where the step happens; the step's own copy says what to do.
+ */
+export function RequiresAppLabel() {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.06em]"
+      className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-bold"
       style={{ background: "var(--terc, #62d6c81a)", color: "var(--onterc, #62d6c8)" }}
     >
-      <Smartphone size={12} aria-hidden />
-      Requires mobile app
+      <Smartphone size={16} aria-hidden />
+      Continue in mobile app
     </span>
   );
 }

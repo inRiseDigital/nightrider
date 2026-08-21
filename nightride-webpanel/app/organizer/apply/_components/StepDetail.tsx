@@ -7,6 +7,7 @@ import { RequiresAppLabel, StepThumb } from "@/components/organizer/ui/StepMedia
 import { TextField } from "@/components/organizer/ui/TextField";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
 import type { StepView, VenueAddressDraft } from "@/lib/organizer/types";
+import { VenueLocationPicker } from "./VenueLocationPicker";
 
 /**
  * The body of an opened step — shared by the checklist (inline) and timeline
@@ -94,10 +95,25 @@ function AdminNote({ note }: { note: string }) {
 function AddressSummary({ draft }: { draft: VenueAddressDraft | null }) {
   if (!draft || !draft.address) return null;
   return (
-    <p className="text-xs text-nr-text-hint">
-      {draft.address}, {draft.city} {draft.countryCode}
-    </p>
+    <div className="flex flex-col gap-1">
+      <p className="text-xs text-nr-text-hint">
+        {draft.address}, {draft.city} {draft.countryCode}
+      </p>
+      {draft.geo && (
+        <p className="font-mono text-xs text-nr-text-hint">
+          Pinned: {draft.geo.latitude.toFixed(5)}, {draft.geo.longitude.toFixed(5)}
+        </p>
+      )}
+    </div>
   );
+}
+
+type Geo = VenueAddressDraft["geo"];
+
+/** Exact compare is right here: both sides come from the same picker/parse path. */
+function sameGeo(a: Geo, b: Geo): boolean {
+  if (!a || !b) return a === b;
+  return a.latitude === b.latitude && a.longitude === b.longitude;
 }
 
 function VenueAddressPanel({
@@ -116,6 +132,7 @@ function VenueAddressPanel({
   const [address, setAddress] = useState(draft?.address ?? "");
   const [city, setCity] = useState(draft?.city ?? "");
   const [countryCode, setCountryCode] = useState(draft?.countryCode ?? "");
+  const [geo, setGeo] = useState<VenueAddressDraft["geo"]>(draft?.geo ?? null);
 
   if (step.awaitingReview) {
     return (
@@ -146,14 +163,16 @@ function VenueAddressPanel({
           address: address.trim(),
           city: city.trim(),
           countryCode: countryCode.trim().toUpperCase(),
-          // Lat/long is captured on the Night Ride mobile app, which can use
-          // geolocator's mocked-location check (see StepId 'gps' doc comment
-          // in lib/organizer/types.ts) — this webpanel can't verify a manually
-          // typed pin, so it no longer collects one. Preserve whatever the
-          // mobile app already wrote rather than clobbering it back to null
-          // when the applicant only edits the street address here.
-          geo: draft?.geo ?? null,
-          placeId: draft?.placeId ?? "",
+          // A browser pin is advisory — it can't run geolocator's mocked-
+          // location check the way the mobile `gps` step does (see the StepId
+          // doc comment in lib/organizer/types.ts). It is still the applicant's
+          // own claim about where the venue is, which is what an admin needs to
+          // review; the mobile fix is what verifies it later.
+          geo,
+          // `placeId` only means anything alongside the geo it was resolved
+          // for. Nothing here resolves places, so a moved pin invalidates an
+          // id the mobile app wrote; an untouched pin keeps it.
+          placeId: sameGeo(geo, draft?.geo ?? null) ? draft?.placeId ?? "" : "",
         });
       }}
     >
@@ -170,6 +189,7 @@ function VenueAddressPanel({
         value={countryCode}
         onChange={(e) => setCountryCode(e.target.value)}
       />
+      <VenueLocationPicker geo={geo} onChange={setGeo} disabled={busy} />
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <AccentButton type="submit" size="sm" loading={busy}>

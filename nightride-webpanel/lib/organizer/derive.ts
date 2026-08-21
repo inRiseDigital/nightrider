@@ -14,12 +14,16 @@ export function deriveSteps(state: ApplicationState): StepView[] {
     const reviewStep = state.review.steps[def.id];
     const rawStatus = reviewStep?.status ?? "pending";
 
+    // Keyed on the step id, not its kind: nic and selfie are cleared in the
+    // mobile app, which sets the same advisory `uploaded` flag a browser
+    // upload would. gps has no flag — its claim is the attempts array, which
+    // this panel does not read.
     const applicantClaim =
       def.id === "venueAddress"
         ? state.application.steps.venueAddress !== null
-        : def.kind === "upload"
-          ? state.application.steps[def.id as "nic" | "selfie" | "video"].uploaded
-          : false;
+        : def.id === "gps"
+          ? false
+          : state.application.steps[def.id].uploaded;
 
     // review.steps.<id>.status stays 'active' until an admin looks at it —
     // there is no server trigger that flips it the moment a file lands in

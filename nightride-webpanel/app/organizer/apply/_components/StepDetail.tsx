@@ -3,35 +3,25 @@
 import { useState } from "react";
 import { AccentButton } from "@/components/organizer/ui/AccentButton";
 import { ErrorNote } from "@/components/organizer/ui/AuthCard";
-import { RequiresAppPill, StepThumb } from "@/components/organizer/ui/StepMedia";
+import { RequiresAppLabel, StepThumb } from "@/components/organizer/ui/StepMedia";
 import { TextField } from "@/components/organizer/ui/TextField";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
 import type { StepView, VenueAddressDraft } from "@/lib/organizer/types";
+import { VenueLocationPicker } from "./VenueLocationPicker";
 
 /**
  * The body of an opened step — shared by the checklist (inline) and timeline
  * (panel below the rail) layouts. Behaviour is dispatched on `step.kind`:
- * 'address' is a typed form, 'upload' is a real Storage upload, 'app' (gps
- * only) is informational — that capture only happens in the Night Ride mobile
- * app, which this webpanel does not touch.
+ * 'address' is a typed form, 'upload' is a real Storage upload (video only),
+ * 'app' is informational — nic, selfie, and gps are captured and uploaded by
+ * the Night Ride mobile app, which this webpanel does not touch.
  */
 export function StepDetail({ step }: { step: StepView }) {
   const { busy, error, application, uploadProgress } = useApplicationState();
-  const { submitVenueAddress, uploadNic, uploadSelfie, uploadVideo } = useApplicationActions();
+  const { submitVenueAddress, uploadVideo } = useApplicationActions();
 
   if (step.kind === "app") {
-    return (
-      <div className="flex flex-col items-start gap-3">
-        <p className="text-[13px] text-nr-text-secondary">
-          {step.status === "pending"
-            ? "Locked until an admin accepts your venue address."
-            : step.detail}
-        </p>
-        {step.status !== "pending" && <RequiresAppPill />}
-        {step.thumbLabel && <StepThumb label={step.thumbLabel} />}
-        {step.note && <AdminNote note={step.note} />}
-      </div>
-    );
+    return <AppStepPanel step={step} />;
   }
 
   if (step.kind === "address") {
@@ -46,17 +36,48 @@ export function StepDetail({ step }: { step: StepView }) {
     );
   }
 
-  // kind === "upload": nic / selfie / video
+  // kind === "upload": the walkthrough video, the one step still uploaded here
   return (
     <UploadPanel
       step={step}
       busy={busy}
       error={error}
       progress={uploadProgress[step.id] ?? 0}
-      onUploadNic={(front, back) => void uploadNic(front, back)}
-      onUploadSelfie={(file) => void uploadSelfie(file)}
       onUploadVideo={(file) => void uploadVideo(file)}
     />
+  );
+}
+
+/**
+ * nic / selfie / gps. Read-only: the applicant does the work in the app and
+ * this panel reflects whatever the app wrote — the advisory `uploaded` flag
+ * for nic/selfie (which derive.ts turns into 'submitted'), or an admin's own
+ * verdict once they have looked.
+ */
+function AppStepPanel({ step }: { step: StepView }) {
+  // Only gps is ever locked, and only until its venue address is accepted.
+  const locked = step.status === "pending";
+  const settled = step.status === "accepted" || step.awaitingReview;
+
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <p className="text-[13px] text-nr-text-secondary">
+        {locked ? "Locked until an admin accepts your venue address." : step.detail}
+      </p>
+      {step.note && <AdminNote note={step.note} />}
+      {!locked && <RequiresAppLabel />}
+      {step.awaitingReview && (
+        <p className="text-xs" style={{ color: "var(--ter)" }}>
+          Captured in the app — wait for review.
+        </p>
+      )}
+      {step.status === "accepted" && (
+        <p className="text-xs" style={{ color: "var(--suc)" }}>Accepted.</p>
+      )}
+      {/* The tile stands in for media that has not arrived yet, so it goes
+          once the applicant's own claim (or an admin) says it has. */}
+      {step.thumbLabel && !settled && <StepThumb label={step.thumbLabel} />}
+    </div>
   );
 }
 
@@ -74,10 +95,25 @@ function AdminNote({ note }: { note: string }) {
 function AddressSummary({ draft }: { draft: VenueAddressDraft | null }) {
   if (!draft || !draft.address) return null;
   return (
-    <p className="text-xs text-nr-text-hint">
-      {draft.address}, {draft.city} {draft.countryCode}
-    </p>
+    <div className="flex flex-col gap-1">
+      <p className="text-xs text-nr-text-hint">
+        {draft.address}, {draft.city} {draft.countryCode}
+      </p>
+      {draft.geo && (
+        <p className="font-mono text-xs text-nr-text-hint">
+          Pinned: {draft.geo.latitude.toFixed(5)}, {draft.geo.longitude.toFixed(5)}
+        </p>
+      )}
+    </div>
   );
+}
+
+type Geo = VenueAddressDraft["geo"];
+
+/** Exact compare is right here: both sides come from the same picker/parse path. */
+function sameGeo(a: Geo, b: Geo): boolean {
+  if (!a || !b) return a === b;
+  return a.latitude === b.latitude && a.longitude === b.longitude;
 }
 
 function VenueAddressPanel({
@@ -96,6 +132,7 @@ function VenueAddressPanel({
   const [address, setAddress] = useState(draft?.address ?? "");
   const [city, setCity] = useState(draft?.city ?? "");
   const [countryCode, setCountryCode] = useState(draft?.countryCode ?? "");
+  const [geo, setGeo] = useState<VenueAddressDraft["geo"]>(draft?.geo ?? null);
 
   if (step.awaitingReview) {
     return (
@@ -126,14 +163,16 @@ function VenueAddressPanel({
           address: address.trim(),
           city: city.trim(),
           countryCode: countryCode.trim().toUpperCase(),
-          // Lat/long is captured on the Night Ride mobile app, which can use
-          // geolocator's mocked-location check (see StepId 'gps' doc comment
-          // in lib/organizer/types.ts) — this webpanel can't verify a manually
-          // typed pin, so it no longer collects one. Preserve whatever the
-          // mobile app already wrote rather than clobbering it back to null
-          // when the applicant only edits the street address here.
-          geo: draft?.geo ?? null,
-          placeId: draft?.placeId ?? "",
+          // A browser pin is advisory — it can't run geolocator's mocked-
+          // location check the way the mobile `gps` step does (see the StepId
+          // doc comment in lib/organizer/types.ts). It is still the applicant's
+          // own claim about where the venue is, which is what an admin needs to
+          // review; the mobile fix is what verifies it later.
+          geo,
+          // `placeId` only means anything alongside the geo it was resolved
+          // for. Nothing here resolves places, so a moved pin invalidates an
+          // id the mobile app wrote; an untouched pin keeps it.
+          placeId: sameGeo(geo, draft?.geo ?? null) ? draft?.placeId ?? "" : "",
         });
       }}
     >
@@ -150,6 +189,7 @@ function VenueAddressPanel({
         value={countryCode}
         onChange={(e) => setCountryCode(e.target.value)}
       />
+      <VenueLocationPicker geo={geo} onChange={setGeo} disabled={busy} />
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <AccentButton type="submit" size="sm" loading={busy}>
@@ -173,12 +213,10 @@ function ProgressBar({ progress }: { progress: number }) {
 function FilePicker({
   label,
   accept,
-  capture,
   onChange,
 }: {
   label: string;
   accept: string;
-  capture?: boolean;
   onChange: (file: File | null) => void;
 }) {
   return (
@@ -187,7 +225,6 @@ function FilePicker({
       <input
         type="file"
         accept={accept}
-        {...(capture ? { capture: "environment" } : {})}
         onChange={(e) => onChange(e.target.files?.[0] ?? null)}
         className="rounded-lg border border-nr-border bg-nr-surface-raised px-3 py-2 text-xs text-nr-text-primary file:mr-3 file:rounded file:border-0 file:bg-[var(--org-accent)] file:px-2.5 file:py-1 file:text-nr-bg"
       />
@@ -200,25 +237,15 @@ function UploadPanel({
   busy,
   error,
   progress,
-  onUploadNic,
-  onUploadSelfie,
   onUploadVideo,
 }: {
   step: StepView;
   busy: boolean;
   error: string;
   progress: number;
-  onUploadNic: (front: File, back: File) => void;
-  onUploadSelfie: (file: File) => void;
   onUploadVideo: (file: File) => void;
 }) {
-  const isNic = step.id === "nic";
-  const isVideo = step.id === "video";
-  const accept = isVideo ? "video/mp4" : "image/jpeg,image/png";
-
-  const [front, setFront] = useState<File | null>(null);
-  const [back, setBack] = useState<File | null>(null);
-  const [single, setSingle] = useState<File | null>(null);
+  const [video, setVideo] = useState<File | null>(null);
 
   if (step.awaitingReview) {
     return (
@@ -239,48 +266,26 @@ function UploadPanel({
     );
   }
 
-  const ready = isNic ? Boolean(front && back) : Boolean(single);
-
   return (
     <form
       className="flex w-full flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (isNic) {
-          if (front && back) onUploadNic(front, back);
-        } else if (isVideo) {
-          if (single) onUploadVideo(single);
-        } else if (single) {
-          onUploadSelfie(single);
-        }
+        if (video) onUploadVideo(video);
       }}
     >
       <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
       {step.note && <AdminNote note={step.note} />}
 
-      {isNic ? (
-        <>
-          <FilePicker label="Front of ID" accept={accept} onChange={setFront} />
-          <FilePicker label="Back of ID" accept={accept} onChange={setBack} />
-        </>
-      ) : (
-        <FilePicker
-          label={isVideo ? "Walkthrough video" : "Selfie"}
-          accept={accept}
-          capture={!isNic}
-          onChange={setSingle}
-        />
-      )}
+      <FilePicker label="Walkthrough video" accept="video/mp4" onChange={setVideo} />
 
-      <p className="text-[11px] text-nr-text-hint">
-        {isVideo ? "MP4, up to 60 seconds, 30 MB max." : "JPEG or PNG, 6 MB max."}
-      </p>
+      <p className="text-[11px] text-nr-text-hint">MP4, up to 60 seconds, 30 MB max.</p>
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {busy && progress > 0 && <ProgressBar progress={progress} />}
 
-      <AccentButton type="submit" size="sm" loading={busy} disabled={!ready}>
+      <AccentButton type="submit" size="sm" loading={busy} disabled={!video}>
         Upload
       </AccentButton>
     </form>

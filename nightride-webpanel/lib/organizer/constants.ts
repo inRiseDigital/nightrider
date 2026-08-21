@@ -43,8 +43,15 @@ export const IS_DEV = process.env.NODE_ENV !== "production";
 
 /**
  * The five checks every organizer completes, in schema order: venueAddress
- * gates gps, and the three identity/venue uploads can happen any time in
+ * gates gps, and the identity/venue evidence steps can happen any time in
  * between.
+ *
+ * nic and selfie are `kind: "app"`: both are live captures — a scan of a
+ * physical ID and a face shot taken on the spot — and a browser file picker
+ * cannot tell a live capture from a saved image, so the Night Ride app owns
+ * them (camera + Storage upload, see Nightride/lib/pages/organizer/verify/).
+ * This panel only reports their state. The walkthrough video stays a browser
+ * upload: it is footage of a venue, not a liveness check.
  */
 export const BASE_STEPS: BaseStepDef[] = [
   {
@@ -56,14 +63,16 @@ export const BASE_STEPS: BaseStepDef[] = [
   {
     id: "nic",
     label: "NIC / ID Scan",
-    detail: "Upload a clear photo of the front and back of your government ID.",
-    kind: "upload",
+    detail: "Open the Night Ride app and scan the front and back of your government ID.",
+    kind: "app",
+    thumbLabel: "nic front + back photo\npending",
   },
   {
     id: "selfie",
     label: "Live Selfie",
-    detail: "Upload a live selfie so we can match it to your ID.",
-    kind: "upload",
+    detail: "Open the Night Ride app and take a live selfie so we can match it to your ID.",
+    kind: "app",
+    thumbLabel: "live selfie\npending",
   },
   {
     id: "video",
@@ -80,11 +89,14 @@ export const BASE_STEPS: BaseStepDef[] = [
   },
 ];
 
-/** Client-side pre-checks — the Storage rule enforces the same limits server-side. */
-export const KYC_IMAGE_MAX_BYTES = 6 * 1024 * 1024;
+/**
+ * Client-side pre-checks — the Storage rule enforces the same limits
+ * server-side. Only the video step uploads from the browser now, so these
+ * cover the walkthrough and the poster frame extracted from it; the nic and
+ * selfie image limits live in the mobile app.
+ */
 export const KYC_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
 export const KYC_POSTER_MAX_BYTES = 2 * 1024 * 1024;
-export const KYC_IMAGE_TYPES = ["image/jpeg", "image/png"];
 export const KYC_VIDEO_TYPE = "video/mp4";
 
 export const STEP_STATUS_STYLES: Record<StepStatus, StepStatusStyle> = {

@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Fills the local Firebase emulator (Auth + Firestore + Storage) with realistic Night Ride data matching docs/FIRESTORE_SCHEMA.md, for developing the Flutter app and the webpanel against.",
   "scripts": {
-    "seed": "node seed.mjs"
+    "seed": "node seed.mjs",
+    "seed:prod-test": "node seed-production-test-data.mjs",
+    "unseed:prod-test": "node unseed-production-test-data.mjs"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0"

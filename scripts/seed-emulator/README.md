@@ -122,3 +122,43 @@ way.
 
 Passwords are printed at the end of every run — they're also fixed strings in
 `seed.mjs` (search for `ACCOUNTS`) if you need them before that.
+
+## Production test data (`seed-production-test-data.mjs`)
+
+Separate from everything above. `seed.mjs` refuses to run anywhere but the
+emulator by design; this pair is the opposite — it only ever runs against the
+live `nightride-a9173` project, with a real
+`firebase_service_account.json` at the repo root, and every uid/document id it
+writes is prefixed `test-`.
+
+```bash
+cd scripts/seed-emulator
+npm run seed:prod-test   -- --i-know-this-is-production
+npm run unseed:prod-test -- --i-know-this-is-production   # deletes exactly what the above wrote
+```
+
+Both scripts refuse to do anything without the flag. The unseed script also
+re-checks that every id it is about to delete starts with `test-` — the Admin
+SDK bypasses `firestore.rules`, so a dropped prefix would otherwise delete a
+real document.
+
+What gets written: 5 Auth users + `users/{uid}` documents (admin, plain rider,
+and organizers at approved / mid-verification / rejected), the matching
+create-once `users/{uid}/private/organizerReview` verdict documents, one
+`venues/{id}` owned by the approved organizer, and 3 `events/{id}`
+(published-by-organizer, draft, admin-entered).
+
+| Email | Role |
+|---|---|
+| `test-admin@nightride.test` | `isAdmin: true` |
+| `test-rider@nightride.test` | Plain user |
+| `test-organizer-verified@nightride.test` | `organizerStatus: 'approved'`, owns the test venue |
+| `test-organizer-pending@nightride.test` | Submitted, untriaged (`organizerStatus: 'none'`) |
+| `test-organizer-rejected@nightride.test` | `organizerStatus: 'rejected'` |
+
+Passwords are printed at the end of the run, and are fixed strings in
+`ACCOUNTS` in the script.
+
+No Storage objects are written, so the KYC review panes render as missing
+files for these accounts — enough to exercise the queue and the verdict
+states, not enough to review an image.

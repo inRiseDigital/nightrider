@@ -57,12 +57,12 @@ export function EventEditor() {
     <div className="max-w-[760px]">
       <button
         onClick={closeEditor}
-        className="mb-3.5 flex items-center gap-1.5 text-xs text-nr-primary-light hover:text-nr-accent"
+        className="mb-3.5 flex items-center gap-1.5 text-xs text-[var(--m3-ter)] hover:text-[var(--m3-warn)]"
       >
         <ArrowLeft size={13} /> Back to events
       </button>
 
-      <div className="flex flex-col gap-[18px] rounded-lg border border-nr-border bg-nr-surface p-5">
+      <div className="flex flex-col gap-[18px] rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-5">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[2fr_1fr]">
           <div>
             <FieldLabel className="mb-1.5">Event name</FieldLabel>
@@ -140,7 +140,7 @@ export function EventEditor() {
             />
             <button
               onClick={addLineup}
-              className="whitespace-nowrap rounded-lg border border-nr-border bg-nr-surface-raised px-4 text-xs font-semibold text-nr-text-primary hover:border-nr-primary/50"
+              className="whitespace-nowrap rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf2)] px-4 text-xs font-semibold text-[var(--m3-on)] hover:border-[var(--m3-pri)]/50"
             >
               Add
             </button>
@@ -149,12 +149,12 @@ export function EventEditor() {
             {eventDraft.lineup.map((name, i) => (
               <span
                 key={`${name}-${i}`}
-                className="flex items-center gap-1.5 rounded-full border border-nr-primary/30 bg-nr-primary/10 px-2.5 py-1.5 text-xs text-nr-primary"
+                className="flex items-center gap-1.5 rounded-full border border-[var(--m3-pri)]/30 bg-[var(--m3-pri)]/10 px-2.5 py-1.5 text-xs text-[var(--m3-pri)]"
               >
                 {name}
                 <button
                   onClick={() => removeLineup(i)}
-                  className="text-nr-text-secondary hover:text-nr-text-primary"
+                  className="text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
                   aria-label={`Remove ${name}`}
                 >
                   <X size={11} />
@@ -169,16 +169,16 @@ export function EventEditor() {
             <FieldLabel>Ticket tiers</FieldLabel>
             <button
               onClick={addTier}
-              className="text-xs font-semibold text-nr-primary hover:text-nr-primary-dark"
+              className="text-xs font-semibold text-[var(--m3-pri)] hover:text-[var(--m3-pric)]"
             >
               + Add tier
             </button>
           </div>
           {eventDraft.tiers.length === 0 ? (
-            <p className="py-1.5 text-xs text-nr-text-hint">No ticket tiers yet.</p>
+            <p className="py-1.5 text-xs text-[var(--m3-outline)]">No ticket tiers yet.</p>
           ) : (
             eventDraft.tiers.map((tier, i) => (
-              <div key={i} className="flex items-center gap-2.5 border-b border-nr-border/60 py-2">
+              <div key={i} className="flex items-center gap-2.5 border-b border-[var(--m3-outlinev)] py-2">
                 <SlimInput
                   value={tier.name}
                   onChange={(e) => updateTier(i, "name", e.target.value)}
@@ -203,7 +203,7 @@ export function EventEditor() {
                 />
                 <button
                   onClick={() => removeTier(i)}
-                  className="px-1 text-nr-text-hint hover:text-red-400"
+                  className="px-1 text-[var(--m3-outline)] hover:text-red-400"
                   aria-label={`Remove tier ${tier.name}`}
                 >
                   <X size={14} />
@@ -221,15 +221,15 @@ export function EventEditor() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-nr-border bg-nr-surface-raised p-3.5">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf2)] p-3.5">
           <Toggle
             checked={eventDraft.recurring}
             onChange={() => updateDraft("recurring", !eventDraft.recurring)}
             label="Recurring residency"
           />
           <div className="flex-1">
-            <p className="text-[13px] font-semibold text-nr-text-primary">Recurring residency</p>
-            <p className="mt-px text-[11px] text-nr-text-hint">
+            <p className="text-[13px] font-semibold text-[var(--m3-on)]">Recurring residency</p>
+            <p className="mt-px text-[11px] text-[var(--m3-outline)]">
               e.g. &ldquo;Techno Fridays&rdquo; — repeats without re-entering it every week
             </p>
           </div>
@@ -238,7 +238,7 @@ export function EventEditor() {
               value={eventDraft.recurrenceLabel}
               onChange={(e) => updateDraft("recurrenceLabel", e.target.value)}
               placeholder="Every Friday"
-              className="w-[160px] bg-nr-surface py-2 text-xs"
+              className="w-[160px] bg-[var(--m3-surf1)] py-2 text-xs"
             />
           )}
         </div>
@@ -258,44 +258,44 @@ export function EventEditor() {
         {isEditingExisting && (
           <button
             onClick={() => updateDraft("notifyOnChange", !eventDraft.notifyOnChange)}
-            className="flex items-center gap-2.5 rounded-lg border border-nr-border bg-nr-surface-raised px-3.5 py-3 text-left"
+            className="flex items-center gap-2.5 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf2)] px-3.5 py-3 text-left"
           >
             <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-nr-primary-light text-[10px] text-nr-bg ${
-                eventDraft.notifyOnChange ? "bg-nr-primary-light" : "bg-transparent"
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[var(--m3-ter)] text-[10px] text-[var(--m3-onpri)] ${
+                eventDraft.notifyOnChange ? "bg-[var(--m3-ter)]" : "bg-transparent"
               }`}
             >
               {eventDraft.notifyOnChange ? "✓" : ""}
             </span>
-            <span className="text-xs text-nr-text-secondary">
+            <span className="text-xs text-[var(--m3-onv)]">
               Notify everyone who saved this event if I change the date, price, or lineup
             </span>
           </button>
         )}
 
         {moderation && (
-          <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-nr-border bg-nr-surface-raised px-3.5 py-3">
+          <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf2)] px-3.5 py-3">
             <StatusChip label={moderation.label} className={moderation.className} size="sm" />
-            <span className="text-[11px] text-nr-text-secondary">{eventDraft.moderationEta}</span>
+            <span className="text-[11px] text-[var(--m3-onv)]">{eventDraft.moderationEta}</span>
           </div>
         )}
 
-        <div className="flex flex-wrap justify-end gap-2.5 border-t border-nr-border/60 pt-4">
+        <div className="flex flex-wrap justify-end gap-2.5 border-t border-[var(--m3-outlinev)] pt-4">
           <button
             onClick={closeEditor}
-            className="rounded-lg px-4 py-2.5 text-[13px] font-semibold text-nr-text-secondary hover:text-nr-text-primary"
+            className="rounded-lg px-4 py-2.5 text-[13px] font-semibold text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
           >
             Discard
           </button>
           <button
             onClick={saveDraftEvent}
-            className="rounded-lg border border-nr-border px-4 py-2.5 text-[13px] font-semibold text-nr-text-primary hover:border-nr-primary/50"
+            className="rounded-lg border border-[var(--m3-outlinev)] px-4 py-2.5 text-[13px] font-semibold text-[var(--m3-on)] hover:border-[var(--m3-pri)]/50"
           >
             Save as Draft
           </button>
           <button
             onClick={submitEvent}
-            className="rounded-lg bg-nr-accent px-[18px] py-2.5 text-[13px] font-semibold text-nr-bg hover:bg-nr-accent/80"
+            className="rounded-lg bg-[var(--m3-warn)] px-[18px] py-2.5 text-[13px] font-semibold text-[var(--m3-onpri)] hover:bg-[var(--m3-warn)]/80"
           >
             {eventDraft.scheduledPublish ? "Schedule Publish" : "Submit for Review"}
           </button>

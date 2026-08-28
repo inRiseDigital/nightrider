@@ -46,10 +46,10 @@ export function VenueAppPreview() {
       <SectionEyebrow>Live preview — how it appears in the app</SectionEyebrow>
 
       {/* Map / list card */}
-      <div className="overflow-hidden rounded-2xl border border-nr-border bg-nr-surface">
+      <div className="overflow-hidden rounded-2xl border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)]">
         <div className="relative h-[150px]">
           <ImageSlot slotId={hero} placeholder="Hero image" rounded="rounded-none" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent from-40% to-nr-bg/90" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent from-40% to-[var(--m3-surf)]/90" />
           <div className="pointer-events-none absolute right-2.5 top-2.5">
             <StatusChip
               label={openToday ? "OPEN TODAY" : "CLOSED TODAY"}
@@ -62,10 +62,10 @@ export function VenueAppPreview() {
             />
           </div>
           <div className="pointer-events-none absolute bottom-2.5 left-3 right-3">
-            <p className="font-display text-base uppercase tracking-wide text-nr-text-primary">
+            <p className="font-display text-base uppercase tracking-wide text-[var(--m3-on)]">
               {profile.name}
             </p>
-            <p className="mt-0.5 text-[11px] text-nr-text-secondary">{profile.city}</p>
+            <p className="mt-0.5 text-[11px] text-[var(--m3-onv)]">{profile.city}</p>
           </div>
         </div>
         <div className="flex flex-col gap-2 p-3">
@@ -73,13 +73,13 @@ export function VenueAppPreview() {
             {profile.genres.slice(0, 2).map((g) => (
               <span
                 key={g}
-                className="rounded-full border border-nr-primary-light/30 bg-nr-primary-light/10 px-2 py-0.5 text-[10px] font-semibold text-nr-primary-light"
+                className="rounded-full border border-[var(--m3-ter)]/30 bg-[var(--m3-ter)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--m3-ter)]"
               >
                 {g}
               </span>
             ))}
           </div>
-          <div className="flex justify-between font-mono text-[11px] text-nr-text-secondary">
+          <div className="flex justify-between font-mono text-[11px] text-[var(--m3-onv)]">
             <span>{coverText(profile)}</span>
             <span>{capacityText(profile)}</span>
           </div>
@@ -87,7 +87,7 @@ export function VenueAppPreview() {
       </div>
 
       {/* Detail sheet */}
-      <div className="overflow-hidden rounded-2xl border border-nr-border bg-nr-surface">
+      <div className="overflow-hidden rounded-2xl border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)]">
         <div className="relative h-[150px]">
           <ImageSlot slotId={hero} placeholder="Hero image" rounded="rounded-none" />
         </div>
@@ -105,8 +105,8 @@ export function VenueAppPreview() {
         </div>
         <div className="flex flex-col gap-3 p-4">
           <div>
-            <p className="font-display text-lg uppercase text-nr-text-primary">{profile.name}</p>
-            <p className="mt-0.5 text-xs text-nr-text-secondary">
+            <p className="font-display text-lg uppercase text-[var(--m3-on)]">{profile.name}</p>
+            <p className="mt-0.5 text-xs text-[var(--m3-onv)]">
               {profile.city} · {profile.dressCode} · {profile.agePolicy}
             </p>
           </div>
@@ -114,18 +114,18 @@ export function VenueAppPreview() {
             {[...profile.genres, ...profile.amenities].map((label) => (
               <span
                 key={label}
-                className="rounded-full border border-nr-primary-light/30 bg-nr-primary-light/10 px-2.5 py-0.5 text-[10px] font-semibold text-nr-primary-light"
+                className="rounded-full border border-[var(--m3-ter)]/30 bg-[var(--m3-ter)]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[var(--m3-ter)]"
               >
                 {label}
               </span>
             ))}
           </div>
-          <div className="flex justify-between border-t border-nr-border/60 pt-2.5 font-mono text-xs text-nr-text-secondary">
+          <div className="flex justify-between border-t border-[var(--m3-outlinev)] pt-2.5 font-mono text-xs text-[var(--m3-onv)]">
             <span>Cover {coverText(profile)}</span>
             <span>{capacityText(profile)}</span>
           </div>
-          <p className="text-xs text-nr-text-primary">
-            <span className="text-nr-text-secondary">Today: </span>
+          <p className="text-xs text-[var(--m3-on)]">
+            <span className="text-[var(--m3-onv)]">Today: </span>
             {hoursTextFor(profile, dayIdx)}
           </p>
           {nextException && (
@@ -137,8 +137,8 @@ export function VenueAppPreview() {
             <span
               className={`flex-1 rounded-lg border px-2 py-2.5 text-center text-xs font-semibold ${
                 profile.tableLink
-                  ? "border-nr-primary bg-nr-primary text-nr-text-primary"
-                  : "border-nr-border text-nr-text-hint"
+                  ? "border-[var(--m3-pri)] bg-[var(--m3-pri)] text-[var(--m3-on)]"
+                  : "border-[var(--m3-outlinev)] text-[var(--m3-outline)]"
               }`}
             >
               {profile.tableLink ? "Reserve a Table" : "Add table link"}
@@ -147,7 +147,7 @@ export function VenueAppPreview() {
               href={directionsHref}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 rounded-lg bg-nr-primary-light px-2 py-2.5 text-center text-xs font-semibold text-nr-bg hover:opacity-90"
+              className="flex-1 rounded-lg bg-[var(--m3-ter)] px-2 py-2.5 text-center text-xs font-semibold text-[var(--m3-onpri)] hover:opacity-90"
             >
               Get Directions
             </a>

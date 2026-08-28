@@ -81,7 +81,7 @@ export function AiVisibilitySection() {
   const badgeFor = (pass: boolean | null) => {
     if (pass === true) return { mark: "✓", className: "bg-emerald-500/10 text-emerald-400" };
     if (pass === false) return { mark: "!", className: "bg-red-500/10 text-red-400" };
-    return { mark: "?", className: "bg-white/5 text-nr-text-secondary" };
+    return { mark: "?", className: "bg-white/5 text-[var(--m3-onv)]" };
   };
 
   return (
@@ -94,31 +94,31 @@ export function AiVisibilitySection() {
       />
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
           <FieldLabel>Recommended by the AI companion this week</FieldLabel>
-          <p className="mt-2 font-display text-[32px] leading-none text-nr-text-primary">
+          <p className="mt-2 font-display text-[32px] leading-none text-[var(--m3-on)]">
             {MOCK_AI_RECOMMEND_COUNT}
           </p>
         </div>
-        <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
           <FieldLabel className="mb-2.5">By intent</FieldLabel>
           {MOCK_AI_INTENTS.map((i) => (
             <div key={i.label} className="flex justify-between py-0.5 text-xs">
-              <span className="text-nr-text-primary">&ldquo;{i.label}&rdquo;</span>
-              <span className="font-mono text-nr-text-secondary">{i.count}</span>
+              <span className="text-[var(--m3-on)]">&ldquo;{i.label}&rdquo;</span>
+              <span className="font-mono text-[var(--m3-onv)]">{i.count}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+      <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
         <FieldLabel className="mb-3.5">Why am I not being recommended more?</FieldLabel>
         {diagnostics.map((d) => {
           const badge = badgeFor(d.pass);
           return (
             <div
               key={d.label}
-              className="flex flex-wrap items-center gap-3 border-b border-nr-border/60 py-3 last:border-b-0"
+              className="flex flex-wrap items-center gap-3 border-b border-[var(--m3-outlinev)] py-3 last:border-b-0"
             >
               <span
                 className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-xs font-bold ${badge.className}`}
@@ -126,13 +126,13 @@ export function AiVisibilitySection() {
                 {badge.mark}
               </span>
               <div className="min-w-[200px] flex-1">
-                <p className="text-[13px] font-semibold text-nr-text-primary">{d.label}</p>
-                <p className="mt-px text-[11px] text-nr-text-hint">{d.hint}</p>
+                <p className="text-[13px] font-semibold text-[var(--m3-on)]">{d.label}</p>
+                <p className="mt-px text-[11px] text-[var(--m3-outline)]">{d.hint}</p>
               </div>
               {d.ctaLabel && (
                 <button
                   onClick={d.onCta}
-                  className="whitespace-nowrap text-xs font-semibold text-nr-primary-light hover:text-nr-accent"
+                  className="whitespace-nowrap text-xs font-semibold text-[var(--m3-ter)] hover:text-[var(--m3-warn)]"
                 >
                   {d.ctaLabel}
                 </button>

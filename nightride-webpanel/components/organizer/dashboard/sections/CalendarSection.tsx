@@ -47,15 +47,15 @@ export function CalendarSection() {
       <div className="mb-3.5 flex items-center gap-3.5">
         <button
           onClick={() => shiftCalendar(-1)}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-nr-border bg-nr-surface-raised text-nr-text-primary hover:border-nr-primary/50"
+          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf2)] text-[var(--m3-on)] hover:border-[var(--m3-pri)]/50"
           aria-label="Previous month"
         >
           <ChevronLeft size={15} />
         </button>
-        <p className="font-mono text-xs text-nr-text-secondary">{calendar?.label ?? "—"}</p>
+        <p className="font-mono text-xs text-[var(--m3-onv)]">{calendar?.label ?? "—"}</p>
         <button
           onClick={() => shiftCalendar(1)}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-nr-border bg-nr-surface-raised text-nr-text-primary hover:border-nr-primary/50"
+          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf2)] text-[var(--m3-on)] hover:border-[var(--m3-pri)]/50"
           aria-label="Next month"
         >
           <ChevronRight size={15} />
@@ -64,7 +64,7 @@ export function CalendarSection() {
 
       <div className="grid grid-cols-7 gap-1.5">
         {DAYS.map((d) => (
-          <p key={d} className="pb-1 text-center font-mono text-[11px] text-nr-text-hint">
+          <p key={d} className="pb-1 text-center font-mono text-[11px] text-[var(--m3-outline)]">
             {d}
           </p>
         ))}
@@ -76,13 +76,13 @@ export function CalendarSection() {
             <button
               key={cell.key}
               onClick={() => onCellClick(cell.dateISO)}
-              className={`min-h-[82px] rounded-lg border border-nr-border/60 p-2 text-left transition-colors hover:border-nr-primary hover:bg-white/5 ${
-                cell.isClosed ? "bg-white/[0.02]" : "bg-nr-surface"
+              className={`min-h-[82px] rounded-lg border border-[var(--m3-outlinev)] p-2 text-left transition-colors hover:border-[var(--m3-pri)] hover:bg-white/5 ${
+                cell.isClosed ? "bg-white/[0.02]" : "bg-[var(--m3-surf1)]"
               }`}
             >
               <span
                 className={`font-mono text-[11px] ${
-                  cell.isClosed ? "text-nr-text-hint/70" : "text-nr-text-secondary"
+                  cell.isClosed ? "text-[var(--m3-outline)]/70" : "text-[var(--m3-onv)]"
                 }`}
               >
                 {cell.dayNum}
@@ -90,13 +90,13 @@ export function CalendarSection() {
               {cell.events.map((e) => (
                 <span
                   key={e.id}
-                  className="mt-1 block truncate rounded bg-nr-primary/10 px-1.5 py-0.5 text-[10px] text-nr-primary"
+                  className="mt-1 block truncate rounded bg-[var(--m3-pri)]/10 px-1.5 py-0.5 text-[10px] text-[var(--m3-pri)]"
                 >
                   {e.name}
                 </span>
               ))}
               {cell.isClosed && (
-                <span className="mt-1 block truncate text-[10px] text-nr-text-hint">
+                <span className="mt-1 block truncate text-[10px] text-[var(--m3-outline)]">
                   {cell.closedLabel}
                 </span>
               )}
@@ -106,7 +106,7 @@ export function CalendarSection() {
       </div>
 
       {!calendar && (
-        <p className="mt-4 font-mono text-[11px] text-nr-text-hint">Loading calendar…</p>
+        <p className="mt-4 font-mono text-[11px] text-[var(--m3-outline)]">Loading calendar…</p>
       )}
     </>
   );

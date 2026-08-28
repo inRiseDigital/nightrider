@@ -58,7 +58,7 @@ export function VenuesSection() {
         trailing={
           <button
             onClick={openAddVenue}
-            className="rounded-lg border border-nr-border px-4 py-2 text-[13px] font-semibold text-nr-accent hover:border-nr-accent/50"
+            className="rounded-lg border border-[var(--m3-outlinev)] px-4 py-2 text-[13px] font-semibold text-[var(--m3-warn)] hover:border-[var(--m3-warn)]/50"
           >
             + Add Venue
           </button>
@@ -66,8 +66,8 @@ export function VenuesSection() {
       />
 
       {addingVenue && (
-        <div className="mb-5 flex max-w-[480px] flex-col gap-3 rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-          <p className="text-[13px] font-semibold text-nr-text-primary">Add a new venue</p>
+        <div className="mb-5 flex max-w-[480px] flex-col gap-3 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+          <p className="text-[13px] font-semibold text-[var(--m3-on)]">Add a new venue</p>
           <SlimInput
             value={newVenueName}
             onChange={(e) => setNewVenueName(e.target.value)}
@@ -81,13 +81,13 @@ export function VenuesSection() {
           <div className="flex justify-end gap-2.5">
             <button
               onClick={cancelAddVenue}
-              className="rounded-lg px-4 py-2.5 text-xs font-semibold text-nr-text-secondary hover:text-nr-text-primary"
+              className="rounded-lg px-4 py-2.5 text-xs font-semibold text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
             >
               Cancel
             </button>
             <button
               onClick={createVenue}
-              className="rounded-lg bg-nr-accent px-4 py-2.5 text-xs font-semibold text-nr-bg hover:bg-nr-accent/80"
+              className="rounded-lg bg-[var(--m3-warn)] px-4 py-2.5 text-xs font-semibold text-[var(--m3-onpri)] hover:bg-[var(--m3-warn)]/80"
             >
               Create &amp; Verify
             </button>
@@ -100,15 +100,15 @@ export function VenuesSection() {
       ) : (
         <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1.3fr_1fr]">
           <div className="min-w-0">
-            <div className="mb-[18px] flex gap-5 border-b border-nr-border">
+            <div className="mb-[18px] flex gap-5 border-b border-[var(--m3-outlinev)]">
               {TABS.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setVenueTab(t.id)}
                   className={`border-b-2 px-0.5 py-2.5 text-[13px] font-semibold transition-colors ${
                     venueTab === t.id
-                      ? "border-nr-primary text-nr-text-primary"
-                      : "border-transparent text-nr-text-secondary hover:text-nr-text-primary"
+                      ? "border-[var(--m3-pri)] text-[var(--m3-on)]"
+                      : "border-transparent text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
                   }`}
                 >
                   {t.label}
@@ -117,7 +117,7 @@ export function VenuesSection() {
             </div>
 
             {venueTab === "gallery" && (
-              <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+              <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
                 <FieldLabel className="mb-2.5">
                   Hero image — shown on your card and at the top of your detail page
                 </FieldLabel>
@@ -158,7 +158,7 @@ function RemoveImageButton({ onClick, small }: { onClick: () => void; small?: bo
       onClick={onClick}
       title="Remove image"
       aria-label="Remove image"
-      className={`absolute left-2 top-2 z-10 flex items-center justify-center rounded-full border border-nr-border bg-nr-bg/80 text-nr-text-primary hover:bg-nr-bg ${
+      className={`absolute left-2 top-2 z-10 flex items-center justify-center rounded-full border border-[var(--m3-outlinev)] bg-[var(--m3-surf)]/80 text-[var(--m3-on)] hover:bg-[var(--m3-surf)] ${
         small ? "h-5 w-5" : "h-6 w-6"
       }`}
     >
@@ -171,7 +171,7 @@ function AttributesTab() {
   const { profile, editingVenue, toggleVenueSetValue, setVenueField } = useOrganizerDashboard();
 
   return (
-    <div className="flex flex-col gap-[22px] rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+    <div className="flex flex-col gap-[22px] rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
       <ChipGroup
         label="Music genres"
         options={GENRES}
@@ -275,14 +275,14 @@ function HoursTab() {
 
   return (
     <>
-      <div className="mb-4 rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+      <div className="mb-4 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
         <FieldLabel className="mb-3">Regular opening hours</FieldLabel>
         {profile.hours.map((h, i) => (
           <div
             key={h.day}
-            className="flex flex-wrap items-center gap-3 border-b border-nr-border/60 py-2.5 last:border-b-0"
+            className="flex flex-wrap items-center gap-3 border-b border-[var(--m3-outlinev)] py-2.5 last:border-b-0"
           >
-            <span className="w-[38px] text-[13px] font-semibold text-nr-text-primary">{h.day}</span>
+            <span className="w-[38px] text-[13px] font-semibold text-[var(--m3-on)]">{h.day}</span>
             <button
               onClick={() => toggleDayClosed(editingVenue, i)}
               className={`w-16 rounded-full border px-2.5 py-1 text-center font-mono text-[11px] font-semibold ${closedPill(
@@ -300,7 +300,7 @@ function HoursTab() {
                   onChange={(e) => setHourField(editingVenue, i, "open", e.target.value)}
                   className="py-1.5 text-xs"
                 />
-                <span className="text-xs text-nr-text-hint">to</span>
+                <span className="text-xs text-[var(--m3-outline)]">to</span>
                 <SlimInput
                   type="time"
                   mono
@@ -314,25 +314,25 @@ function HoursTab() {
         ))}
       </div>
 
-      <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+      <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
         <div className="mb-3 flex items-center justify-between">
           <FieldLabel>Exceptions — holidays, private hire, closures</FieldLabel>
           <button
             onClick={() => addException(editingVenue)}
-            className="text-xs font-semibold text-nr-primary hover:text-nr-primary-dark"
+            className="text-xs font-semibold text-[var(--m3-pri)] hover:text-[var(--m3-pric)]"
           >
             + Add exception
           </button>
         </div>
         {profile.exceptions.length === 0 ? (
-          <p className="py-2 text-xs text-nr-text-hint">
+          <p className="py-2 text-xs text-[var(--m3-outline)]">
             No exceptions set — regular hours apply every week.
           </p>
         ) : (
           profile.exceptions.map((ex, i) => (
             <div
               key={i}
-              className="flex flex-wrap items-center gap-2.5 border-b border-nr-border/60 py-2.5 last:border-b-0"
+              className="flex flex-wrap items-center gap-2.5 border-b border-[var(--m3-outlinev)] py-2.5 last:border-b-0"
             >
               <SlimInput
                 value={ex.label}
@@ -357,7 +357,7 @@ function HoursTab() {
               </button>
               <button
                 onClick={() => removeException(editingVenue, i)}
-                className="px-1 text-nr-text-hint hover:text-red-400"
+                className="px-1 text-[var(--m3-outline)] hover:text-red-400"
                 aria-label={`Remove exception ${ex.label}`}
               >
                 <X size={14} />
@@ -373,7 +373,7 @@ function HoursTab() {
 function LinksTab() {
   const { profile, editingVenue, setVenueField } = useOrganizerDashboard();
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+    <div className="flex flex-col gap-4 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
       <div>
         <FieldLabel className="mb-1.5">Table / booking link</FieldLabel>
         <SlimInput

@@ -39,22 +39,22 @@ export function SettingsSection() {
   return (
     <>
       <div className="flex max-w-[600px] flex-col gap-4">
-        <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
           <FieldLabel className="mb-3.5">Account</FieldLabel>
           {accountRows.map((row) => (
             <div
               key={row.field}
-              className="flex items-center justify-between gap-3 border-b border-nr-border/60 py-2.5 last:border-b-0"
+              className="flex items-center justify-between gap-3 border-b border-[var(--m3-outlinev)] py-2.5 last:border-b-0"
             >
               <div className="min-w-0">
-                <p className="text-xs text-nr-text-secondary">{row.label}</p>
-                <p className="mt-0.5 truncate font-mono text-[13px] text-nr-text-primary">
+                <p className="text-xs text-[var(--m3-onv)]">{row.label}</p>
+                <p className="mt-0.5 truncate font-mono text-[13px] text-[var(--m3-on)]">
                   {row.value}
                 </p>
               </div>
               <button
                 onClick={() => startChangeField(row.field)}
-                className="shrink-0 text-xs font-semibold text-nr-primary-light hover:text-nr-accent"
+                className="shrink-0 text-xs font-semibold text-[var(--m3-ter)] hover:text-[var(--m3-warn)]"
               >
                 Change
               </button>
@@ -62,26 +62,26 @@ export function SettingsSection() {
           ))}
         </div>
 
-        <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
           <FieldLabel className="mb-1">Identity verification</FieldLabel>
-          <p className="mb-3.5 text-[11px] text-nr-text-hint">
+          <p className="mb-3.5 text-[11px] text-[var(--m3-outline)]">
             Completed during your organizer application. To redo any of these, apply through the
             mobile app.
           </p>
           {VERIFICATION_ROWS.map((v) => (
             <div
               key={v.label}
-              className="flex flex-wrap items-center justify-between gap-3 border-b border-nr-border/60 py-2.5 last:border-b-0"
+              className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--m3-outlinev)] py-2.5 last:border-b-0"
             >
               <div>
-                <p className="text-[13px] text-nr-text-primary">{v.label}</p>
-                <p className="mt-0.5 text-[11px] text-nr-text-hint">{v.detail}</p>
+                <p className="text-[13px] text-[var(--m3-on)]">{v.label}</p>
+                <p className="mt-0.5 text-[11px] text-[var(--m3-outline)]">{v.detail}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-bold tracking-wider text-emerald-400">
                   VERIFIED
                 </span>
-                <span className="rounded-full border border-nr-border px-2.5 py-0.5 font-mono text-[10px] tracking-wider text-nr-text-hint">
+                <span className="rounded-full border border-[var(--m3-outlinev)] px-2.5 py-0.5 font-mono text-[10px] tracking-wider text-[var(--m3-outline)]">
                   IMMUTABLE
                 </span>
               </div>
@@ -120,7 +120,7 @@ export function SettingsSection() {
           </div>
         ) : (
           <div>
-            <p className="mb-3 text-xs leading-relaxed text-nr-text-secondary">
+            <p className="mb-3 text-xs leading-relaxed text-[var(--m3-onv)]">
               We sent a code to {changeValue}. Enter it to confirm the change.
             </p>
             <SlimInput

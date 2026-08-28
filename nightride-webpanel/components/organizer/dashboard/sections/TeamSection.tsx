@@ -20,7 +20,7 @@ export function TeamSection() {
 
   return (
     <>
-      <div className="mb-4 rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+      <div className="mb-4 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
         <FieldLabel className="mb-2.5">Invite staff — scoped roles</FieldLabel>
         <div className="mb-2.5 flex flex-wrap gap-2.5">
           <SlimInput
@@ -50,31 +50,31 @@ export function TeamSection() {
         </div>
         <button
           onClick={addTeamMember}
-          className="rounded-lg bg-nr-accent px-4 py-2.5 text-xs font-semibold text-nr-bg hover:bg-nr-accent/80"
+          className="rounded-lg bg-[var(--m3-warn)] px-4 py-2.5 text-xs font-semibold text-[var(--m3-onpri)] hover:bg-[var(--m3-warn)]/80"
         >
           + Invite
         </button>
       </div>
 
-      <div className="mb-4 overflow-hidden rounded-lg border border-nr-border bg-nr-surface">
+      <div className="mb-4 overflow-hidden rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)]">
         {team.length === 0 ? (
-          <p className="px-[18px] py-5 text-xs text-nr-text-hint">No team members yet.</p>
+          <p className="px-[18px] py-5 text-xs text-[var(--m3-outline)]">No team members yet.</p>
         ) : (
           team.map((tm, i) => (
             <div
               key={`${tm.email}-${i}`}
-              className="flex flex-wrap items-center gap-3.5 border-b border-nr-border/60 px-[18px] py-3 last:border-b-0"
+              className="flex flex-wrap items-center gap-3.5 border-b border-[var(--m3-outlinev)] px-[18px] py-3 last:border-b-0"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-nr-text-primary">{tm.name}</p>
-                <p className="mt-px font-mono text-[11px] text-nr-text-hint">{tm.email}</p>
+                <p className="text-[13px] font-semibold text-[var(--m3-on)]">{tm.name}</p>
+                <p className="mt-px font-mono text-[11px] text-[var(--m3-outline)]">{tm.email}</p>
               </div>
-              <span className="rounded-full border border-nr-primary-light/30 bg-nr-primary-light/10 px-2.5 py-0.5 text-[11px] font-semibold text-nr-primary-light">
+              <span className="rounded-full border border-[var(--m3-ter)]/30 bg-[var(--m3-ter)]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--m3-ter)]">
                 {tm.role}
               </span>
               <button
                 onClick={() => removeTeamMember(i)}
-                className="text-xs text-nr-text-hint hover:text-red-400"
+                className="text-xs text-[var(--m3-outline)] hover:text-red-400"
               >
                 Remove
               </button>
@@ -87,11 +87,11 @@ export function TeamSection() {
         {activity.map((a, i) => (
           <div
             key={i}
-            className="flex flex-wrap gap-3.5 border-b border-nr-border/60 px-[18px] py-3 text-xs last:border-b-0"
+            className="flex flex-wrap gap-3.5 border-b border-[var(--m3-outlinev)] px-[18px] py-3 text-xs last:border-b-0"
           >
-            <span className="w-[110px] shrink-0 font-semibold text-nr-text-primary">{a.who}</span>
-            <span className="min-w-[160px] flex-1 text-nr-text-secondary">{a.what}</span>
-            <span className="shrink-0 font-mono text-nr-text-hint">{a.when}</span>
+            <span className="w-[110px] shrink-0 font-semibold text-[var(--m3-on)]">{a.who}</span>
+            <span className="min-w-[160px] flex-1 text-[var(--m3-onv)]">{a.what}</span>
+            <span className="shrink-0 font-mono text-[var(--m3-outline)]">{a.when}</span>
           </div>
         ))}
       </PanelCard>

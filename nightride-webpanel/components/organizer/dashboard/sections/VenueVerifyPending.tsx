@@ -15,10 +15,10 @@ export function VenueVerifyPending() {
 
   return (
     <div className="max-w-[640px]">
-      <h2 className="mb-1.5 font-display text-base uppercase tracking-wide text-nr-text-primary">
+      <h2 className="mb-1.5 font-display text-base uppercase tracking-wide text-[var(--m3-on)]">
         Verify {profile.name} before it goes live
       </h2>
-      <p className="mb-5 text-[13px] text-nr-text-secondary">
+      <p className="mb-5 text-[13px] text-[var(--m3-onv)]">
         New venues go through the same verification as your organizer application — complete these
         from the mobile app.
       </p>
@@ -30,8 +30,8 @@ export function VenueVerifyPending() {
           return (
             <div
               key={step.id}
-              className={`overflow-hidden rounded-lg border bg-nr-surface ${
-                done ? "border-emerald-500/30" : "border-nr-primary-light/30"
+              className={`overflow-hidden rounded-lg border bg-[var(--m3-surf1)] ${
+                done ? "border-emerald-500/30" : "border-[var(--m3-ter)]/30"
               }`}
             >
               <button
@@ -43,31 +43,31 @@ export function VenueVerifyPending() {
                   className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold ${
                     done
                       ? "bg-emerald-500/10 text-emerald-400"
-                      : "bg-nr-primary-light/10 text-nr-primary-light"
+                      : "bg-[var(--m3-ter)]/10 text-[var(--m3-ter)]"
                   }`}
                 >
                   {done ? "✓" : "•"}
                 </span>
                 <span className="flex-1">
-                  <span className="block text-sm font-semibold text-nr-text-primary">
+                  <span className="block text-sm font-semibold text-[var(--m3-on)]">
                     {step.label}
                   </span>
                   <span
                     className={`mt-0.5 block font-mono text-[11px] ${
-                      done ? "text-emerald-400" : "text-nr-primary-light"
+                      done ? "text-emerald-400" : "text-[var(--m3-ter)]"
                     }`}
                   >
                     {done ? "Completed" : "In progress — waiting on mobile app"}
                   </span>
                 </span>
-                <span className="text-nr-text-hint">
+                <span className="text-[var(--m3-outline)]">
                   {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </span>
               </button>
               {isOpen && (
-                <div className="border-t border-nr-border/60 px-[18px] pb-[18px]">
-                  <p className="my-3.5 text-[13px] text-nr-text-secondary">{step.detail}</p>
-                  <div className="h-[90px] w-[140px] rounded-lg border border-nr-border bg-[repeating-linear-gradient(45deg,#17171A,#17171A_8px,#0F0F0F_8px,#0F0F0F_16px)]" />
+                <div className="border-t border-[var(--m3-outlinev)] px-[18px] pb-[18px]">
+                  <p className="my-3.5 text-[13px] text-[var(--m3-onv)]">{step.detail}</p>
+                  <div className="h-[90px] w-[140px] rounded-lg border border-[var(--m3-outlinev)] bg-[repeating-linear-gradient(45deg,#17171A,#17171A_8px,#0F0F0F_8px,#0F0F0F_16px)]" />
                 </div>
               )}
             </div>
@@ -75,14 +75,14 @@ export function VenueVerifyPending() {
         })}
       </div>
 
-      <p className="mt-[18px] rounded-lg border border-nr-primary-light/30 bg-nr-primary-light/10 px-4 py-3.5 text-xs text-nr-primary-light">
+      <p className="mt-[18px] rounded-lg border border-[var(--m3-ter)]/30 bg-[var(--m3-ter)]/10 px-4 py-3.5 text-xs text-[var(--m3-ter)]">
         Once all steps are complete, an admin reviews and approves the venue — then its editor and
         app preview unlock.
       </p>
 
       <button
         onClick={() => approveVenue(editingVenue)}
-        className="mt-3.5 border-b border-dashed border-nr-border font-mono text-[11px] text-nr-text-hint hover:text-nr-text-secondary"
+        className="mt-3.5 border-b border-dashed border-[var(--m3-outlinev)] font-mono text-[11px] text-[var(--m3-outline)] hover:text-[var(--m3-onv)]"
       >
         simulate: admin approves this venue
       </button>

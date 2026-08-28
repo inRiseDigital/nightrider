@@ -22,9 +22,9 @@ export function OverviewSection() {
     <>
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {MOCK_KPIS.map((kpi) => (
-          <div key={kpi.label} className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-            <p className="text-xs text-nr-text-secondary">{kpi.label}</p>
-            <p className="mt-2 font-display text-[32px] leading-none text-nr-text-primary">
+          <div key={kpi.label} className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+            <p className="text-xs text-[var(--m3-onv)]">{kpi.label}</p>
+            <p className="mt-2 font-display text-[32px] leading-none text-[var(--m3-on)]">
               {kpi.value}
             </p>
             <p className={`mt-1.5 font-mono text-[11px] ${kpi.deltaClass}`}>{kpi.delta}</p>
@@ -39,17 +39,17 @@ export function OverviewSection() {
             return (
               <div
                 key={ev.id}
-                className="flex items-center gap-3.5 border-b border-nr-border/60 px-[18px] py-3.5 last:border-b-0"
+                className="flex items-center gap-3.5 border-b border-[var(--m3-outlinev)] px-[18px] py-3.5 last:border-b-0"
               >
-                <div className="h-11 w-11 shrink-0 rounded-lg border border-nr-border bg-[repeating-linear-gradient(45deg,#17171A,#17171A_6px,#0F0F0F_6px,#0F0F0F_12px)]" />
+                <div className="h-11 w-11 shrink-0 rounded-lg border border-[var(--m3-outlinev)] bg-[repeating-linear-gradient(45deg,#17171A,#17171A_6px,#0F0F0F_6px,#0F0F0F_12px)]" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-nr-text-primary">{ev.name}</p>
-                  <p className="mt-0.5 font-mono text-[11px] text-nr-text-hint">
+                  <p className="truncate text-[13px] font-semibold text-[var(--m3-on)]">{ev.name}</p>
+                  <p className="mt-0.5 font-mono text-[11px] text-[var(--m3-outline)]">
                     {venueName(venues, ev.venue)} · {ev.date}
                   </p>
                 </div>
                 <StatusChip label={chip.label} className={chip.className} />
-                <p className="w-16 shrink-0 text-right font-mono text-xs text-nr-text-secondary">
+                <p className="w-16 shrink-0 text-right font-mono text-xs text-[var(--m3-onv)]">
                   {ev.tiers.length ? `${ev.tiers.reduce((s, t) => s + t.qty, 0)} qty` : "—"}
                 </p>
               </div>
@@ -62,23 +62,23 @@ export function OverviewSection() {
             {venueOrder.map((id) => (
               <div
                 key={id}
-                className="flex items-center gap-3 border-b border-nr-border/60 px-[18px] py-3 last:border-b-0"
+                className="flex items-center gap-3 border-b border-[var(--m3-outlinev)] px-[18px] py-3 last:border-b-0"
               >
                 <span
                   className={`h-2 w-2 shrink-0 rounded-full ${
-                    venues[id].verified ? "bg-nr-accent" : "bg-nr-text-hint"
+                    venues[id].verified ? "bg-[var(--m3-warn)]" : "bg-[var(--m3-outline)]"
                   }`}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-nr-text-primary">{venues[id].name}</p>
-                  <p className="mt-px font-mono text-[11px] text-nr-text-hint">{venues[id].city}</p>
+                  <p className="text-[13px] font-semibold text-[var(--m3-on)]">{venues[id].name}</p>
+                  <p className="mt-px font-mono text-[11px] text-[var(--m3-outline)]">{venues[id].city}</p>
                 </div>
               </div>
             ))}
           </PanelCard>
 
-          <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-            <h2 className="mb-3 font-display text-sm uppercase tracking-wider text-nr-text-primary">
+          <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+            <h2 className="mb-3 font-display text-sm uppercase tracking-wider text-[var(--m3-on)]">
               Application Status
             </h2>
             <div className="flex items-center gap-3">
@@ -86,7 +86,7 @@ export function OverviewSection() {
                 <Check size={14} strokeWidth={3} />
               </span>
               <div>
-                <p className="text-[13px] font-semibold text-nr-text-primary">Verified organizer</p>
+                <p className="text-[13px] font-semibold text-[var(--m3-on)]">Verified organizer</p>
                 <p className="mt-0.5 font-mono text-[11px] text-emerald-400">Approved</p>
               </div>
             </div>

@@ -34,7 +34,7 @@ export function TonightSection() {
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1.3fr_1fr]">
         <div className="flex flex-col gap-4">
-          <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+          <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
             <FieldLabel className="mb-2.5">
               Live status — stops the app sending people you can&apos;t let in
             </FieldLabel>
@@ -47,7 +47,7 @@ export function TonightSection() {
                   className={`rounded-lg px-3.5 py-2.5 text-xs font-semibold ring-1 ring-inset transition-colors ${
                     tonight.status === s.id
                       ? s.className
-                      : "text-nr-text-secondary ring-nr-border hover:text-nr-text-primary"
+                      : "text-[var(--m3-onv)] ring-[var(--m3-outlinev)] hover:text-[var(--m3-on)]"
                   }`}
                 >
                   {s.label}
@@ -56,7 +56,7 @@ export function TonightSection() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+          <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
             <FieldLabel className="mb-2.5">Current queue / wait time</FieldLabel>
             <div className="flex flex-wrap items-center gap-2.5">
               <SlimInput
@@ -67,13 +67,13 @@ export function TonightSection() {
                 onChange={(e) => setQueueMinutes(Number(e.target.value) || 0)}
                 className="w-[100px] py-2"
               />
-              <span className="text-xs text-nr-text-secondary">
+              <span className="text-xs text-[var(--m3-onv)]">
                 min wait — posted live as &ldquo;{queueText}&rdquo;
               </span>
             </div>
           </div>
 
-          <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
+          <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
             <FieldLabel className="mb-3">Tonight-only flash offer</FieldLabel>
             <div className="mb-2.5 flex flex-wrap gap-2.5">
               <SlimInput
@@ -94,23 +94,23 @@ export function TonightSection() {
               onClick={toggleFlash}
               className={`rounded-lg border px-4 py-2.5 text-xs font-semibold transition-colors ${
                 tonight.flashActive
-                  ? "border-nr-accent bg-nr-accent text-nr-bg"
-                  : "border-nr-border text-nr-text-primary hover:border-nr-accent/50"
+                  ? "border-[var(--m3-warn)] bg-[var(--m3-warn)] text-[var(--m3-onpri)]"
+                  : "border-[var(--m3-outlinev)] text-[var(--m3-on)] hover:border-[var(--m3-warn)]/50"
               }`}
             >
               {tonight.flashActive ? "Flash Offer Live — Stop" : "Go Live With Offer"}
             </button>
           </div>
 
-          <div className="rounded-lg border border-red-600 bg-nr-surface p-[18px]">
+          <div className="rounded-lg border border-red-600 bg-[var(--m3-surf1)] p-[18px]">
             <FieldLabel className="mb-2.5">
               Emergency closure — instantly pulls you from the map and notifies anyone heading over
             </FieldLabel>
             <button
               onClick={toggleEmergency}
-              className={`rounded-lg px-[18px] py-2.5 text-[13px] font-semibold text-nr-text-primary transition-colors ${
+              className={`rounded-lg px-[18px] py-2.5 text-[13px] font-semibold text-[var(--m3-on)] transition-colors ${
                 tonight.emergencyActive
-                  ? "bg-nr-text-secondary text-nr-bg hover:opacity-90"
+                  ? "bg-[var(--m3-onv)] text-[var(--m3-onpri)] hover:opacity-90"
                   : "bg-red-600 hover:bg-red-700"
               }`}
             >
@@ -119,12 +119,12 @@ export function TonightSection() {
           </div>
         </div>
 
-        <div className="w-full max-w-[260px] overflow-hidden rounded-2xl border border-nr-border bg-nr-surface">
-          <p className="border-b border-nr-border/60 px-4 py-3.5 font-mono text-[10px] tracking-[0.15em] text-nr-text-hint">
+        <div className="w-full max-w-[260px] overflow-hidden rounded-2xl border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)]">
+          <p className="border-b border-[var(--m3-outlinev)] px-4 py-3.5 font-mono text-[10px] tracking-[0.15em] text-[var(--m3-outline)]">
             TONIGHT SCREEN
           </p>
           <div className="flex flex-col gap-3 p-4">
-            <p className="font-display text-base uppercase text-nr-text-primary">
+            <p className="font-display text-base uppercase text-[var(--m3-on)]">
               {venues[editingVenue].name}
             </p>
             <div>
@@ -134,9 +134,9 @@ export function TonightSection() {
                 size="sm"
               />
             </div>
-            <p className="text-xs text-nr-text-secondary">Queue: {queueText}</p>
+            <p className="text-xs text-[var(--m3-onv)]">Queue: {queueText}</p>
             {tonight.flashActive && (
-              <p className="rounded-lg border border-nr-accent/30 bg-nr-accent/10 px-2.5 py-2 text-[11px] text-nr-accent">
+              <p className="rounded-lg border border-[var(--m3-warn)]/30 bg-[var(--m3-warn)]/10 px-2.5 py-2 text-[11px] text-[var(--m3-warn)]">
                 LIVE: {tonight.flashText} until {tonight.flashUntil}
               </p>
             )}
@@ -145,7 +145,7 @@ export function TonightSection() {
                 Emergency closure live — off the map
               </p>
             )}
-            <p className="border-t border-nr-border/60 pt-2.5 text-xs text-nr-text-secondary">
+            <p className="border-t border-[var(--m3-outlinev)] pt-2.5 text-xs text-[var(--m3-onv)]">
               Saves tonight: 84 · one-tap broadcast ready
             </p>
           </div>

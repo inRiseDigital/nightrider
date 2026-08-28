@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/components/admin/ui/cn";
 
-/** Card with an Anton uppercase header bar, used across the dashboard sections. */
+/** Card with a header bar, used across the dashboard sections — M3 surface. */
 export function PanelCard({
   title,
   action,
@@ -18,10 +18,16 @@ export function PanelCard({
   bodyClassName?: string;
 }) {
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-nr-border bg-nr-surface", className)}>
+    <div
+      className={cn("overflow-hidden rounded-xl", className)}
+      style={{ background: "var(--m3-surf1)" }}
+    >
       {title && (
-        <div className="flex items-center justify-between gap-3 border-b border-nr-border px-5 py-4">
-          <h2 className="font-display text-sm uppercase tracking-wider text-nr-text-primary">
+        <div
+          className="flex items-center justify-between gap-3 border-b px-5 py-4"
+          style={{ borderColor: "var(--m3-outlinev)" }}
+        >
+          <h2 className="text-sm font-medium tracking-wide" style={{ color: "var(--m3-on)" }}>
             {title}
           </h2>
           {action}
@@ -34,31 +40,60 @@ export function PanelCard({
 
 /** Small muted caption that labels a control group. */
 export function FieldLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn("text-xs text-nr-text-secondary", className)}>{children}</p>;
+  return (
+    <p className={cn("text-xs", className)} style={{ color: "var(--m3-onv)" }}>
+      {children}
+    </p>
+  );
 }
 
-const inputBase =
-  "rounded-lg border border-nr-border bg-nr-surface-raised px-3 py-2.5 text-sm text-nr-text-primary placeholder:text-nr-text-hint focus:border-nr-primary focus:outline-none focus:ring-1 focus:ring-nr-primary";
-
-/** Bare input matching the dashboard's inline-field style (no wrapper label). */
+/** Bare input matching the M3 outlined-field style (no wrapper label). */
 export function SlimInput({
   className,
   mono = false,
+  style,
   ...props
 }: React.InputHTMLAttributes<HTMLInputElement> & { mono?: boolean }) {
-  return <input className={cn(inputBase, mono && "font-mono", className)} {...props} />;
+  return (
+    <input
+      className={cn(
+        "rounded-md border px-3 py-2.5 text-sm outline-none transition-colors",
+        mono && "font-mono",
+        className
+      )}
+      style={{
+        borderColor: "var(--m3-outline)",
+        background: "var(--m3-surf2)",
+        color: "var(--m3-on)",
+        ...style,
+      }}
+      {...props}
+    />
+  );
 }
 
 export function SlimTextarea({
   className,
+  style,
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(inputBase, "resize-y", className)} {...props} />;
+  return (
+    <textarea
+      className={cn("resize-y rounded-md border px-3 py-2.5 text-sm outline-none", className)}
+      style={{
+        borderColor: "var(--m3-outline)",
+        background: "var(--m3-surf2)",
+        color: "var(--m3-on)",
+        ...style,
+      }}
+      {...props}
+    />
+  );
 }
 
 /**
  * Pill toggle used for genres, dress codes, venue switchers, and filters.
- * Active state is the brand pink; inactive is a hairline outline.
+ * Active state is the M3 primary tone; inactive is a hairline outline.
  */
 export function Chip({
   label,
@@ -79,20 +114,23 @@ export function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "px-3.5 py-2 text-xs font-semibold transition-colors",
+        "flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium transition-colors border",
         shape === "pill" ? "rounded-full" : "rounded-lg",
-        active
-          ? "border border-nr-primary bg-nr-primary/10 text-nr-primary"
-          : "border border-nr-border text-nr-text-secondary hover:border-nr-text-secondary/60 hover:text-nr-text-primary",
         className
       )}
+      style={
+        active
+          ? { borderColor: "var(--m3-pri)", background: "color-mix(in srgb, var(--m3-pri) 12%, transparent)", color: "var(--m3-pri)" }
+          : { borderColor: "var(--m3-outline)", color: "var(--m3-onv)" }
+      }
     >
+      {active && <span className="msi text-base leading-none">check</span>}
       {label}
     </button>
   );
 }
 
-/** iOS-style switch — used for the recurring-residency toggle. */
+/** Switch — used for the recurring-residency toggle and other on/off state. */
 export function Toggle({
   checked,
   onChange,
@@ -109,16 +147,18 @@ export function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={onChange}
-      className={cn(
-        "relative h-6 w-10 shrink-0 rounded-full transition-colors",
-        checked ? "bg-nr-primary" : "bg-nr-border"
-      )}
+      className="relative h-6 w-10 shrink-0 rounded-full border-2 transition-colors"
+      style={{
+        background: checked ? "var(--m3-pric)" : "var(--m3-surf3)",
+        borderColor: checked ? "var(--m3-pric)" : "var(--m3-outline)",
+      }}
     >
       <span
-        className={cn(
-          "absolute top-1 h-4 w-4 rounded-full bg-nr-text-primary transition-all",
-          checked ? "left-5" : "left-1"
-        )}
+        className="absolute top-0.5 h-4 w-4 rounded-full transition-all"
+        style={{
+          background: checked ? "var(--m3-onpric)" : "var(--m3-onv)",
+          left: checked ? "18px" : "2px",
+        }}
       />
     </button>
   );
@@ -167,7 +207,10 @@ export function VenueSwitcher({
 /** Muted monospace section divider, e.g. "DRAFTS — NOT YET SUBMITTED". */
 export function SectionEyebrow({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <p className={cn("font-mono text-[11px] uppercase tracking-[0.1em] text-nr-text-hint", className)}>
+    <p
+      className={cn("font-mono text-[11px] uppercase tracking-[0.1em]", className)}
+      style={{ color: "var(--m3-outline)" }}
+    >
       {children}
     </p>
   );

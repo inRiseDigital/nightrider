@@ -8,11 +8,11 @@ export function InboxSection() {
   const { inbox, toggleInboxItem } = useOrganizerDashboard();
 
   return (
-    <div className="overflow-hidden rounded-lg border border-nr-border bg-nr-surface">
+    <div className="overflow-hidden rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)]">
       {inbox.map((m) => {
         const type = INBOX_TYPE_STYLES[m.type];
         return (
-          <div key={m.id} className="border-b border-nr-border/60 last:border-b-0">
+          <div key={m.id} className="border-b border-[var(--m3-outlinev)] last:border-b-0">
             <button
               onClick={() => toggleInboxItem(m.id)}
               aria-expanded={m.open}
@@ -20,16 +20,16 @@ export function InboxSection() {
             >
               <StatusChip label={type.label} className={type.className} size="sm" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-semibold text-nr-text-primary">
+                <span className="block text-[13px] font-semibold text-[var(--m3-on)]">
                   {m.subject}
                 </span>
-                <span className="mt-px block text-[11px] text-nr-text-hint">
+                <span className="mt-px block text-[11px] text-[var(--m3-outline)]">
                   {m.from} · {m.date}
                 </span>
               </span>
             </button>
             {m.open && (
-              <p className="bg-nr-surface-raised px-[18px] py-3.5 text-xs text-nr-text-secondary">
+              <p className="bg-[var(--m3-surf2)] px-[18px] py-3.5 text-xs text-[var(--m3-onv)]">
                 {m.body}
               </p>
             )}

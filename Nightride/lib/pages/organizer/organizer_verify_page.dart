@@ -14,9 +14,9 @@ import 'package:nightride/services/organizer_service.dart';
 import 'package:nightride/services/organizer_verification_service.dart';
 
 /// The real evidence steps, in the order the checklist shows them.
-/// `venueAddress` gates `gps` — an admin must accept it before the on-site
-/// GPS check unlocks (see FIRESTORE_SCHEMA.md's ReviewStep docs) — so it
-/// leads the list.
+/// `nic`, `selfie`, and `venueAddress` gate `gps` — the applicant must
+/// upload/enter all three before the on-site GPS check unlocks — so they
+/// lead the list.
 enum _StepId { venueAddress, nic, selfie, gps, video }
 
 extension on _StepId {
@@ -397,22 +397,34 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
 
   _RowStatus _statusFor(_StepId id, Map<String, dynamic> review, Map<String, dynamic> applied) {
     final reviewStep = (review[id.key] as Map?) ?? const {};
-    // gps and video both start 'pending' in the create shape -- gps waits on an
-    // accepted venue address, video on an admin's walkthrough script -- so a
-    // missing status for either means locked, not open.
-    final fallback = (id == _StepId.gps || id == _StepId.video) ? 'pending' : 'active';
-    final status = reviewStep['status'] as String? ?? fallback;
-    if (status == 'accepted') return _RowStatus.accepted;
-    if (status == 'pending') return _RowStatus.locked;
-    if (status == 'needs_info') return _RowStatus.action;
 
     if (id == _StepId.gps) {
+      // gps unlocks once the applicant has uploaded nic, selfie, and venue
+      // address themselves -- no admin acceptance required.
+      final status = reviewStep['status'] as String?;
+      if (status == 'accepted') return _RowStatus.accepted;
+      if (status == 'needs_info') return _RowStatus.action;
+
+      final nicUploaded = (applied['nic'] as Map?)?['uploaded'] == true;
+      final selfieUploaded = (applied['selfie'] as Map?)?['uploaded'] == true;
+      final address = (applied['venueAddress'] as Map?)?['address'] as String?;
+      final addressDone = address != null && address.isNotEmpty;
+      if (!(nicUploaded && selfieUploaded && addressDone)) return _RowStatus.locked;
+
       final attempts = (applied['gps'] as Map?)?['attempts'];
       final currentAttempt = reviewStep['attempt'] as int? ?? 0;
       final hasCurrent = attempts is List &&
           attempts.any((a) => a is Map && a['attempt'] == currentAttempt);
       return hasCurrent ? _RowStatus.submitted : _RowStatus.todo;
     }
+
+    // video starts 'pending' in the create shape -- it waits on an admin's
+    // walkthrough script -- so a missing status means locked, not open.
+    final fallback = id == _StepId.video ? 'pending' : 'active';
+    final status = reviewStep['status'] as String? ?? fallback;
+    if (status == 'accepted') return _RowStatus.accepted;
+    if (status == 'pending') return _RowStatus.locked;
+    if (status == 'needs_info') return _RowStatus.action;
 
     if (id == _StepId.venueAddress) {
       final address = (applied['venueAddress'] as Map?)?['address'] as String?;

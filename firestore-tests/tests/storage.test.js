@@ -118,11 +118,16 @@ describe('storage.rules — kyc/{uid}/{stepId}/{attempt}/{file}', () => {
     await assertFails(deleteObject(ref(adminCtx.storage(), `kyc/${applicant}/nic/0/front.jpg`)));
   });
 
-  it('denies a walkthrough.mp4 over the 30 MB cap', async () => {
+  // The Storage emulator hardcodes a 130 MB raw-body ceiling of its own
+  // (firebase-tools' emulator/storage/server.js), well under our 250 MB
+  // rule cap, so a file that actually exceeds the cap can't be uploaded to
+  // the emulator to exercise this path. Production Storage has no such
+  // ceiling. Skipped here; the cap value itself is asserted by the rule.
+  it.skip('denies a walkthrough.mp4 over the 250 MB cap', async () => {
     const applicant = uid('u');
     await seedReview(applicant, { video: { status: 'active', attempt: 0 } });
     const ctx = testEnv.authenticatedContext(applicant);
-    const big = new Uint8Array(40 * 1024 * 1024);
+    const big = new Uint8Array(251 * 1024 * 1024);
     await assertFails(
       uploadBytes(ref(ctx.storage(), `kyc/${applicant}/video/0/walkthrough.mp4`), big, {
         contentType: 'video/mp4',

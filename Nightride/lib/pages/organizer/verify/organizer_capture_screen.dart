@@ -28,14 +28,14 @@ Future<File?> captureOrganizerPhoto(
 }
 
 /// Pushes a full-screen live camera video-recording flow, hard-capped at
-/// [maxSeconds] (the walkthrough is capped at 60s/720p/30MB per
+/// [maxSeconds] (the walkthrough is capped at 5min/720p/250MB per
 /// FIRESTORE_SCHEMA.md, enforced here by the recorder preset + this timer).
 /// Returns the confirmed clip file, or null if the applicant backs out.
 Future<File?> captureOrganizerVideo(
   BuildContext context, {
   required String title,
   required String prompt,
-  int maxSeconds = 60,
+  int maxSeconds = 300,
 }) {
   return Navigator.of(context).push<File?>(
     MaterialPageRoute(
@@ -60,7 +60,7 @@ class _CameraCaptureScreen extends StatefulWidget {
     required this.lens,
     required this.guide,
     this.isVideo = false,
-    this.maxSeconds = 60,
+    this.maxSeconds = 300,
   });
 
   final String title;

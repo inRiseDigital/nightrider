@@ -429,9 +429,19 @@ export function extractPosterFrame(videoFile: File): Promise<Blob> {
     videoEl.muted = true;
     videoEl.playsInline = true;
     videoEl.preload = "metadata";
+    // Off-screen but attached: Safari/WebKit can silently never fire
+    // loadedmetadata/seeked on a <video> that isn't in the DOM, which hangs
+    // this promise (and the whole upload, since nothing uploads until this
+    // resolves) forever with no visible progress.
+    videoEl.style.position = "fixed";
+    videoEl.style.left = "-9999px";
     videoEl.src = url;
+    document.body.appendChild(videoEl);
 
-    const cleanup = () => URL.revokeObjectURL(url);
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      videoEl.remove();
+    };
 
     videoEl.onloadedmetadata = () => {
       // A hair past t=0 avoids the all-black first frame some encoders emit.

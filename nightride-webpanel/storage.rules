@@ -99,7 +99,7 @@ service firebase.storage {
              ||
              (stepId == 'video'
                && ((file == 'walkthrough.mp4'
-                     && request.resource.size < 30 * 1024 * 1024
+                     && request.resource.size < 250 * 1024 * 1024
                      && request.resource.contentType == 'video/mp4')
                    || (file == 'poster.jpg'
                      && request.resource.size < 2 * 1024 * 1024

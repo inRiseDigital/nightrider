@@ -498,13 +498,13 @@ clause, `allow create` alone leaves reviewed evidence overwritable by the
 applicant who submitted it. The rules test suite pins this
 (`firestore-tests/tests/storage.test.js`).
 
-The walkthrough video is capped at 60 seconds, 720p, H.264/AAC MP4, 30 MB —
+The walkthrough video is capped at 5 minutes, 720p, H.264/AAC MP4, 250 MB —
 enforced by the recorder preset, a client pre-check, and the Storage rule. The
 app extracts the poster frame at capture. There is no thumbnail Cloud Function:
 standing up a function runtime, its deploy pipeline, and its IAM surface to
 produce one JPEG per applicant is disproportionate, and the poster is navigation
 chrome, never evidence — the admin reviews the video itself in a streaming
-player. Uploads are resumable; 30 MB over venue Wi-Fi is a multi-minute upload
+player. Uploads are resumable; 250 MB over venue Wi-Fi is a multi-minute upload
 that will get backgrounded.
 
 Avatars sit in a separate top-level prefix because they are world-readable and

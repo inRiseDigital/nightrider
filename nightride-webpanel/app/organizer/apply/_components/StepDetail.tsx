@@ -55,14 +55,14 @@ export function StepDetail({ step }: { step: StepView }) {
  * verdict once they have looked.
  */
 function AppStepPanel({ step }: { step: StepView }) {
-  // Only gps is ever locked, and only until its venue address is accepted.
+  // Only gps is ever locked, and only until nic, selfie, and venue address are all done.
   const locked = step.status === "pending";
   const settled = step.status === "accepted" || step.awaitingReview;
 
   return (
     <div className="flex flex-col items-start gap-3">
       <p className="text-[13px] text-nr-text-secondary">
-        {locked ? "Locked until an admin accepts your venue address." : step.detail}
+        {locked ? "Locked until you upload your ID, selfie, and venue address." : step.detail}
       </p>
       {step.note && <AdminNote note={step.note} />}
       {!locked && <RequiresAppLabel />}
@@ -334,7 +334,7 @@ function UploadPanel({
 
       <FilePicker label="Walkthrough video" accept="video/mp4" onChange={setVideo} />
 
-      <p className="text-[11px] text-nr-text-hint">MP4, up to 60 seconds, 30 MB max.</p>
+      <p className="text-[11px] text-nr-text-hint">MP4, up to 5 minutes, 250 MB max.</p>
 
       {error && <ErrorNote>{error}</ErrorNote>}
 

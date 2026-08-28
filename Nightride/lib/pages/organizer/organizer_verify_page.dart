@@ -162,7 +162,7 @@ class _OrganizerVerifyPageState extends ConsumerState<OrganizerVerifyPage> {
         context,
         title: 'Walkthrough',
         prompt: 'Follow the script an admin sent you',
-        maxSeconds: 60,
+        maxSeconds: 300,
       );
       if (video == null) return;
 
@@ -786,7 +786,7 @@ class _WalkthroughScriptSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            const Text('Record one take that covers all of it, up to 60 seconds.',
+            const Text('Record one take that covers all of it, up to 5 minutes.',
                 style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4)),
             const SizedBox(height: 16),
             Flexible(

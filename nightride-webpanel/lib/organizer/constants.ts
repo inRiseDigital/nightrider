@@ -86,7 +86,7 @@ export const BASE_STEPS: BaseStepDef[] = [
   {
     id: "video",
     label: "Video Walkthrough",
-    detail: "Record a walkthrough (up to 60 seconds) following the script an admin writes for your venue.",
+    detail: "Record a walkthrough (up to 5 minutes) following the script an admin writes for your venue.",
     kind: "upload",
   },
 ];
@@ -97,7 +97,7 @@ export const BASE_STEPS: BaseStepDef[] = [
  * cover the walkthrough and the poster frame extracted from it; the nic and
  * selfie image limits live in the mobile app.
  */
-export const KYC_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+export const KYC_VIDEO_MAX_BYTES = 250 * 1024 * 1024;
 export const KYC_POSTER_MAX_BYTES = 2 * 1024 * 1024;
 export const KYC_VIDEO_TYPE = "video/mp4";
 

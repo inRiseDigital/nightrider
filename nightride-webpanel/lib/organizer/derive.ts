@@ -25,6 +25,24 @@ function videoPrerequisitesMet(state: ApplicationState): boolean {
 }
 
 /**
+ * gps unlocks once the applicant has uploaded nic, selfie, and entered a
+ * venue address themselves — no admin acceptance required (unlike video,
+ * which still waits on an admin-written script).
+ */
+function gpsPrerequisitesMet(state: ApplicationState): boolean {
+  const app = state.application.steps;
+  const review = state.review.steps;
+  const done = (id: "nic" | "selfie" | "venueAddress", claim: boolean) =>
+    claim || review[id]?.status === "accepted";
+
+  return (
+    done("nic", app.nic.uploaded) &&
+    done("selfie", app.selfie.uploaded) &&
+    done("venueAddress", app.venueAddress !== null)
+  );
+}
+
+/**
  * Flattens the five schema steps into a single ordered list of render-ready
  * steps. Status and the admin's note are sourced from the review doc — the
  * one exception is the locally-derived 'submitted' presentation state below,
@@ -34,7 +52,10 @@ function videoPrerequisitesMet(state: ApplicationState): boolean {
 export function deriveSteps(state: ApplicationState): StepView[] {
   return BASE_STEPS.map((def) => {
     const reviewStep = state.review.steps[def.id];
-    const rawStatus = reviewStep?.status ?? "pending";
+    const rawStatus =
+      def.id === "gps" && (reviewStep?.status ?? "pending") === "pending" && gpsPrerequisitesMet(state)
+        ? "active"
+        : reviewStep?.status ?? "pending";
 
     // Keyed on the step id, not its kind: nic and selfie are cleared in the
     // mobile app, which sets the same advisory `uploaded` flag a browser

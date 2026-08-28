@@ -541,6 +541,8 @@ const ORGANIZER_GPS_CAPTURED_AT = T("2026-05-17T18:00:00Z");
 const REJECTED_SUBMITTED_AT = T("2026-06-01T11:00:00Z");
 const REJECTED_DECIDED_AT = T("2026-06-10T16:45:00Z");
 const REJECTED_NIC_REVIEWED_AT = T("2026-06-05T10:00:00Z");
+const APPLICANT_SCRIPT_SENT_AT = T("2026-07-22T09:20:00Z");
+const ORGANIZER_SCRIPT_SENT_AT = T("2026-05-14T09:20:00Z");
 
 const USERS = {
   [UID.admin]: baseUser({
@@ -719,7 +721,26 @@ function reviewStep(overrides) {
     reviewedBy: null,
     venueId: null,
     mediaDeletedAt: null,
+    // video only — the walkthrough script an admin publishes to unlock it.
+    script: null,
     ...overrides,
+  };
+}
+
+/** A published walkthrough script — the thing that unlocks the video step. */
+function walkthroughScript(sentAt) {
+  return {
+    format: "list",
+    lines: [
+      "Start outside: the street entrance with the venue name visible.",
+      "Walk in through the main door and show the ID check position.",
+      "Pan across the main floor.",
+      "Show the bar, including the POS terminal.",
+      "Walk to a fire exit and show that it is unobstructed.",
+    ],
+    revision: 0,
+    updatedAt: sentAt,
+    updatedBy: UID.admin,
   };
 }
 
@@ -728,6 +749,8 @@ const ORGANIZER_REVIEWS = {
   // 'submitted' because the applicant has uploaded evidence and it is
   // sitting in the admin's queue. gps is still 'pending' — it only starts
   // once an admin has accepted the venue address to measure a fix against.
+  // video only got as far as 'submitted' because an admin had already sent a
+  // walkthrough script; with no script it would still be 'pending'.
   [UID.applicant]: {
     status: "none",
     appliedAt: APPLICANT_SUBMITTED_AT,
@@ -739,7 +762,10 @@ const ORGANIZER_REVIEWS = {
       venueAddress: reviewStep({ status: "active" }),
       nic: reviewStep({ status: "submitted" }),
       selfie: reviewStep({ status: "submitted" }),
-      video: reviewStep({ status: "submitted" }),
+      video: reviewStep({
+        status: "submitted",
+        script: walkthroughScript(APPLICANT_SCRIPT_SENT_AT),
+      }),
       gps: reviewStep({ status: "pending" }),
     },
     updatedAt: APPLICANT_SUBMITTED_AT,
@@ -773,6 +799,7 @@ const ORGANIZER_REVIEWS = {
         status: "accepted",
         reviewedAt: ORGANIZER_DECIDED_AT,
         reviewedBy: UID.admin,
+        script: walkthroughScript(ORGANIZER_SCRIPT_SENT_AT),
       }),
       gps: reviewStep({
         status: "accepted",
@@ -803,7 +830,9 @@ const ORGANIZER_REVIEWS = {
         reviewedBy: UID.admin,
       }),
       selfie: reviewStep({ status: "active" }),
-      video: reviewStep({ status: "active" }),
+      // Still 'pending' with no script: this application died on identity, and
+      // never reaching the walkthrough is exactly the point of the gate.
+      video: reviewStep({ status: "pending" }),
       gps: reviewStep({ status: "pending" }),
     },
     updatedAt: REJECTED_DECIDED_AT,

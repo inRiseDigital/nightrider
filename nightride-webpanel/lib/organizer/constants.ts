@@ -8,6 +8,7 @@ import {
   OverallStatusStyle,
   StepStatus,
   StepStatusStyle,
+  VideoScript,
 } from "./types";
 
 /**
@@ -42,9 +43,10 @@ export const TONE_COPY: Record<CopyTone, { intro: string; reviewIntro: string }>
 export const IS_DEV = process.env.NODE_ENV !== "production";
 
 /**
- * The five checks every organizer completes, in schema order: venueAddress
- * gates gps, and the identity/venue evidence steps can happen any time in
- * between.
+ * The five checks every organizer completes, in the order the applicant meets
+ * them. Two of them are gated: venueAddress gates gps, and all four of the
+ * others gate video, which is why video comes last. The identity steps can
+ * happen any time in between.
  *
  * nic and selfie are `kind: "app"`: both are live captures — a scan of a
  * physical ID and a face shot taken on the spot — and a browser file picker
@@ -54,12 +56,6 @@ export const IS_DEV = process.env.NODE_ENV !== "production";
  * upload: it is footage of a venue, not a liveness check.
  */
 export const BASE_STEPS: BaseStepDef[] = [
-  {
-    id: "venueAddress",
-    label: "Venue Address",
-    detail: "Tell us where your venue is. An admin confirms this before the on-site GPS check unlocks.",
-    kind: "address",
-  },
   {
     id: "nic",
     label: "NIC / ID Scan",
@@ -75,10 +71,10 @@ export const BASE_STEPS: BaseStepDef[] = [
     thumbLabel: "live selfie\npending",
   },
   {
-    id: "video",
-    label: "Video Walkthrough",
-    detail: "Upload a short walkthrough (up to 60 seconds) showing the entrance, the bar, and the POS terminal.",
-    kind: "upload",
+    id: "venueAddress",
+    label: "Venue Address",
+    detail: "Tell us where your venue is. An admin confirms this before the on-site GPS check unlocks.",
+    kind: "address",
   },
   {
     id: "gps",
@@ -86,6 +82,12 @@ export const BASE_STEPS: BaseStepDef[] = [
     detail: "Open the Night Ride app on-site so we can confirm the location on record.",
     kind: "app",
     thumbLabel: "gps ping\npending",
+  },
+  {
+    id: "video",
+    label: "Video Walkthrough",
+    detail: "Record a walkthrough (up to 60 seconds) following the script an admin writes for your venue.",
+    kind: "upload",
   },
 ];
 
@@ -98,6 +100,70 @@ export const BASE_STEPS: BaseStepDef[] = [
 export const KYC_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
 export const KYC_POSTER_MAX_BYTES = 2 * 1024 * 1024;
 export const KYC_VIDEO_TYPE = "video/mp4";
+
+/**
+ * Bounds on a walkthrough script. The line count is enforced by the rules too;
+ * the per-line length is only checked here, because rules cannot iterate a
+ * list — see docs/FIRESTORE_SCHEMA.md.
+ */
+export const VIDEO_SCRIPT_MAX_LINES = 20;
+export const VIDEO_SCRIPT_MAX_LINE_CHARS = 500;
+
+export interface VideoScriptTemplate {
+  id: string;
+  label: string;
+  format: VideoScript["format"];
+  lines: string[];
+}
+
+/**
+ * Starting points an admin picks from before editing. They live in code rather
+ * than Firestore on purpose: there is no UI to manage a template collection,
+ * and a constant is honest about that instead of implying one exists.
+ */
+export const VIDEO_SCRIPT_TEMPLATES: VideoScriptTemplate[] = [
+  {
+    id: "nightclub",
+    label: "Nightclub",
+    format: "list",
+    lines: [
+      "Start outside: the street entrance with the venue name or signage visible.",
+      "Walk in through the main door and show the door/ID check position.",
+      "Pan across the main floor and the dance area.",
+      "Show the main bar, including the POS terminal.",
+      "Show the DJ booth or stage.",
+      "Walk to a fire exit and show that it is unobstructed.",
+      "Finish on the toilets and any smoking area.",
+    ],
+  },
+  {
+    id: "bar-lounge",
+    label: "Bar / lounge",
+    format: "list",
+    lines: [
+      "Start outside: the street entrance with the venue name or signage visible.",
+      "Walk in and pan across the seating area.",
+      "Show the bar and the POS terminal.",
+      "Show the kitchen or food service area if you have one.",
+      "Walk to a fire exit and show that it is unobstructed.",
+      "Finish on the toilets.",
+    ],
+  },
+  {
+    id: "outdoor-rooftop",
+    label: "Outdoor / rooftop",
+    format: "list",
+    lines: [
+      "Start at street level: the entrance you send guests to.",
+      "Show the route guests take up to the space (lift, stairs).",
+      "Pan across the whole outdoor area, edge to edge.",
+      "Show the perimeter railings or barriers up close.",
+      "Show the bar and the POS terminal.",
+      "Show the covered area or wet-weather plan.",
+      "Finish on the fire exit route and the toilets.",
+    ],
+  },
+];
 
 export const STEP_STATUS_STYLES: Record<StepStatus, StepStatusStyle> = {
   accepted: {

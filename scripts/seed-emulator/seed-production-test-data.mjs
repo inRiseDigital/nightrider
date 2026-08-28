@@ -126,7 +126,25 @@ function reviewStep(overrides) {
     reviewedBy: null,
     venueId: null,
     mediaDeletedAt: null,
+    // video only -- the walkthrough script an admin publishes to unlock it.
+    script: null,
     ...overrides,
+  };
+}
+
+/** A published walkthrough script -- the thing that unlocks the video step. */
+function walkthroughScript(sentAt) {
+  return {
+    format: "list",
+    lines: [
+      "Start outside: the street entrance with the venue name visible.",
+      "Walk in and show the ID check position.",
+      "Show the bar, including the POS terminal.",
+      "Walk to a fire exit and show that it is unobstructed.",
+    ],
+    revision: 0,
+    updatedAt: sentAt,
+    updatedBy: UID.admin,
   };
 }
 
@@ -297,8 +315,9 @@ const USERS = {
   }),
 
   // Mid-checklist -- venue address submitted (awaiting review), ID + selfie
-  // done, video and gps still to do. Untriaged (organizerStatus stays
-  // 'none' until an admin picks it up -- see docs/FIRESTORE_SCHEMA.md).
+  // done, gps still to do and video still locked behind an admin's walkthrough
+  // script. Untriaged (organizerStatus stays 'none' until an admin picks it up
+  // -- see docs/FIRESTORE_SCHEMA.md).
   [UID.orgPending]: baseUser({
     email: "test-organizer-pending@nightride.test",
     displayName: "Test Organizer (Pending)",
@@ -383,7 +402,7 @@ const ORGANIZER_REVIEWS = {
       venueAddress: reviewStep({ status: "accepted", reviewedAt: DECIDED_AT, reviewedBy: UID.admin, venueId: VENUE_ID }),
       nic: reviewStep({ status: "accepted", reviewedAt: DECIDED_AT, reviewedBy: UID.admin }),
       selfie: reviewStep({ status: "accepted", reviewedAt: DECIDED_AT, reviewedBy: UID.admin }),
-      video: reviewStep({ status: "accepted", reviewedAt: DECIDED_AT, reviewedBy: UID.admin }),
+      video: reviewStep({ status: "accepted", reviewedAt: DECIDED_AT, reviewedBy: UID.admin, script: walkthroughScript(SUBMITTED_AT) }),
       gps: reviewStep({ status: "accepted", reviewedAt: DECIDED_AT, reviewedBy: UID.admin }),
     },
     updatedAt: DECIDED_AT,
@@ -399,7 +418,9 @@ const ORGANIZER_REVIEWS = {
       venueAddress: reviewStep({ status: "active" }),
       nic: reviewStep({ status: "submitted" }),
       selfie: reviewStep({ status: "submitted" }),
-      video: reviewStep({ status: "active" }),
+      // No script sent yet, so the video step is locked -- the applicant sees
+      // "waiting for an admin" rather than an upload they cannot usefully make.
+      video: reviewStep({ status: "pending" }),
       gps: reviewStep({ status: "pending" }),
     },
     updatedAt: SUBMITTED_AT,
@@ -415,7 +436,7 @@ const ORGANIZER_REVIEWS = {
       venueAddress: reviewStep({ status: "active" }),
       nic: reviewStep({ status: "submitted" }),
       selfie: reviewStep({ status: "active" }),
-      video: reviewStep({ status: "active" }),
+      video: reviewStep({ status: "pending" }),
       gps: reviewStep({ status: "pending" }),
     },
     updatedAt: DECIDED_AT,

@@ -21,6 +21,7 @@ import type {
   StepId,
   UploadStepId,
   VenueAddressDraft,
+  VideoScript,
 } from "./types";
 
 /**
@@ -61,12 +62,13 @@ export const EMPTY_APPLICATION: ApplicantApplication = {
   steps: DEFAULT_APPLICANT_STEPS,
 };
 
-const DEFAULT_REVIEW_STEP: ReviewStep = { status: "pending", attempt: 0, note: "", venueId: null };
+const DEFAULT_REVIEW_STEP: ReviewStep = { status: "pending", attempt: 0, note: "", venueId: null, script: null };
 
 /**
  * The exact shape `initialShape()` in firestore.rules pins for a brand-new
- * review document — gps starts 'pending' because it depends on an admin
- * having accepted a venue address to measure against.
+ * review document. Two steps start 'pending' because each waits on an admin:
+ * gps on an accepted venue address to measure against, video on a published
+ * walkthrough script to record against.
  */
 export const EMPTY_REVIEW: ReviewDoc = {
   status: "none",
@@ -75,7 +77,7 @@ export const EMPTY_REVIEW: ReviewDoc = {
     venueAddress: { ...DEFAULT_REVIEW_STEP, status: "active" },
     nic: { ...DEFAULT_REVIEW_STEP, status: "active" },
     selfie: { ...DEFAULT_REVIEW_STEP, status: "active" },
-    video: { ...DEFAULT_REVIEW_STEP, status: "active" },
+    video: { ...DEFAULT_REVIEW_STEP, status: "pending" },
     gps: { ...DEFAULT_REVIEW_STEP, status: "pending" },
   },
 };
@@ -145,6 +147,23 @@ export function parseApplication(data: Record<string, unknown> | undefined): App
   };
 }
 
+/**
+ * A script with no usable lines is no script — returning null keeps every
+ * caller on one check ("is there a script yet?") instead of two.
+ */
+export function parseVideoScript(raw: unknown): VideoScript | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const lines = Array.isArray(r.lines) ? r.lines.filter((line): line is string => typeof line === "string" && line !== "") : [];
+  if (lines.length === 0) return null;
+  return {
+    format: r.format === "text" ? "text" : "list",
+    lines,
+    revision: typeof r.revision === "number" ? r.revision : 0,
+    updatedBy: typeof r.updatedBy === "string" ? r.updatedBy : "",
+  };
+}
+
 function parseReviewStep(raw: unknown, fallbackStatus: ReviewStep["status"]): ReviewStep {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_REVIEW_STEP, status: fallbackStatus };
   const r = raw as Record<string, unknown>;
@@ -153,6 +172,7 @@ function parseReviewStep(raw: unknown, fallbackStatus: ReviewStep["status"]): Re
     attempt: typeof r.attempt === "number" ? r.attempt : 0,
     note: typeof r.note === "string" ? r.note : "",
     venueId: typeof r.venueId === "string" ? r.venueId : null,
+    script: parseVideoScript(r.script),
   };
 }
 
@@ -167,7 +187,7 @@ export function parseReview(data: Record<string, unknown> | undefined): ReviewDo
       venueAddress: parseReviewStep(rawSteps.venueAddress, "active"),
       nic: parseReviewStep(rawSteps.nic, "active"),
       selfie: parseReviewStep(rawSteps.selfie, "active"),
-      video: parseReviewStep(rawSteps.video, "active"),
+      video: parseReviewStep(rawSteps.video, "pending"),
       gps: parseReviewStep(rawSteps.gps, "pending"),
     },
   };
@@ -320,11 +340,11 @@ export async function ensureReviewDoc(uid: string): Promise<void> {
       rejectionReason: "",
       phoneVerified: false,
       steps: {
-        venueAddress: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-        nic: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-        selfie: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-        video: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
-        gps: { status: "pending", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null },
+        venueAddress: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+        nic: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+        selfie: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+        video: { status: "pending", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
+        gps: { status: "pending", attempt: 0, note: "", reviewedAt: null, reviewedBy: null, venueId: null, mediaDeletedAt: null, script: null },
       },
       updatedAt: serverTimestamp(),
     });

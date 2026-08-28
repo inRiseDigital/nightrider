@@ -6,7 +6,7 @@ import { ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { RequiresAppLabel, StepThumb } from "@/components/organizer/ui/StepMedia";
 import { TextField } from "@/components/organizer/ui/TextField";
 import { useApplicationActions, useApplicationState } from "@/lib/organizer/store";
-import type { StepView, VenueAddressDraft } from "@/lib/organizer/types";
+import type { StepView, VenueAddressDraft, VideoScript } from "@/lib/organizer/types";
 import { VenueLocationPicker } from "./VenueLocationPicker";
 
 /**
@@ -77,6 +77,43 @@ function AppStepPanel({ step }: { step: StepView }) {
       {/* The tile stands in for media that has not arrived yet, so it goes
           once the applicant's own claim (or an admin) says it has. */}
       {step.thumbLabel && !settled && <StepThumb label={step.thumbLabel} />}
+    </div>
+  );
+}
+
+/**
+ * The walkthrough script an admin wrote for this venue. Read-only here — the
+ * applicant records against it, they do not edit it.
+ */
+function ScriptCard({ script }: { script: VideoScript }) {
+  return (
+    <div className="w-full rounded-xl border border-nr-border bg-nr-surface p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-nr-text-secondary">
+          Your walkthrough script
+        </p>
+        {script.revision > 0 && (
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            style={{ background: "var(--warnc)", color: "var(--onwarnc)" }}
+          >
+            Revised
+          </span>
+        )}
+      </div>
+      {script.format === "list" ? (
+        <ol className="ml-4 flex list-decimal flex-col gap-1.5 text-[13px] text-nr-text-secondary">
+          {script.lines.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ol>
+      ) : (
+        <div className="flex flex-col gap-2 text-[13px] text-nr-text-secondary">
+          {script.lines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -247,11 +284,27 @@ function UploadPanel({
 }) {
   const [video, setVideo] = useState<File | null>(null);
 
+  // The step is unlocked in every sense except the one that matters: the
+  // applicant has finished the other four and there is no script to record
+  // against yet. Saying so beats leaving them at a locked step.
+  if (step.awaitingScript) {
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-[13px] text-nr-text-secondary">
+          That&apos;s everything we needed from you for now. An admin is writing the walkthrough script for
+          your venue — it appears here, and this step unlocks the moment it does.
+        </p>
+        {step.note && <AdminNote note={step.note} />}
+      </div>
+    );
+  }
+
   if (step.awaitingReview) {
     return (
       <div className="flex flex-col items-start gap-2">
         <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
         <p className="text-xs" style={{ color: "var(--ter)" }}>This step is already submitted — wait for review.</p>
+        {step.script && <ScriptCard script={step.script} />}
         {step.note && <AdminNote note={step.note} />}
       </div>
     );
@@ -262,6 +315,7 @@ function UploadPanel({
       <div className="flex flex-col items-start gap-2">
         <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
         {step.status === "accepted" && <p className="text-xs" style={{ color: "var(--suc)" }}>Accepted.</p>}
+        {step.script && <ScriptCard script={step.script} />}
       </div>
     );
   }
@@ -276,6 +330,7 @@ function UploadPanel({
     >
       <p className="text-[13px] text-nr-text-secondary">{step.detail}</p>
       {step.note && <AdminNote note={step.note} />}
+      {step.script && <ScriptCard script={step.script} />}
 
       <FilePicker label="Walkthrough video" accept="video/mp4" onChange={setVideo} />
 

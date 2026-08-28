@@ -4,7 +4,7 @@
 // (the same doc, read from the other side) rather than redefined here.
 
 import type { Timestamp } from "firebase/firestore";
-import type { ApplicantApplication, GpsObservation, StepId, StepStatus } from "@/lib/organizer/types";
+import type { ApplicantApplication, GpsObservation, StepId, StepStatus, VideoScript } from "@/lib/organizer/types";
 
 export type { ApplicantApplication, GpsObservation, StepId, StepStatus };
 
@@ -36,6 +36,8 @@ export interface AdminReviewStep {
   reviewedBy: string | null;
   venueId: string | null;
   mediaDeletedAt: Timestamp | null;
+  /** video only: the walkthrough script this admin (or another) published. */
+  script: VideoScript | null;
 }
 
 /** `users/{uid}/private/organizerReview` — the verdict document, in full. */
@@ -87,7 +89,8 @@ export type LogAction =
   | "venue.create"
   | "report.delete"
   | "kyc.needsInfo"
-  | "kyc.accept";
+  | "kyc.accept"
+  | "kyc.script";
 
 export type LogTargetType = "event" | "venue" | "user" | "report";
 

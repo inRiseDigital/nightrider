@@ -60,7 +60,14 @@ class _ChatVerificationGateState extends ConsumerState<ChatVerificationGate>
   Future<void> _poll() async {
     // Notifier refreshes the user, force-refreshes the ID-token claim, and flips
     // emailVerifiedProvider to true when done — which removes this gate.
-    await ref.read(emailVerifiedProvider.notifier).refresh();
+    // Timer.periodic doesn't await this, so an uncaught error here becomes an
+    // unhandled async exception that crashes the app; a transient network
+    // hiccup must not stop the next poll from firing.
+    try {
+      await ref.read(emailVerifiedProvider.notifier).refresh();
+    } catch (_) {
+      // Ignored — the timer retries in _pollInterval.
+    }
   }
 
   void _startCooldown() {

@@ -29,11 +29,19 @@ export interface HoursException {
 export type VerifyStepId = "license" | "gps" | "video";
 export type VerifyStepStatus = "active" | "done";
 
+export interface SocialLink {
+  network: string;
+  value: string;
+}
+
 export interface VenueProfile {
   /** False until an admin approves the venue; gates the editor and the app preview. */
   verified: boolean;
   name: string;
   city: string;
+  address: string;
+  about: string;
+  socialLinks: SocialLink[];
   genres: string[];
   dressCode: string;
   agePolicy: string;

@@ -42,7 +42,7 @@ import type {
   VerifyStepId,
 } from "./types";
 
-export type VenueTab = "gallery" | "attributes" | "hours" | "links";
+export type VenueTab = "profile" | "hours" | "links";
 export type ChangeField = "email" | "phone";
 export type ChangeStage = "edit" | "otp";
 
@@ -129,6 +129,9 @@ interface OrganizerDashboardValue {
   createVenue: () => void;
   setVenueField: <K extends keyof VenueProfile>(id: string, field: K, value: VenueProfile[K]) => void;
   toggleVenueSetValue: (id: string, field: "genres" | "amenities", value: string) => void;
+  addSocialLink: (id: string) => void;
+  removeSocialLink: (id: string, idx: number) => void;
+  setSocialLinkField: (id: string, idx: number, field: "network" | "value", value: string) => void;
   setHourField: (id: string, dayIdx: number, field: "open" | "close", value: string) => void;
   toggleDayClosed: (id: string, dayIdx: number) => void;
   addException: (id: string) => void;
@@ -250,7 +253,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const [venueOrder, setVenueOrder] = useState<string[]>(MOCK_VENUE_ORDER);
   const [venues, setVenues] = useState<Record<string, VenueProfile>>(MOCK_VENUES);
   const [editingVenue, setEditingVenue] = useState(MOCK_VENUE_ORDER[0]);
-  const [venueTab, setVenueTab] = useState<VenueTab>("gallery");
+  const [venueTab, setVenueTab] = useState<VenueTab>("profile");
   const [addingVenue, setAddingVenue] = useState(false);
   const [newVenueName, setNewVenueName] = useState("");
   const [newVenueCity, setNewVenueCity] = useState("");
@@ -330,6 +333,33 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
         [field]: p[field].includes(value)
           ? p[field].filter((x) => x !== value)
           : [...p[field], value],
+      }));
+    },
+    [updateVenue]
+  );
+
+  const addSocialLink = useCallback(
+    (id: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        socialLinks: [...p.socialLinks, { network: "instagram", value: "" }],
+      }));
+    },
+    [updateVenue]
+  );
+
+  const removeSocialLink = useCallback(
+    (id: string, idx: number) => {
+      updateVenue(id, (p) => ({ ...p, socialLinks: p.socialLinks.filter((_, i) => i !== idx) }));
+    },
+    [updateVenue]
+  );
+
+  const setSocialLinkField = useCallback(
+    (id: string, idx: number, field: "network" | "value", value: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        socialLinks: p.socialLinks.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
       }));
     },
     [updateVenue]
@@ -724,6 +754,9 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       createVenue,
       setVenueField,
       toggleVenueSetValue,
+      addSocialLink,
+      removeSocialLink,
+      setSocialLinkField,
       setHourField,
       toggleDayClosed,
       addException,
@@ -830,7 +863,8 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
     }),
     [
       venueOrder, venues, editingVenue, profile, venueTab, addingVenue, newVenueName, newVenueCity,
-      openAddVenue, cancelAddVenue, createVenue, setVenueField, toggleVenueSetValue, setHourField,
+      openAddVenue, cancelAddVenue, createVenue, setVenueField, toggleVenueSetValue,
+      addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
       toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,
       toggleVerifyStep, approveVenue,
       events, eventEditorOpen, editingEventId, eventDraft, lineupInput, cancelingEventId,

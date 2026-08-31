@@ -14,15 +14,24 @@ import {
   GENRES,
 } from "@/lib/organizer/dashboard/constants";
 import { ImageSlot } from "../ui/ImageSlot";
-import { Chip, FieldLabel, SlimInput, VenueSwitcher } from "../ui/Primitives";
+import { Chip, FieldLabel, SlimInput, SlimTextarea, VenueSwitcher } from "../ui/Primitives";
 import { VenueAppPreview } from "./VenueAppPreview";
 import { VenueVerifyPending } from "./VenueVerifyPending";
 
 const TABS: { id: VenueTab; label: string }[] = [
-  { id: "gallery", label: "Gallery & Hero" },
-  { id: "attributes", label: "Attributes" },
+  { id: "profile", label: "Profile" },
   { id: "hours", label: "Hours" },
   { id: "links", label: "Links" },
+];
+
+const SOCIAL_NETWORKS = [
+  { value: "instagram", label: "Instagram" },
+  { value: "tiktok", label: "TikTok" },
+  { value: "facebook", label: "Facebook" },
+  { value: "x", label: "X" },
+  { value: "youtube", label: "YouTube" },
+  { value: "website", label: "Website" },
+  { value: "whatsapp", label: "WhatsApp" },
 ];
 
 export function VenuesSection() {
@@ -116,31 +125,7 @@ export function VenuesSection() {
               ))}
             </div>
 
-            {venueTab === "gallery" && (
-              <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-                <FieldLabel className="mb-2.5">
-                  Hero image — shown on your card and at the top of your detail page
-                </FieldLabel>
-                <div className="relative">
-                  <ImageSlot slotId={hero} placeholder="Drop your hero photo" className="h-[220px]" />
-                  <RemoveImageButton onClick={() => requestRemoveImage(hero)} />
-                </div>
-
-                <FieldLabel className="mb-2.5 mt-[18px]">
-                  Gallery — additional photos for your detail page
-                </FieldLabel>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  {gallery.map((slotId) => (
-                    <div key={slotId} className="relative">
-                      <ImageSlot slotId={slotId} placeholder="Add photo" className="h-[110px]" />
-                      <RemoveImageButton onClick={() => requestRemoveImage(slotId)} small />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {venueTab === "attributes" && <AttributesTab />}
+            {venueTab === "profile" && <ProfileTab hero={hero} gallery={gallery} />}
             {venueTab === "hours" && <HoursTab />}
             {venueTab === "links" && <LinksTab />}
           </div>
@@ -167,66 +152,199 @@ function RemoveImageButton({ onClick, small }: { onClick: () => void; small?: bo
   );
 }
 
-function AttributesTab() {
-  const { profile, editingVenue, toggleVenueSetValue, setVenueField } = useOrganizerDashboard();
+function ProfileTab({ hero, gallery }: { hero: string; gallery: string[] }) {
+  const {
+    profile,
+    editingVenue,
+    toggleVenueSetValue,
+    setVenueField,
+    addSocialLink,
+    removeSocialLink,
+    setSocialLinkField,
+    requestRemoveImage,
+  } = useOrganizerDashboard();
 
   return (
-    <div className="flex flex-col gap-[22px] rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-      <ChipGroup
-        label="Music genres"
-        options={GENRES}
-        isActive={(g) => profile.genres.includes(g)}
-        onToggle={(g) => toggleVenueSetValue(editingVenue, "genres", g)}
-      />
-      <ChipGroup
-        label="Dress code"
-        options={DRESS_CODES}
-        isActive={(d) => profile.dressCode === d}
-        onToggle={(d) => setVenueField(editingVenue, "dressCode", d)}
-      />
-      <ChipGroup
-        label="Age policy"
-        options={AGE_POLICIES}
-        isActive={(a) => profile.agePolicy === a}
-        onToggle={(a) => setVenueField(editingVenue, "agePolicy", a)}
-      />
-      <ChipGroup
-        label="Amenities"
-        options={AMENITIES}
-        isActive={(a) => profile.amenities.includes(a)}
-        onToggle={(a) => toggleVenueSetValue(editingVenue, "amenities", a)}
-      />
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="flex flex-col gap-4 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+        <div>
+          <FieldLabel className="mb-1.5">Venue name</FieldLabel>
+          <SlimInput
+            value={profile.name}
+            onChange={(e) => setVenueField(editingVenue, "name", e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div>
+          <FieldLabel className="mb-1.5">Address</FieldLabel>
+          <SlimInput
+            value={profile.address}
+            onChange={(e) => setVenueField(editingVenue, "address", e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3.5">
+          <div>
+            <FieldLabel className="mb-1.5">Capacity</FieldLabel>
+            <SlimInput
+              type="number"
+              mono
+              value={profile.capacity}
+              onChange={(e) => setVenueField(editingVenue, "capacity", Number(e.target.value) || 0)}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <FieldLabel className="mb-1.5">Dress code</FieldLabel>
+            <select
+              value={profile.dressCode}
+              onChange={(e) => setVenueField(editingVenue, "dressCode", e.target.value)}
+              className="w-full rounded-md border px-3 py-2.5 text-sm outline-none"
+              style={{
+                borderColor: "var(--m3-outline)",
+                background: "var(--m3-surf2)",
+                color: "var(--m3-on)",
+              }}
+            >
+              {DRESS_CODES.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <FieldLabel className="mb-1.5">About this venue</FieldLabel>
+          <SlimTextarea
+            rows={4}
+            value={profile.about}
+            onChange={(e) => setVenueField(editingVenue, "about", e.target.value)}
+            className="w-full"
+          />
+        </div>
 
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
         <div>
-          <FieldLabel className="mb-1.5">Cover min ({profile.currency})</FieldLabel>
-          <SlimInput
-            type="number"
-            mono
-            value={profile.coverMin}
-            onChange={(e) => setVenueField(editingVenue, "coverMin", Number(e.target.value) || 0)}
-            className="w-full py-2"
+          <div className="mb-2.5 flex items-baseline justify-between">
+            <FieldLabel>Social links</FieldLabel>
+            <span className="text-[11px] text-[var(--m3-outline)]">Handle or full URL</span>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {profile.socialLinks.map((link, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <select
+                  value={link.network}
+                  onChange={(e) => setSocialLinkField(editingVenue, i, "network", e.target.value)}
+                  className="w-[110px] shrink-0 rounded-md border px-2 py-2 text-xs outline-none"
+                  style={{
+                    borderColor: "var(--m3-outline)",
+                    background: "var(--m3-surf2)",
+                    color: "var(--m3-onv)",
+                  }}
+                >
+                  {SOCIAL_NETWORKS.map((n) => (
+                    <option key={n.value} value={n.value}>
+                      {n.label}
+                    </option>
+                  ))}
+                </select>
+                <SlimInput
+                  value={link.value}
+                  onChange={(e) => setSocialLinkField(editingVenue, i, "value", e.target.value)}
+                  placeholder="@handle or https://..."
+                  className="min-w-0 flex-1 py-2 text-xs"
+                />
+                <button
+                  onClick={() => removeSocialLink(editingVenue, i)}
+                  className="shrink-0 text-[var(--m3-outline)] hover:text-red-400"
+                  aria-label="Remove social link"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => addSocialLink(editingVenue)}
+              className="self-start rounded-full px-3.5 py-1.5 text-xs font-semibold"
+              style={{ background: "var(--m3-pric)", color: "var(--m3-onpric)" }}
+            >
+              + Add link
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+          <ChipGroup
+            label="Music genres"
+            options={GENRES}
+            isActive={(g) => profile.genres.includes(g)}
+            onToggle={(g) => toggleVenueSetValue(editingVenue, "genres", g)}
           />
         </div>
-        <div>
-          <FieldLabel className="mb-1.5">Cover max ({profile.currency})</FieldLabel>
-          <SlimInput
-            type="number"
-            mono
-            value={profile.coverMax}
-            onChange={(e) => setVenueField(editingVenue, "coverMax", Number(e.target.value) || 0)}
-            className="w-full py-2"
+
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+          <FieldLabel className="mb-2.5">
+            Hero image — shown on your card and at the top of your detail page
+          </FieldLabel>
+          <div className="relative">
+            <ImageSlot slotId={hero} placeholder="Drop your hero photo" className="h-[200px]" />
+            <RemoveImageButton onClick={() => requestRemoveImage(hero)} />
+          </div>
+
+          <FieldLabel className="mb-2.5 mt-[18px]">
+            Gallery — additional photos for your detail page
+          </FieldLabel>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {gallery.map((slotId) => (
+              <div key={slotId} className="relative">
+                <ImageSlot slotId={slotId} placeholder="Add photo" className="h-[88px]" />
+                <RemoveImageButton onClick={() => requestRemoveImage(slotId)} small />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+          <ChipGroup
+            label="Age policy"
+            options={AGE_POLICIES}
+            isActive={(a) => profile.agePolicy === a}
+            onToggle={(a) => setVenueField(editingVenue, "agePolicy", a)}
           />
         </div>
-        <div>
-          <FieldLabel className="mb-1.5">Capacity</FieldLabel>
-          <SlimInput
-            type="number"
-            mono
-            value={profile.capacity}
-            onChange={(e) => setVenueField(editingVenue, "capacity", Number(e.target.value) || 0)}
-            className="w-full py-2"
+
+        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+          <ChipGroup
+            label="Amenities"
+            options={AMENITIES}
+            isActive={(a) => profile.amenities.includes(a)}
+            onToggle={(a) => toggleVenueSetValue(editingVenue, "amenities", a)}
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3.5 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
+          <div>
+            <FieldLabel className="mb-1.5">Cover min ({profile.currency})</FieldLabel>
+            <SlimInput
+              type="number"
+              mono
+              value={profile.coverMin}
+              onChange={(e) => setVenueField(editingVenue, "coverMin", Number(e.target.value) || 0)}
+              className="w-full py-2"
+            />
+          </div>
+          <div>
+            <FieldLabel className="mb-1.5">Cover max ({profile.currency})</FieldLabel>
+            <SlimInput
+              type="number"
+              mono
+              value={profile.coverMax}
+              onChange={(e) => setVenueField(editingVenue, "coverMax", Number(e.target.value) || 0)}
+              className="w-full py-2"
+            />
+          </div>
         </div>
       </div>
     </div>

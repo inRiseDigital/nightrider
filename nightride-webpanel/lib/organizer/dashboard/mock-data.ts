@@ -39,6 +39,13 @@ export const MOCK_VENUES: Record<string, VenueProfile> = {
     verified: true,
     name: "Sirens Dubai",
     city: "Dubai, UAE",
+    address: "Marina Walk, Dubai Marina, Dubai, UAE",
+    about:
+      "Rooftop techno and house on the Marina skyline. Open-air terrace, resident DJs Thu–Sat, and a strict door policy after 23:00.",
+    socialLinks: [
+      { network: "instagram", value: "@sirensdubai" },
+      { network: "tiktok", value: "@sirensdubai" },
+    ],
     genres: ["Techno", "House"],
     dressCode: "Smart Casual",
     agePolicy: "21+",
@@ -55,6 +62,10 @@ export const MOCK_VENUES: Record<string, VenueProfile> = {
     verified: true,
     name: "Warehouse 9",
     city: "Tokyo, Japan",
+    address: "9 Chome, Shibuya, Tokyo, Japan",
+    about:
+      "Industrial main room built for deep house and techno. Outdoor terrace for smoke breaks, VIP tables on request.",
+    socialLinks: [{ network: "instagram", value: "@warehouse9tokyo" }],
     genres: ["Deep House", "Techno", "Commercial"],
     dressCode: "Casual",
     agePolicy: "18+",

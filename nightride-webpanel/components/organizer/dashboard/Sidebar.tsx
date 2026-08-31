@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
-import { ORGANIZER_NAV_GROUPS } from "./nav-items";
+import { ORGANIZER_NAV_ITEMS } from "./nav-items";
 
 /**
  * 88px Material icon rail + slide-out drawer, per the design's nav pattern.
  *
- * The rail shows one icon per nav group (its first item is the rail
- * destination); the hamburger button always opens the full grouped drawer.
+ * Both the rail and the drawer list the same 5 flat destinations — the
+ * drawer exists for a labelled, larger-hit-target view of the same nav, not
+ * a deeper hierarchy (that lives in each destination's own tab strip).
  * `drawerOpen` is lifted to DashboardShell since both the rail's own
  * hamburger and the topbar's mobile menu button open the same drawer.
  */
@@ -42,42 +43,31 @@ export function Sidebar({
         </span>
       </div>
 
-      {ORGANIZER_NAV_GROUPS.map((group) => (
-        <div key={group.label} className="mb-3">
-          <p
-            className="px-4 pb-2 text-[11px] font-medium uppercase tracking-widest"
-            style={{ color: "var(--m3-onv)" }}
+      {ORGANIZER_NAV_ITEMS.map((item) => {
+        const active = isActiveHref(item.href);
+        const badge = item.badge === "liveEvents" ? String(liveCount) : null;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onClose}
+            aria-current={active ? "page" : undefined}
+            className="mb-0.5 flex h-14 items-center gap-3 rounded-full px-4 transition-colors hover:opacity-90"
+            style={{
+              background: active ? "var(--m3-surf3)" : "transparent",
+              color: active ? "var(--m3-pri)" : "var(--m3-on)",
+            }}
           >
-            {group.label}
-          </p>
-          {group.items.map((item) => {
-            const active = isActiveHref(item.href);
-            const badge = item.badge === "liveEvents" ? String(liveCount) : null;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                aria-current={active ? "page" : undefined}
-                className="mb-0.5 flex h-14 items-center gap-3 rounded-full px-4 transition-colors hover:opacity-90"
-                style={{
-                  background: active ? "var(--m3-surf3)" : "transparent",
-                  color: active ? "var(--m3-pri)" : "var(--m3-on)",
-                }}
-              >
-                <span className="msi text-[22px]">{item.icon}</span>
-                <span className="flex-1 text-sm font-medium">{item.label}</span>
-                {badge && (
-                  <span className="font-mono text-xs" style={{ color: "var(--m3-onv)" }}>
-                    {badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-          <div className="mx-4 mt-2 h-px" style={{ background: "var(--m3-outlinev)" }} />
-        </div>
-      ))}
+            <span className="msi text-[22px]">{item.icon}</span>
+            <span className="flex-1 text-sm font-medium">{item.label}</span>
+            {badge && (
+              <span className="font-mono text-xs" style={{ color: "var(--m3-onv)" }}>
+                {badge}
+              </span>
+            )}
+          </Link>
+        );
+      })}
     </nav>
   );
 
@@ -106,15 +96,15 @@ export function Sidebar({
         <span className="msi text-2xl">add</span>
       </button>
 
-      {ORGANIZER_NAV_GROUPS.map((group) => {
-        const rep = group.items[0];
-        const active = group.items.some((it) => isActiveHref(it.href));
+      {ORGANIZER_NAV_ITEMS.map((item) => {
+        const active = isActiveHref(item.href);
+        const badge = item.badge === "liveEvents" ? String(liveCount) : null;
         return (
           <Link
-            key={group.label}
-            href={rep.href}
-            title={group.label}
-            className="mb-3 flex w-full flex-col items-center gap-1 px-1"
+            key={item.href}
+            href={item.href}
+            title={item.label}
+            className="relative mb-3 flex w-full flex-col items-center gap-1 px-1"
           >
             <span
               className="flex h-8 w-14 items-center justify-center rounded-full transition-colors"
@@ -123,13 +113,21 @@ export function Sidebar({
                 color: active ? "var(--m3-onpri)" : "var(--m3-onv)",
               }}
             >
-              <span className="msi text-2xl">{group.icon}</span>
+              <span className="msi text-2xl">{item.icon}</span>
+              {badge && (
+                <span
+                  className="absolute -right-1 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[10px] font-bold"
+                  style={{ background: "var(--m3-err)", color: "#601410" }}
+                >
+                  {badge}
+                </span>
+              )}
             </span>
             <span
               className="text-center text-[11px] font-medium leading-tight tracking-wide"
               style={{ color: active ? "var(--m3-on)" : "var(--m3-onv)" }}
             >
-              {group.label.charAt(0) + group.label.slice(1).toLowerCase()}
+              {item.label}
             </span>
           </Link>
         );
@@ -153,10 +151,7 @@ export function Sidebar({
       {drawerOpen && (
         <div className="fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/55" onClick={onClose} />
-          <div
-            className="relative h-full rounded-r-2xl"
-            style={{ background: "var(--m3-surf1)" }}
-          >
+          <div className="relative h-full rounded-r-2xl" style={{ background: "var(--m3-surf1)" }}>
             {drawer}
           </div>
         </div>

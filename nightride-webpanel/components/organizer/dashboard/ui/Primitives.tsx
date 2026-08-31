@@ -3,6 +3,37 @@
 import type { ReactNode } from "react";
 import { cn } from "@/components/admin/ui/cn";
 
+/** Destination-level tab strip (Home/Events/Audience/Account pages) — same
+ *  underline pattern as the venue editor's internal tabs. */
+export function TabStrip<T extends string>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: readonly { id: T; label: string }[];
+  active: T;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div className="mb-[18px] flex gap-5 border-b border-[var(--m3-outlinev)]">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          className={cn(
+            "border-b-2 px-0.5 py-2.5 text-[13px] font-semibold transition-colors",
+            active === t.id
+              ? "border-[var(--m3-pri)] text-[var(--m3-on)]"
+              : "border-transparent text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Card with a header bar, used across the dashboard sections — M3 surface. */
 export function PanelCard({
   title,

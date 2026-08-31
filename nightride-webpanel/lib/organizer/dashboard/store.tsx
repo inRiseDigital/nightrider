@@ -43,6 +43,10 @@ import type {
 } from "./types";
 
 export type VenueTab = "profile" | "hours" | "links";
+export type HomeTab = "tonight" | "activity";
+export type EventsTab = "list" | "calendar";
+export type AudienceTab = "performance" | "reviews" | "ai-visibility";
+export type AccountTab = "team" | "inbox" | "promotion" | "settings";
 export type ChangeField = "email" | "phone";
 export type ChangeStage = "edit" | "otp";
 
@@ -143,6 +147,16 @@ interface OrganizerDashboardValue {
   toggleExceptionClosed: (id: string, idx: number) => void;
   toggleVerifyStep: (id: string, step: VerifyStepId) => void;
   approveVenue: (id: string) => void;
+
+  // ---- Destination tab strips ----
+  homeTab: HomeTab;
+  setHomeTab: (tab: HomeTab) => void;
+  eventsTab: EventsTab;
+  setEventsTab: (tab: EventsTab) => void;
+  audienceTab: AudienceTab;
+  setAudienceTab: (tab: AudienceTab) => void;
+  accountTab: AccountTab;
+  setAccountTab: (tab: AccountTab) => void;
 
   // ---- Events ----
   events: OrganizerEvent[];
@@ -257,6 +271,10 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const [venues, setVenues] = useState<Record<string, VenueProfile>>(MOCK_VENUES);
   const [editingVenue, setEditingVenue] = useState(MOCK_VENUE_ORDER[0]);
   const [venueTab, setVenueTab] = useState<VenueTab>("profile");
+  const [homeTab, setHomeTab] = useState<HomeTab>("tonight");
+  const [eventsTab, setEventsTab] = useState<EventsTab>("list");
+  const [audienceTab, setAudienceTab] = useState<AudienceTab>("performance");
+  const [accountTab, setAccountTab] = useState<AccountTab>("team");
   const [addingVenue, setAddingVenue] = useState(false);
   const [newVenueName, setNewVenueName] = useState("");
   const [newVenueCity, setNewVenueCity] = useState("");
@@ -769,6 +787,15 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       toggleVerifyStep,
       approveVenue,
 
+      homeTab,
+      setHomeTab,
+      eventsTab,
+      setEventsTab,
+      audienceTab,
+      setAudienceTab,
+      accountTab,
+      setAccountTab,
+
       events,
       eventEditorOpen,
       editingEventId,
@@ -870,6 +897,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
       toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,
       toggleVerifyStep, approveVenue,
+      homeTab, eventsTab, audienceTab, accountTab,
       events, eventEditorOpen, editingEventId, eventDraft, lineupInput, cancelingEventId,
       cancelReasonInput, openNewEvent, openEditEvent, closeEditor, updateDraft, addLineup,
       removeLineup, addTier, updateTier, removeTier, saveDraftEvent, submitEvent, duplicateEvent,

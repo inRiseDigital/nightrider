@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
@@ -9,13 +8,24 @@ import { findNavItem } from "./nav-items";
 export function Topbar({ onMenuClick: _onMenuClick }: { onMenuClick: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { organizer, inbox, hasUnreadInbox, venueOrder, openNewEvent } = useOrganizerDashboard();
+  const { organizer, inbox, hasUnreadInbox, venueOrder, openNewEvent, profile, setAccountTab } =
+    useOrganizerDashboard();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const nav = findNavItem(pathname);
   const isEventsPage = pathname === "/organizer/events";
+  const isAccountPage = pathname === "/organizer/account";
+  const subtitle = isAccountPage
+    ? `${profile.name} · ${profile.city} · ${profile.verified ? "Verified organizer" : "Pending verification"}`
+    : nav?.subtitle;
+
+  const goToAccountTab = (tab: "team" | "inbox" | "settings") => {
+    closeMenus();
+    setAccountTab(tab);
+    router.push("/organizer/account");
+  };
   const closeMenus = () => {
     setNotifOpen(false);
     setProfileOpen(false);
@@ -35,7 +45,7 @@ export function Topbar({ onMenuClick: _onMenuClick }: { onMenuClick: () => void 
             {nav?.title ?? "Organizer Panel"}
           </h1>
           <p className="mt-0.5 truncate text-xs tracking-wide" style={{ color: "var(--m3-onv)" }}>
-            {nav?.subtitle}
+            {subtitle}
           </p>
         </div>
 
@@ -104,10 +114,7 @@ export function Topbar({ onMenuClick: _onMenuClick }: { onMenuClick: () => void 
                 inbox.slice(0, 3).map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => {
-                      closeMenus();
-                      router.push("/organizer/inbox");
-                    }}
+                    onClick={() => goToAccountTab("inbox")}
                     className="block w-full border-b px-3.5 py-2.5 text-left hover:opacity-80"
                     style={{ borderColor: "var(--m3-outlinev)" }}
                   >
@@ -120,14 +127,13 @@ export function Topbar({ onMenuClick: _onMenuClick }: { onMenuClick: () => void 
                   </button>
                 ))
               )}
-              <Link
-                href="/organizer/inbox"
-                onClick={closeMenus}
-                className="block px-3.5 py-2.5 text-xs font-semibold hover:opacity-80"
+              <button
+                onClick={() => goToAccountTab("inbox")}
+                className="block w-full px-3.5 py-2.5 text-left text-xs font-semibold hover:opacity-80"
                 style={{ color: "var(--m3-pri)" }}
               >
                 View all in Inbox
-              </Link>
+              </button>
             </div>
           )}
         </div>
@@ -165,22 +171,20 @@ export function Topbar({ onMenuClick: _onMenuClick }: { onMenuClick: () => void 
                   {venueOrder.length} venue{venueOrder.length === 1 ? "" : "s"} assigned
                 </p>
               </div>
-              <Link
-                href="/organizer/team"
-                onClick={closeMenus}
-                className="block px-3.5 py-2.5 text-xs hover:opacity-80"
+              <button
+                onClick={() => goToAccountTab("team")}
+                className="block w-full px-3.5 py-2.5 text-left text-xs hover:opacity-80"
                 style={{ color: "var(--m3-on)" }}
               >
                 Team &amp; Access
-              </Link>
-              <Link
-                href="/organizer/settings"
-                onClick={closeMenus}
-                className="block px-3.5 py-2.5 text-xs hover:opacity-80"
+              </button>
+              <button
+                onClick={() => goToAccountTab("settings")}
+                className="block w-full px-3.5 py-2.5 text-left text-xs hover:opacity-80"
                 style={{ color: "var(--m3-on)" }}
               >
                 Settings
-              </Link>
+              </button>
               <button
                 onClick={closeMenus}
                 className="block w-full border-t px-3.5 py-2.5 text-left text-xs hover:opacity-80"

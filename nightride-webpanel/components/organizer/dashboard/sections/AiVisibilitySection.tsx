@@ -20,8 +20,8 @@ export function AiVisibilitySection() {
     useOrganizerDashboard();
   const now = useNow();
 
-  const goToVenueTab = (tab: "attributes" | "gallery") => {
-    setVenueTab(tab);
+  const goToVenueProfile = () => {
+    setVenueTab("profile");
     router.push("/organizer/venues");
   };
 
@@ -46,7 +46,7 @@ export function AiVisibilitySection() {
         ? 'Genres help the AI match "techno tonight" style intents.'
         : "No genres tagged — you will be invisible to genre-based searches.",
       ctaLabel: genresSet ? undefined : "Set genres",
-      onCta: () => goToVenueTab("attributes"),
+      onCta: () => goToVenueProfile(),
     },
     {
       label: "Amenities & attributes complete",
@@ -55,7 +55,7 @@ export function AiVisibilitySection() {
         ? "Filters like rooftop / smoking area are filled in."
         : "Add at least 2 amenities so filter-based searches surface you.",
       ctaLabel: amenitiesSet ? undefined : "Add amenities",
-      onCta: () => goToVenueTab("attributes"),
+      onCta: () => goToVenueProfile(),
     },
     {
       label: "Upcoming event within 14 days",
@@ -74,7 +74,7 @@ export function AiVisibilitySection() {
       pass: null,
       hint: "We can't verify from here — make sure you have a hero image plus 4 gallery photos.",
       ctaLabel: "Check gallery",
-      onCta: () => goToVenueTab("gallery"),
+      onCta: () => goToVenueProfile(),
     },
   ];
 

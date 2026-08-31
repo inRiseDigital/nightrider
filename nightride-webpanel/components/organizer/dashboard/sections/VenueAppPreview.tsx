@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ArrowLeft,
   AtSign,
+  Camera,
   ChevronRight,
   Clock,
   Crown,
   ExternalLink,
   Globe,
   Heart,
+  ImagePlus,
   Link2,
   Lock,
   MapPin,
@@ -83,19 +85,94 @@ function networkLabel(link: SocialLink) {
 }
 
 /**
+ * Click-to-browse / drag-and-drop upload for one image slot, styled for the
+ * cream preview rather than the M3 editor. This is the venue's only image
+ * upload surface — the Profile tab just displays what's set here.
+ */
+function useImageUpload(slotId: string) {
+  const { setImage } = useOrganizerDashboard();
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const readFile = useCallback(
+    (file: File | undefined) => {
+      if (!file || !file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") setImage(slotId, reader.result);
+      };
+      reader.readAsDataURL(file);
+    },
+    [slotId, setImage]
+  );
+
+  const openPicker = useCallback(() => inputRef.current?.click(), []);
+
+  const onDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragging(false);
+      readFile(e.dataTransfer.files?.[0]);
+    },
+    [readFile]
+  );
+
+  const onDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+  }, []);
+
+  const onDragLeave = useCallback(() => setDragging(false), []);
+
+  const input = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      className="sr-only"
+      onChange={(e) => {
+        readFile(e.target.files?.[0]);
+        e.target.value = "";
+      }}
+    />
+  );
+
+  return { dragging, openPicker, onDrop, onDragOver, onDragLeave, input };
+}
+
+function RemoveButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title="Remove image"
+      aria-label="Remove image"
+      className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100"
+    >
+      <CloseIcon size={12} />
+    </button>
+  );
+}
+
+/**
  * Faithful phone-frame render of the consumer app's Venue Detail screen,
  * matching `Venue Detail.dc.html` — the cream/pink/lime consumer brand, not
  * the M3 organizer chrome. This is deliberately a different visual system:
  * it's "the phone", not another dashboard panel.
  */
 export function VenueAppPreview() {
-  const { profile, editingVenue, events, images } = useOrganizerDashboard();
+  const { profile, editingVenue, events, images, requestRemoveImage } = useOrganizerDashboard();
   const now = useNow();
   const [liked, setLiked] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const hero = heroSlotId(editingVenue);
   const gallery = gallerySlotIds(editingVenue);
+  const heroUpload = useImageUpload(hero);
 
   const dayIdx = now ? mondayFirstIndex(now) : 0;
   const todayISO = now ? toISODate(now) : "";
@@ -137,18 +214,43 @@ export function VenueAppPreview() {
         style={{ background: CREAM, color: INK, fontFamily: "var(--font-sans), sans-serif" }}
       >
         <div className="nr-phone-scroll max-h-[720px] overflow-y-auto overflow-x-hidden">
-          {/* Hero */}
+          {/* Hero — click, drop, or drag an image here to set it; this is the only
+              place to change the hero photo, the Profile tab just displays it. */}
           <div
-            className="relative h-[220px]"
+            role="button"
+            tabIndex={0}
+            onClick={heroUpload.openPicker}
+            onKeyDown={(e) => e.key === "Enter" && heroUpload.openPicker()}
+            onDrop={heroUpload.onDrop}
+            onDragOver={heroUpload.onDragOver}
+            onDragLeave={heroUpload.onDragLeave}
+            aria-label={images[hero] ? "Replace hero photo" : "Add hero photo"}
+            className="group relative h-[220px] cursor-pointer"
             style={{
               background:
                 "radial-gradient(120% 90% at 20% 20%, #3B1C6B 0%, transparent 60%), radial-gradient(110% 80% at 78% 12%, #1E4FA8 0%, transparent 58%), radial-gradient(90% 70% at 55% 45%, #C2277E 0%, transparent 62%), linear-gradient(180deg, #1A0A22 0%, #0B0510 100%)",
             }}
           >
-            {images[hero] && (
+            {heroUpload.input}
+            {images[hero] ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={images[hero]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white/70">
+                <ImagePlus size={22} />
+                <span className="text-[11px]">Drop your hero photo</span>
+              </div>
             )}
+            <div
+              className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 ${
+                heroUpload.dragging ? "opacity-100" : ""
+              }`}
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                <Camera size={15} />
+                {images[hero] ? "Replace photo" : "Add photo"}
+              </span>
+            </div>
             <div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -163,7 +265,10 @@ export function VenueAppPreview() {
             </div>
 
             <button
-              onClick={() => setLiked((v) => !v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setLiked((v) => !v);
+              }}
               aria-label="Toggle favorite"
               className="absolute right-3 top-11 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white backdrop-blur"
             >
@@ -172,19 +277,20 @@ export function VenueAppPreview() {
             <div className="absolute left-3 top-11 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white backdrop-blur">
               <ArrowLeft size={17} />
             </div>
+            {images[hero] && <RemoveButton onClick={() => requestRemoveImage(hero)} />}
 
             <div
-              className="absolute left-4 bottom-14 rounded-full px-3 py-1 text-[10px] font-bold tracking-widest text-white"
+              className="pointer-events-none absolute left-4 bottom-14 rounded-full px-3 py-1 text-[10px] font-bold tracking-widest text-white"
               style={{ background: PINK }}
             >
               CLUB
             </div>
             <div
-              className="absolute left-4 right-16 bottom-4 font-display text-[26px] uppercase leading-none tracking-wide text-white"
+              className="pointer-events-none absolute left-4 right-16 bottom-4 font-display text-[26px] uppercase leading-none tracking-wide text-white"
             >
               {profile.name}
             </div>
-            <div className="absolute right-4 bottom-4 rounded-full border border-white/15 bg-black/40 px-2.5 py-1 font-mono text-[10px] text-white">
+            <div className="pointer-events-none absolute right-4 bottom-4 rounded-full border border-white/15 bg-black/40 px-2.5 py-1 font-mono text-[10px] text-white">
               1/{Math.max(gallery.length, 1)}
             </div>
           </div>
@@ -342,23 +448,9 @@ export function VenueAppPreview() {
 
             <Section title="GALLERY">
               <div className="nr-phone-scroll flex gap-2 overflow-x-auto pb-1">
-                {gallery.map((slotId) =>
-                  images[slotId] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={slotId}
-                      src={images[slotId]}
-                      alt=""
-                      className="h-[92px] w-[74px] shrink-0 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div
-                      key={slotId}
-                      className="h-[92px] w-[74px] shrink-0 rounded-lg border border-dashed"
-                      style={{ borderColor: HAIRLINE, background: "#FFFDFA" }}
-                    />
-                  )
-                )}
+                {gallery.map((slotId) => (
+                  <GalleryTile key={slotId} slotId={slotId} src={images[slotId]} onRemove={requestRemoveImage} />
+                ))}
               </div>
             </Section>
 
@@ -520,6 +612,54 @@ function Expect({
       <span className="text-center text-[9.5px] leading-tight" style={{ color: "#3A3438" }}>
         {label}
       </span>
+    </div>
+  );
+}
+
+function GalleryTile({
+  slotId,
+  src,
+  onRemove,
+}: {
+  slotId: string;
+  src: string | undefined;
+  onRemove: (slotId: string) => void;
+}) {
+  const upload = useImageUpload(slotId);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={upload.openPicker}
+      onKeyDown={(e) => e.key === "Enter" && upload.openPicker()}
+      onDrop={upload.onDrop}
+      onDragOver={upload.onDragOver}
+      onDragLeave={upload.onDragLeave}
+      aria-label={src ? "Replace gallery photo" : "Add gallery photo"}
+      className="group relative h-[92px] w-[74px] shrink-0 cursor-pointer overflow-hidden rounded-lg border border-dashed"
+      style={{
+        borderColor: upload.dragging ? PINK : HAIRLINE,
+        background: src ? "transparent" : "#FFFDFA",
+      }}
+    >
+      {upload.input}
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center" style={{ color: MUTED }}>
+          <ImagePlus size={16} />
+        </div>
+      )}
+      <div
+        className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 ${
+          upload.dragging ? "opacity-100" : ""
+        }`}
+      >
+        <Camera size={14} color="#fff" />
+      </div>
+      {src && <RemoveButton onClick={() => onRemove(slotId)} />}
     </div>
   );
 }

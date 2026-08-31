@@ -1,19 +1,13 @@
 "use client";
 
 import { X } from "lucide-react";
-import {
-  gallerySlotIds,
-  heroSlotId,
-  useOrganizerDashboard,
-  type VenueTab,
-} from "@/lib/organizer/dashboard/store";
+import { useOrganizerDashboard, type VenueTab } from "@/lib/organizer/dashboard/store";
 import {
   AGE_POLICIES,
   AMENITIES,
   DRESS_CODES,
   GENRES,
 } from "@/lib/organizer/dashboard/constants";
-import { ImageSlot } from "../ui/ImageSlot";
 import { Chip, FieldLabel, SlimInput, SlimTextarea, VenueSwitcher } from "../ui/Primitives";
 import { VenueAppPreview } from "./VenueAppPreview";
 import { VenueVerifyPending } from "./VenueVerifyPending";
@@ -51,11 +45,7 @@ export function VenuesSection() {
     newVenueCity,
     setNewVenueCity,
     createVenue,
-    requestRemoveImage,
   } = useOrganizerDashboard();
-
-  const hero = heroSlotId(editingVenue);
-  const gallery = gallerySlotIds(editingVenue);
 
   return (
     <>
@@ -125,7 +115,7 @@ export function VenuesSection() {
               ))}
             </div>
 
-            {venueTab === "profile" && <ProfileTab hero={hero} gallery={gallery} />}
+            {venueTab === "profile" && <ProfileTab />}
             {venueTab === "hours" && <HoursTab />}
             {venueTab === "links" && <LinksTab />}
           </div>
@@ -137,22 +127,7 @@ export function VenuesSection() {
   );
 }
 
-function RemoveImageButton({ onClick, small }: { onClick: () => void; small?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      title="Remove image"
-      aria-label="Remove image"
-      className={`absolute left-2 top-2 z-10 flex items-center justify-center rounded-full border border-[var(--m3-outlinev)] bg-[var(--m3-surf)]/80 text-[var(--m3-on)] hover:bg-[var(--m3-surf)] ${
-        small ? "h-5 w-5" : "h-6 w-6"
-      }`}
-    >
-      <X size={small ? 10 : 12} />
-    </button>
-  );
-}
-
-function ProfileTab({ hero, gallery }: { hero: string; gallery: string[] }) {
+function ProfileTab() {
   const {
     profile,
     editingVenue,
@@ -161,7 +136,6 @@ function ProfileTab({ hero, gallery }: { hero: string; gallery: string[] }) {
     addSocialLink,
     removeSocialLink,
     setSocialLinkField,
-    requestRemoveImage,
   } = useOrganizerDashboard();
 
   return (
@@ -282,28 +256,6 @@ function ProfileTab({ hero, gallery }: { hero: string; gallery: string[] }) {
             isActive={(g) => profile.genres.includes(g)}
             onToggle={(g) => toggleVenueSetValue(editingVenue, "genres", g)}
           />
-        </div>
-
-        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-          <FieldLabel className="mb-2.5">
-            Hero image — shown on your card and at the top of your detail page
-          </FieldLabel>
-          <div className="relative">
-            <ImageSlot slotId={hero} placeholder="Drop your hero photo" className="h-[200px]" />
-            <RemoveImageButton onClick={() => requestRemoveImage(hero)} />
-          </div>
-
-          <FieldLabel className="mb-2.5 mt-[18px]">
-            Gallery — additional photos for your detail page
-          </FieldLabel>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            {gallery.map((slotId) => (
-              <div key={slotId} className="relative">
-                <ImageSlot slotId={slotId} placeholder="Add photo" className="h-[88px]" />
-                <RemoveImageButton onClick={() => requestRemoveImage(slotId)} small />
-              </div>
-            ))}
-          </div>
         </div>
 
         <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">

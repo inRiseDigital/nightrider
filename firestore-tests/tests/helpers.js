@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
+import { GeoPoint } from 'firebase/firestore';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -111,7 +112,14 @@ export function videoScript(overrides = {}) {
   };
 }
 
-/** A minimal, schema-valid events/{eventId} document. */
+/**
+ * A minimal, schema-valid events/{eventId} document.
+ *
+ * endAt defaults to a real Timestamp (not null): source defaults to
+ * 'organizer', and shapeOk() now requires endAt non-null whenever
+ * source == 'organizer' (a derived `live` status cannot guess an end time).
+ * Tests that specifically exercise the scraped/null-endAt path override it.
+ */
 export function baseEvent(overrides = {}) {
   return {
     name: 'Test Event',
@@ -122,7 +130,7 @@ export function baseEvent(overrides = {}) {
     countryCode: 'AE',
     geo: null,
     startAt: new Date(Date.now() + 86400000),
-    endAt: null,
+    endAt: new Date(Date.now() + 86400000 + 4 * 3600000),
     price: { min: 0, max: 0, currency: 'AED', isFree: true },
     ticketUrl: '',
     coverImage: '',
@@ -149,11 +157,25 @@ export function baseEvent(overrides = {}) {
   };
 }
 
-/** A minimal, schema-valid venues/{venueId} document. */
+/**
+ * A minimal, schema-valid venues/{venueId} document.
+ *
+ * editorUids/editors are derived from ownerUid (the migration backfill rule:
+ * `editorUids = ownerUid ? [ownerUid] : []`, `editors = ownerUid ?
+ * {[ownerUid]: 'owner'} : {}`) unless the caller overrides them explicitly.
+ * This is what flips case 38b from DENY to ALLOW: an organizer creating a
+ * venue with `ownerUid: self` now also gets a matching `editors` map, which
+ * `organizerCreateOk()` requires.
+ */
 export function baseVenue(overrides = {}) {
+  const ownerUid = 'ownerUid' in overrides ? overrides.ownerUid : null;
   return {
     name: 'Test Venue',
-    geo: { latitude: 25.2, longitude: 55.3 },
+    // A real GeoPoint, not a {latitude,longitude} map: venueShapeOk() now
+    // requires `d.geo is latlng`, which only a GeoPoint satisfies. Pre-
+    // organizer-access venue create had zero validation, so this distinction
+    // never mattered until now.
+    geo: new GeoPoint(25.2, 55.3),
     geohash: 'thrq40zzz',
     type: 'nightclub',
     typeLabel: 'Nightclub',
@@ -166,9 +188,13 @@ export function baseVenue(overrides = {}) {
     photos: [],
     source: 'admin',
     osmId: null,
-    ownerUid: null,
+    ownerUid,
     verified: false,
     status: 'active',
+    capacity: 0,
+    timeZone: 'Asia/Dubai',
+    editorUids: ownerUid ? [ownerUid] : [],
+    editors: ownerUid ? { [ownerUid]: 'owner' } : {},
     live: {
       status: 'closed',
       crowdLevel: 'empty',
@@ -177,10 +203,111 @@ export function baseVenue(overrides = {}) {
       tablesAvailable: false,
       tonightDj: '',
       offer: '',
+      doorStatus: 'closed',
+      inVenue: 0,
+      queueMinutes: 0,
+      emergencyActive: false,
+      flash: null,
       updatedAt: new Date(),
     },
     createdAt: new Date(),
     updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** The pinned initial `venues/{id}.verification` shape an organizer create must match. */
+export function initialVenueVerification(overrides = {}) {
+  return {
+    license: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null },
+    gps: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null },
+    video: { status: 'active', attempt: 0, note: '', reviewedAt: null, reviewedBy: null },
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid venueEdits/{venueId} draft document. */
+export function baseVenueEdit(overrides = {}) {
+  return {
+    venueId: 'venue1',
+    status: 'pending',
+    listing: { about: 'A great place.', genres: ['house'] },
+    submittedBy: 'organizer-uid',
+    submittedAt: new Date(),
+    reviewedBy: null,
+    reviewedAt: null,
+    note: '',
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid venues/{venueId}/menuSections/{sectionId} document. */
+export function baseMenuSection(overrides = {}) {
+  return {
+    name: 'Cocktails',
+    order: 0,
+    items: [],
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid venues/{venueId}/activity/{entryId} document. */
+export function baseActivity(overrides = {}) {
+  return {
+    actorUid: 'actor-uid',
+    actorName: 'Test Actor',
+    what: 'updated the menu',
+    targetType: 'menuSection',
+    targetId: 'section1',
+    at: new Date(),
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid venues/{venueId}/promotions/{promoId} document. */
+export function basePromotion(overrides = {}) {
+  return {
+    code: 'VIP10',
+    used: 0,
+    limit: 100,
+    createdAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid venues/{venueId}/pushCampaigns/{campaignId} document. */
+export function basePushCampaign(overrides = {}) {
+  return {
+    title: 'Tonight only',
+    body: 'Free entry before 11pm',
+    status: 'queued',
+    createdAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid venues/{venueId}/boosts/{boostId} document. */
+export function baseBoost(overrides = {}) {
+  return {
+    status: 'pending',
+    startAt: new Date(),
+    endAt: new Date(Date.now() + 86400000),
+    createdAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid users/{uid}/inbox/{messageId} document. */
+export function baseInboxMessage(overrides = {}) {
+  return {
+    subject: 'Policy update',
+    from: 'Night Ride Trust & Safety',
+    type: 'policy',
+    body: 'Please review the updated content policy.',
+    venueId: null,
+    at: new Date(),
+    readAt: null,
     ...overrides,
   };
 }

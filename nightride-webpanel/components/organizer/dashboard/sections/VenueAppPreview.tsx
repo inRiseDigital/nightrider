@@ -173,6 +173,7 @@ export function VenueAppPreview() {
   const now = useNow();
   const [liked, setLiked] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const hero = heroSlotId(editingVenue);
   const gallery = gallerySlotIds(editingVenue);
@@ -232,7 +233,7 @@ export function VenueAppPreview() {
       <SectionEyebrow>Live preview — how it appears in the app</SectionEyebrow>
 
       <div
-        className="mx-auto w-full max-w-[340px] overflow-hidden rounded-[28px] shadow-[0_30px_80px_rgba(0,0,0,0.6)]"
+        className="relative mx-auto w-full max-w-[340px] overflow-hidden rounded-[28px] shadow-[0_30px_80px_rgba(0,0,0,0.6)]"
         style={{ background: CREAM, color: INK, fontFamily: "var(--font-sans), sans-serif" }}
       >
         <div className="nr-phone-scroll max-h-[720px] overflow-y-auto overflow-x-hidden">
@@ -391,7 +392,11 @@ export function VenueAppPreview() {
               </div>
             </Section>
 
-            <Section title="FOOD & DRINKS" action="View menu">
+            <Section
+              title="FOOD & DRINKS"
+              action="View menu"
+              onAction={profile.menu.length ? () => setMenuOpen(true) : undefined}
+            >
               <div className="nr-phone-scroll flex gap-3 overflow-x-auto pb-1">
                 {menuCards.map((card) => (
                   <div
@@ -534,6 +539,76 @@ export function VenueAppPreview() {
           </button>
         </div>
 
+        {menuOpen && (
+          <div className="absolute inset-0 z-10">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setMenuOpen(false)} />
+            <div
+              className="absolute inset-x-0 bottom-0 flex max-h-[85%] flex-col rounded-t-[20px] pb-5 pt-4"
+              style={{ background: CREAM }}
+            >
+              <div className="mx-auto mb-3.5 h-1 w-11 rounded-full" style={{ background: "#E0D6CB" }} />
+              <div className="flex items-center justify-between px-4">
+                <p className="font-display text-lg uppercase tracking-wide">Menu</p>
+                <button onClick={() => setMenuOpen(false)} aria-label="Close menu">
+                  <CloseIcon size={18} color={MUTED} />
+                </button>
+              </div>
+
+              <div className="nr-phone-scroll mt-3 flex-1 overflow-y-auto px-4">
+                {profile.menu.map((section) => (
+                  <div key={section.id} className="mb-4 last:mb-0">
+                    <p className="mb-2 text-[10.5px] font-bold tracking-widest">
+                      {section.name.toUpperCase()}
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {section.items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-start gap-3 rounded-xl border px-3 py-2.5"
+                          style={{
+                            background: "#FFFDFA",
+                            borderColor: HAIRLINE,
+                            opacity: item.soldOut ? 0.5 : 1,
+                          }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[12.5px] font-semibold leading-tight">
+                              {item.name}
+                              {item.soldOut && (
+                                <span className="ml-1.5 text-[10px] font-medium" style={{ color: MUTED }}>
+                                  · Sold out
+                                </span>
+                              )}
+                            </p>
+                            {item.desc && (
+                              <p className="mt-1 text-[10.5px] leading-snug" style={{ color: MUTED }}>
+                                {item.desc}
+                              </p>
+                            )}
+                            {(item.size || item.serves) && (
+                              <p className="mt-1 text-[10px]" style={{ color: MUTED }}>
+                                {[item.size, item.serves && `serves ${item.serves}`]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            )}
+                          </div>
+                          {item.price > 0 && (
+                            <p className="shrink-0 text-[12px] font-semibold" style={{ color: PINK }}>
+                              {profile.currency}
+                              {item.price.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {sheetOpen && (
           <div className="absolute inset-0 z-10">
             <div className="absolute inset-0 bg-black/60" onClick={() => setSheetOpen(false)} />
@@ -571,10 +646,12 @@ export function VenueAppPreview() {
 function Section({
   title,
   action,
+  onAction,
   children,
 }: {
   title: string;
   action?: string;
+  onAction?: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -585,10 +662,16 @@ function Section({
           <Sparkle size={11} color={PINK} />
         </div>
         {action && (
-          <div className="flex items-center gap-1 text-[11px] font-medium" style={{ color: PINK }}>
+          <button
+            type="button"
+            onClick={onAction}
+            disabled={!onAction}
+            className="flex items-center gap-1 text-[11px] font-medium disabled:cursor-default"
+            style={{ color: PINK }}
+          >
             {action}
             <ChevronRight size={12} />
-          </div>
+          </button>
         )}
       </div>
       {children}

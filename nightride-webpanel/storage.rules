@@ -9,13 +9,21 @@ rules_version = '2';
 //   kyc/{uid}/selfie/{attempt}/capture.jpg
 //   kyc/{uid}/video/{attempt}/walkthrough.mp4
 //   kyc/{uid}/video/{attempt}/poster.jpg
+//   venuePhotos/{venueId}/hero.jpg
+//   venuePhotos/{venueId}/gallery/{0..3}.jpg
+//   venuePhotos/{venueId}/menu/{itemId}.jpg
+//   eventMedia/{eventId}/cover.jpg
+//   eventMedia/{eventId}/poster.jpg
+//   venueKyc/{venueId}/{license|gps|video}/{attempt}/{file}
 //
 // {attempt} comes from users/{uid}/private/organizerReview.steps.<id>.attempt,
 // which only an admin can advance. Together with an explicit `resource == null`
 // that makes both properties structural rather than a matter of client
 // behaviour: reviewed evidence cannot be overwritten, and an applicant cannot
 // mint fresh upload paths to burn storage, because they cannot move the number
-// that appears in the path.
+// that appears in the path. venueKyc/** repeats the exact same structure,
+// keyed by venues.verification.<id>.attempt instead — the organizer cannot
+// move that number either, since it is pinned in firestore.rules.
 //
 // Note the `resource == null` is load-bearing and not redundant. Storage is not
 // Firestore here: `create` does not imply the object is absent, because a
@@ -23,10 +31,18 @@ rules_version = '2';
 // classified as a create. `update` covers metadata-only mutation. Dropping that
 // one clause makes reviewed evidence silently overwritable.
 //
-// Deletion is Admin SDK only. Retention is enforced by the webpanel's server
-// route on the approve/reject action, backstopped by a bucket lifecycle rule of
-// age > 180 days on kyc/**. Object Versioning must stay off for this prefix —
-// it would resurrect deleted identity documents.
+// venuePhotos/ and eventMedia/ are the deliberate CONTRAST: they are
+// replaceable content, not identity evidence, so they allow plain `write`
+// (create, overwrite, and delete all fall under `write` here) with no
+// `resource == null` clause at all — re-uploading a hero shot must just work.
+// They do NOT join the kyc/** retention bucket lifecycle rule or
+// admin-scheduled-retention.mts; they are content, not identity documents.
+//
+// Deletion of kyc/** and venueKyc/** is Admin SDK only. Retention is enforced
+// by the webpanel's server route on the approve/reject action, backstopped by
+// a bucket lifecycle rule of age > 180 days on kyc/** and venueKyc/**. Object
+// Versioning must stay off for both prefixes — it would resurrect deleted
+// identity documents.
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -54,6 +70,41 @@ service firebase.storage {
       return review(uid) == null
         ? {}
         : review(uid).data.get('steps', {}).get(stepId, {});
+    }
+
+    // Cross-service read of the venue document, for the venuePhotos/
+    // venueKyc authorization checks below. Same caching behaviour as
+    // review()/userDoc() above.
+    function venueDoc(venueId) {
+      return firestore.get(/databases/(default)/documents/venues/$(venueId));
+    }
+    function isVenueEditor(venueId, roles) {
+      return signedIn() && venueDoc(venueId) != null
+        && venueDoc(venueId).data.get('editors', {}).get(request.auth.uid, '') in roles;
+    }
+    function venueVerifyStep(venueId, stepId) {
+      return venueDoc(venueId) == null
+        ? {}
+        : venueDoc(venueId).data.get('verification', {}).get(stepId, {});
+    }
+
+    function eventDoc(eventId) {
+      return firestore.get(/databases/(default)/documents/events/$(eventId));
+    }
+    // The event document must exist before its cover/poster uploads — create
+    // the draft, upload, then patch coverImage/posterImage. There is nothing
+    // else here to authorize an upload against.
+    function isEventOwner(eventId) {
+      return signedIn() && eventDoc(eventId) != null
+        && eventDoc(eventId).data.get('organizerUid', null) == request.auth.uid;
+    }
+
+    // Shared size/type cap for replaceable image content (venuePhotos,
+    // eventMedia). `request.resource == null` covers a delete request.
+    function validImage(maxBytes) {
+      return request.resource == null
+        || (request.resource.size < maxBytes
+            && request.resource.contentType.matches('image/(jpeg|png|webp)'));
     }
 
     // ── Avatars — world-readable, owner-written ──────────────────────────────
@@ -103,6 +154,82 @@ service firebase.storage {
                      && request.resource.contentType == 'video/mp4')
                    || (file == 'poster.jpg'
                      && request.resource.size < 2 * 1024 * 1024
+                     && request.resource.contentType.matches('image/(jpeg|png)'))))
+           );
+
+      allow update, delete: if false;
+    }
+
+    // ── Venue photos — replaceable content, public read, editor write ───────
+    // Three sibling match blocks rather than one {path=**} wildcard, so the
+    // prefix stays a known object set. `write` (not create-only) so
+    // re-uploading a hero, gallery slot or menu photo just works, and
+    // `delete` falls under `write` too — the deliberate contrast with kyc/**'s
+    // `resource == null` immutability.
+    match /venuePhotos/{venueId}/hero.jpg {
+      allow read: if true;
+      allow write: if isVenueEditor(venueId, ['owner', 'manager', 'door'])
+        && validImage(6 * 1024 * 1024);
+    }
+
+    match /venuePhotos/{venueId}/gallery/{file} {
+      allow read: if true;
+      // photos[1..4] — slot 0 is the hero above. Gallery index must be
+      // 0..3 (photos[i+1]); anything else is not a slot the panel maps to a
+      // Firestore field.
+      allow write: if isVenueEditor(venueId, ['owner', 'manager', 'door'])
+        && file.matches('[0-3][.]jpg')
+        && validImage(6 * 1024 * 1024);
+    }
+
+    match /venuePhotos/{venueId}/menu/{file} {
+      allow read: if true;
+      allow write: if isVenueEditor(venueId, ['owner', 'manager', 'door'])
+        && validImage(6 * 1024 * 1024);
+    }
+
+    // ── Event media — replaceable content, public read, owner write ─────────
+    match /eventMedia/{eventId}/cover.jpg {
+      allow read: if true;
+      allow write: if isEventOwner(eventId) && validImage(6 * 1024 * 1024);
+    }
+
+    match /eventMedia/{eventId}/poster.jpg {
+      allow read: if true;
+      allow write: if isEventOwner(eventId) && validImage(6 * 1024 * 1024);
+    }
+
+    // ── Venue KYC evidence — owner + admin read, append-only, immutable ──────
+    // Copies kyc/{uid}/** exactly, resource == null clause included, keyed on
+    // venues.verification.<id>.attempt instead of organizerReview's — that
+    // field is pinned against organizer writes in firestore.rules, so the
+    // retry cap is structural here too. Only the venue OWNER may upload —
+    // managers/door staff never touch identity evidence.
+    match /venueKyc/{venueId}/{stepId}/{attempt}/{file} {
+
+      allow read: if isAdmin() || isVenueEditor(venueId, ['owner']);
+
+      allow create: if isVenueEditor(venueId, ['owner'])
+        && resource == null
+        && stepId in ['license', 'gps', 'video']
+        && int(attempt) == venueVerifyStep(venueId, stepId).get('attempt', -1)
+        && (
+             (stepId == 'license'
+               && file in ['front.jpg', 'back.jpg']
+               && request.resource.size < 6 * 1024 * 1024
+               && request.resource.contentType.matches('image/(jpeg|png)'))
+             ||
+             (stepId == 'gps'
+               && file == 'capture.jpg'
+               && request.resource.size < 6 * 1024 * 1024
+               && request.resource.contentType.matches('image/(jpeg|png)'))
+             ||
+             (stepId == 'video'
+               && ((file == 'walkthrough.mp4'
+                     && request.resource.size < 250 * 1024 * 1024
+                     && request.resource.contentType == 'video/mp4')
+                   || (file == 'poster.jpg'
+                     && request.resource.size < 6 * 1024 * 1024
                      && request.resource.contentType.matches('image/(jpeg|png)'))))
            );
 

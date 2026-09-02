@@ -164,7 +164,12 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
  * it's "the phone", not another dashboard panel.
  */
 export function VenueAppPreview() {
-  const { profile, editingVenue, events, images, requestRemoveImage } = useOrganizerDashboard();
+  // The phone shows the *published* listing — drafted edits only appear here
+  // once the save bar commits them. Menu and images are live either way,
+  // since neither goes through the draft.
+  const { savedProfile, editingVenue, events, images, requestRemoveImage } =
+    useOrganizerDashboard();
+  const profile = savedProfile;
   const now = useNow();
   const [liked, setLiked] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);

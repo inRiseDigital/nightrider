@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { Pencil, Plus, X } from "lucide-react";
 import { useOrganizerDashboard, type VenueTab } from "@/lib/organizer/dashboard/store";
 import {
   AGE_POLICIES,
@@ -13,6 +13,7 @@ import {
   Chip,
   FilledButton,
   IconButton,
+  OutlinedButton,
   SectionLabel,
   Select,
   TextArea,
@@ -123,12 +124,59 @@ export function VenuesSection() {
             {venueTab === "menu" && <VenueMenuSection />}
             {venueTab === "hours" && <HoursTab />}
             {venueTab === "links" && <LinksTab />}
+
+            {/* Menu edits publish immediately, so that tab has nothing to save. */}
+            {venueTab !== "menu" && <SaveBar />}
           </div>
 
           <VenueAppPreview />
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Sticky footer for the editor column. Listing edits land in a draft, so this
+ * is the only way they reach the published record the app preview renders.
+ */
+function SaveBar() {
+  const { editingVenue, venueDirty, saveVenue, discardVenue } = useOrganizerDashboard();
+
+  return (
+    <div
+      className="sticky bottom-0 z-[5] -mt-1 flex flex-wrap items-center gap-3 py-4"
+      style={{
+        background: "var(--m3-surf)",
+        boxShadow: "0 -12px 16px -8px var(--m3-surf)",
+      }}
+    >
+      {venueDirty && (
+        <span
+          className="flex h-7 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium"
+          style={{ background: "var(--m3-warnc)", color: "var(--m3-onwarnc)" }}
+        >
+          <Pencil size={14} />
+          Unsaved changes
+        </span>
+      )}
+      <FilledButton
+        onClick={() => saveVenue(editingVenue)}
+        disabled={!venueDirty}
+        tonal={!venueDirty}
+        className={venueDirty ? undefined : "cursor-default hover:opacity-100"}
+      >
+        Save changes
+      </FilledButton>
+      {venueDirty && (
+        <OutlinedButton onClick={() => discardVenue(editingVenue)}>Discard</OutlinedButton>
+      )}
+      <p className="text-[13px] text-[var(--m3-onv)]">
+        {venueDirty
+          ? "Unsaved edits are only visible to you until you save."
+          : "Edits to a verified venue are reviewed before going live."}
+      </p>
+    </div>
   );
 }
 

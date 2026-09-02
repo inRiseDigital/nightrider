@@ -333,6 +333,29 @@ export function FilledButton({
   );
 }
 
+/** M3 outlined button — same metrics as filled, hairline container. */
+export function OutlinedButton({
+  children,
+  icon,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex h-10 items-center gap-2 rounded-full border px-5 text-sm font-medium transition-colors hover:bg-[var(--m3-surf3)]",
+        className
+      )}
+      style={{ borderColor: "var(--m3-outline)", color: "var(--m3-onv)" }}
+      {...props}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
 /** M3 text button — same metrics, no container. */
 export function TextButton({
   children,

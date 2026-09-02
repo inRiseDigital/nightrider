@@ -99,6 +99,32 @@ export function blankVenueProfile(name: string, city: string): VenueProfile {
   };
 }
 
+/**
+ * Fields that bypass the venue draft. The Menu tab is bannered "edits skip
+ * review and update in the app straight away", and verification state is set
+ * by an admin, so both write to the published record directly. They are
+ * excluded from the dirty check and preserved when a draft commits.
+ */
+const LIVE_VENUE_FIELDS = ["menu", "verified", "verificationSteps", "openVerifyStep"] as const;
+
+/** The draft with live fields overlaid — what the editor should render. */
+function withLiveFields(draft: VenueProfile, saved: VenueProfile): VenueProfile {
+  return {
+    ...draft,
+    menu: saved.menu,
+    verified: saved.verified,
+    verificationSteps: saved.verificationSteps,
+    openVerifyStep: saved.openVerifyStep,
+  };
+}
+
+/** Just the reviewable listing fields, for comparing draft against published. */
+function listingFieldsOf(p: VenueProfile): Partial<VenueProfile> {
+  const listing: Partial<VenueProfile> = { ...p };
+  for (const field of LIVE_VENUE_FIELDS) delete listing[field];
+  return listing;
+}
+
 /** Menu sections and items are added client-side only, so a timestamp plus a
  *  counter is enough to keep React keys unique without a uuid dependency. */
 let menuIdSeq = 0;
@@ -135,7 +161,14 @@ interface OrganizerDashboardValue {
   venueOrder: string[];
   venues: Record<string, VenueProfile>;
   editingVenue: string;
+  /** Listing fields as edited (draft when one exists); menu/verification always live. */
   profile: VenueProfile;
+  /** The published record — what the app preview renders. */
+  savedProfile: VenueProfile;
+  /** True when the selected venue has uncommitted listing edits. */
+  venueDirty: boolean;
+  saveVenue: (id: string) => void;
+  discardVenue: (id: string) => void;
   venueTab: VenueTab;
   addingVenue: boolean;
   newVenueName: string;
@@ -300,6 +333,12 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   // ---- Venues ----
   const [venueOrder, setVenueOrder] = useState<string[]>(MOCK_VENUE_ORDER);
   const [venues, setVenues] = useState<Record<string, VenueProfile>>(MOCK_VENUES);
+  /**
+   * Unsaved listing edits, keyed by venue id. A draft is created lazily on the
+   * first edit and cleared on save/discard, so `venues` always holds the
+   * published version the app preview renders. Drafts survive switching venues.
+   */
+  const [venueDrafts, setVenueDrafts] = useState<Record<string, VenueProfile>>({});
   const [editingVenue, setEditingVenue] = useState(MOCK_VENUE_ORDER[0]);
   const [venueTab, setVenueTab] = useState<VenueTab>("profile");
   const [homeTab, setHomeTab] = useState<HomeTab>("tonight");
@@ -367,112 +406,156 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   }, [confirmRemoveSlotId]);
 
   // ---- Venue mutators ----
+  /** Writes straight to the published record — for menu and verification only. */
   const updateVenue = useCallback((id: string, fn: (p: VenueProfile) => VenueProfile) => {
     setVenues((prev) => ({ ...prev, [id]: fn(prev[id]) }));
   }, []);
 
+  /**
+   * Writes into the venue's draft, seeding it from the published record on the
+   * first edit. Every reviewable listing field goes through here, so nothing
+   * reaches the app preview until the save bar commits it.
+   */
+  const updateVenueListing = useCallback(
+    (id: string, fn: (p: VenueProfile) => VenueProfile) => {
+      setVenueDrafts((prev) => {
+        const base = prev[id] ?? venues[id];
+        if (!base) return prev;
+        return { ...prev, [id]: fn(base) };
+      });
+    },
+    [venues]
+  );
+
   const setVenueField = useCallback(
     <K extends keyof VenueProfile>(id: string, field: K, value: VenueProfile[K]) => {
-      updateVenue(id, (p) => ({ ...p, [field]: value }));
+      updateVenueListing(id, (p) => ({ ...p, [field]: value }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const toggleVenueSetValue = useCallback(
     (id: string, field: "genres" | "amenities", value: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         [field]: p[field].includes(value)
           ? p[field].filter((x) => x !== value)
           : [...p[field], value],
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const addSocialLink = useCallback(
     (id: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         socialLinks: [...p.socialLinks, { network: "instagram", value: "" }],
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const removeSocialLink = useCallback(
     (id: string, idx: number) => {
-      updateVenue(id, (p) => ({ ...p, socialLinks: p.socialLinks.filter((_, i) => i !== idx) }));
+      updateVenueListing(id, (p) => ({
+        ...p,
+        socialLinks: p.socialLinks.filter((_, i) => i !== idx),
+      }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const setSocialLinkField = useCallback(
     (id: string, idx: number, field: "network" | "value", value: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         socialLinks: p.socialLinks.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const setHourField = useCallback(
     (id: string, dayIdx: number, field: "open" | "close", value: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         hours: p.hours.map((h, i) => (i === dayIdx ? { ...h, [field]: value } : h)),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const toggleDayClosed = useCallback(
     (id: string, dayIdx: number) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         hours: p.hours.map((h, i) => (i === dayIdx ? { ...h, closed: !h.closed } : h)),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const addException = useCallback(
     (id: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         exceptions: [...p.exceptions, { label: "New exception", date: "", closed: true }],
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const removeException = useCallback(
     (id: string, idx: number) => {
-      updateVenue(id, (p) => ({ ...p, exceptions: p.exceptions.filter((_, i) => i !== idx) }));
+      updateVenueListing(id, (p) => ({
+        ...p,
+        exceptions: p.exceptions.filter((_, i) => i !== idx),
+      }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const setExceptionField = useCallback(
     (id: string, idx: number, field: "label" | "date", value: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         exceptions: p.exceptions.map((e, i) => (i === idx ? { ...e, [field]: value } : e)),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const toggleExceptionClosed = useCallback(
     (id: string, idx: number) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         exceptions: p.exceptions.map((e, i) => (i === idx ? { ...e, closed: !e.closed } : e)),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
+
+  /** Commits the draft's listing fields, leaving live fields (menu, verification) alone. */
+  const saveVenue = useCallback((id: string) => {
+    setVenueDrafts((prevDrafts) => {
+      const draft = prevDrafts[id];
+      if (!draft) return prevDrafts;
+      setVenues((prev) => ({ ...prev, [id]: { ...prev[id], ...listingFieldsOf(draft) } }));
+      const next = { ...prevDrafts };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  const discardVenue = useCallback((id: string) => {
+    setVenueDrafts((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
 
   // ---- Menu mutators ----
   /** Rewrites one item in place; every per-item edit funnels through here. */
@@ -974,7 +1057,14 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
     cancelChangeField();
   }, [changeOtp, changeField, changeValue, cancelChangeField]);
 
-  const profile = venues[editingVenue];
+  const savedProfile = venues[editingVenue];
+  const draft = venueDrafts[editingVenue];
+  // The editor sees drafted listing fields; the menu and verification state it
+  // shows are always the live ones, since those never enter the draft.
+  const profile = draft ? withLiveFields(draft, savedProfile) : savedProfile;
+  const venueDirty =
+    !!draft &&
+    JSON.stringify(listingFieldsOf(draft)) !== JSON.stringify(listingFieldsOf(savedProfile));
   const hasUnreadInbox = inbox.some((m) => !m.open);
 
   const value = useMemo<OrganizerDashboardValue>(
@@ -985,6 +1075,10 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       venues,
       editingVenue,
       profile,
+      savedProfile,
+      venueDirty,
+      saveVenue,
+      discardVenue,
       venueTab,
       addingVenue,
       newVenueName,
@@ -1127,7 +1221,8 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       confirmRemoveImage,
     }),
     [
-      venueOrder, venues, editingVenue, profile, venueTab, addingVenue, newVenueName, newVenueCity,
+      venueOrder, venues, editingVenue, profile, savedProfile, venueDirty, saveVenue,
+      discardVenue, venueTab, addingVenue, newVenueName, newVenueCity,
       openAddVenue, cancelAddVenue, createVenue, setVenueField, toggleVenueSetValue,
       addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
       toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,

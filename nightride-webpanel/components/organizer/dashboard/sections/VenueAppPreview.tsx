@@ -21,6 +21,7 @@ import {
   Sparkle,
   ThumbsUp,
   Users,
+  Utensils,
   Wifi,
   X as CloseIcon,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import {
   useNow,
   useOrganizerDashboard,
 } from "@/lib/organizer/dashboard/store";
+import { DAYS } from "@/lib/organizer/dashboard/constants";
 import { hoursTextFor, isOpenOn, mondayFirstIndex, toISODate } from "@/lib/organizer/dashboard/format";
 import type { SocialLink } from "@/lib/organizer/dashboard/types";
 import { SectionEyebrow } from "../ui/Primitives";
@@ -561,46 +563,93 @@ export function VenueAppPreview() {
                       {section.name.toUpperCase()}
                     </p>
                     <div className="flex flex-col gap-2">
-                      {section.items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-start gap-3 rounded-xl border px-3 py-2.5"
-                          style={{
-                            background: "#FFFDFA",
-                            borderColor: HAIRLINE,
-                            opacity: item.soldOut ? 0.5 : 1,
-                          }}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[12.5px] font-semibold leading-tight">
-                              {item.name}
-                              {item.soldOut && (
-                                <span className="ml-1.5 text-[10px] font-medium" style={{ color: MUTED }}>
-                                  · Sold out
-                                </span>
+                      {section.items.map((item) => {
+                        const photo = images[menuItemSlotId(editingVenue, item.id)];
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex items-start gap-3 overflow-hidden rounded-xl border p-2.5"
+                            style={{
+                              background: "#FFFDFA",
+                              borderColor: HAIRLINE,
+                              opacity: item.soldOut ? 0.5 : 1,
+                            }}
+                          >
+                            {photo ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={photo}
+                                alt=""
+                                className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg"
+                                style={{ background: "#EFE4DA", color: MUTED }}
+                              >
+                                <Utensils size={16} />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-[12.5px] font-semibold leading-tight">
+                                  {item.name}
+                                  {item.soldOut && (
+                                    <span
+                                      className="ml-1.5 text-[10px] font-medium"
+                                      style={{ color: MUTED }}
+                                    >
+                                      · Sold out
+                                    </span>
+                                  )}
+                                </p>
+                                {item.price > 0 && (
+                                  <p
+                                    className="shrink-0 text-[12px] font-semibold"
+                                    style={{ color: PINK }}
+                                  >
+                                    {profile.currency}
+                                    {item.price.toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                              {item.desc && (
+                                <p className="mt-1 text-[10.5px] leading-snug" style={{ color: MUTED }}>
+                                  {item.desc}
+                                </p>
                               )}
-                            </p>
-                            {item.desc && (
-                              <p className="mt-1 text-[10.5px] leading-snug" style={{ color: MUTED }}>
-                                {item.desc}
-                              </p>
-                            )}
-                            {(item.size || item.serves) && (
-                              <p className="mt-1 text-[10px]" style={{ color: MUTED }}>
-                                {[item.size, item.serves && `serves ${item.serves}`]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </p>
-                            )}
+                              {(item.size || item.serves) && (
+                                <p className="mt-1 text-[10px]" style={{ color: MUTED }}>
+                                  {[item.size, item.serves && `serves ${item.serves}`]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </p>
+                              )}
+                              {(item.tags.length > 0 || item.nights.length > 0) && (
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                  {item.tags.map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className="rounded-full px-2 py-0.5 text-[9px] font-semibold"
+                                      style={{ background: "#F1E3EA", color: "#5A2740" }}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {item.nights.length > 0 && item.nights.length < DAYS.length && (
+                                    <span
+                                      className="rounded-full px-2 py-0.5 text-[9px] font-semibold"
+                                      style={{ background: "#E4F4F2", color: "#1E3D3A" }}
+                                    >
+                                      {item.nights.map((n) => DAYS[n]).join(" · ")}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {item.price > 0 && (
-                            <p className="shrink-0 text-[12px] font-semibold" style={{ color: PINK }}>
-                              {profile.currency}
-                              {item.price.toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

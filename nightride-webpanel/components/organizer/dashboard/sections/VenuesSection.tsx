@@ -1,28 +1,45 @@
 "use client";
 
-import { X } from "lucide-react";
-import {
-  gallerySlotIds,
-  heroSlotId,
-  useOrganizerDashboard,
-  type VenueTab,
-} from "@/lib/organizer/dashboard/store";
+import { Pencil, Plus, X } from "lucide-react";
+import { useOrganizerDashboard, type VenueTab } from "@/lib/organizer/dashboard/store";
 import {
   AGE_POLICIES,
   AMENITIES,
   DRESS_CODES,
   GENRES,
 } from "@/lib/organizer/dashboard/constants";
-import { ImageSlot } from "../ui/ImageSlot";
-import { Chip, FieldLabel, SlimInput, VenueSwitcher } from "../ui/Primitives";
+import {
+  Card,
+  Chip,
+  FilledButton,
+  IconButton,
+  OutlinedButton,
+  SectionLabel,
+  Select,
+  TextArea,
+  TextButton,
+  TextField,
+  VenueSwitcher,
+} from "../ui/Primitives";
 import { VenueAppPreview } from "./VenueAppPreview";
+import { VenueMenuSection } from "./VenueMenuSection";
 import { VenueVerifyPending } from "./VenueVerifyPending";
 
 const TABS: { id: VenueTab; label: string }[] = [
-  { id: "gallery", label: "Gallery & Hero" },
-  { id: "attributes", label: "Attributes" },
+  { id: "profile", label: "Profile" },
+  { id: "menu", label: "Menu" },
   { id: "hours", label: "Hours" },
   { id: "links", label: "Links" },
+];
+
+const SOCIAL_NETWORKS = [
+  { value: "instagram", label: "Instagram" },
+  { value: "tiktok", label: "TikTok" },
+  { value: "facebook", label: "Facebook" },
+  { value: "x", label: "X" },
+  { value: "youtube", label: "YouTube" },
+  { value: "website", label: "Website" },
+  { value: "whatsapp", label: "WhatsApp" },
 ];
 
 export function VenuesSection() {
@@ -42,11 +59,7 @@ export function VenuesSection() {
     newVenueCity,
     setNewVenueCity,
     createVenue,
-    requestRemoveImage,
   } = useOrganizerDashboard();
-
-  const hero = heroSlotId(editingVenue);
-  const gallery = gallerySlotIds(editingVenue);
 
   return (
     <>
@@ -58,57 +71,48 @@ export function VenuesSection() {
         trailing={
           <button
             onClick={openAddVenue}
-            className="rounded-lg border border-nr-border px-4 py-2 text-[13px] font-semibold text-nr-accent hover:border-nr-accent/50"
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-[var(--m3-outline)] pl-2.5 pr-3.5 text-[13px] font-medium text-[var(--m3-onv)] transition-colors hover:border-[var(--m3-pri)] hover:text-[var(--m3-pri)]"
           >
-            + Add Venue
+            <Plus size={16} />
+            Add venue
           </button>
         }
       />
 
       {addingVenue && (
-        <div className="mb-5 flex max-w-[480px] flex-col gap-3 rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-          <p className="text-[13px] font-semibold text-nr-text-primary">Add a new venue</p>
-          <SlimInput
+        <Card className="mb-6 flex max-w-[480px] flex-col gap-6">
+          <SectionLabel>Add a new venue</SectionLabel>
+          <TextField
+            label="Venue name"
             value={newVenueName}
             onChange={(e) => setNewVenueName(e.target.value)}
-            placeholder="Venue name"
           />
-          <SlimInput
+          <TextField
+            label="City, country"
             value={newVenueCity}
             onChange={(e) => setNewVenueCity(e.target.value)}
-            placeholder="City, Country"
           />
-          <div className="flex justify-end gap-2.5">
-            <button
-              onClick={cancelAddVenue}
-              className="rounded-lg px-4 py-2.5 text-xs font-semibold text-nr-text-secondary hover:text-nr-text-primary"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={createVenue}
-              className="rounded-lg bg-nr-accent px-4 py-2.5 text-xs font-semibold text-nr-bg hover:bg-nr-accent/80"
-            >
-              Create &amp; Verify
-            </button>
+          <div className="flex justify-end gap-2">
+            <TextButton onClick={cancelAddVenue}>Cancel</TextButton>
+            <FilledButton onClick={createVenue}>Create &amp; verify</FilledButton>
           </div>
-        </div>
+        </Card>
       )}
 
       {!profile.verified ? (
         <VenueVerifyPending />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1.3fr_1fr]">
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1.3fr_1fr]">
           <div className="min-w-0">
-            <div className="mb-[18px] flex gap-5 border-b border-nr-border">
+            <div className="mb-6 flex gap-5 border-b border-[var(--m3-outlinev)]">
               {TABS.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setVenueTab(t.id)}
                   className={`border-b-2 px-0.5 py-2.5 text-[13px] font-semibold transition-colors ${
                     venueTab === t.id
-                      ? "border-nr-primary text-nr-text-primary"
-                      : "border-transparent text-nr-text-secondary hover:text-nr-text-primary"
+                      ? "border-[var(--m3-pri)] text-[var(--m3-on)]"
+                      : "border-transparent text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
                   }`}
                 >
                   {t.label}
@@ -116,33 +120,13 @@ export function VenuesSection() {
               ))}
             </div>
 
-            {venueTab === "gallery" && (
-              <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-                <FieldLabel className="mb-2.5">
-                  Hero image — shown on your card and at the top of your detail page
-                </FieldLabel>
-                <div className="relative">
-                  <ImageSlot slotId={hero} placeholder="Drop your hero photo" className="h-[220px]" />
-                  <RemoveImageButton onClick={() => requestRemoveImage(hero)} />
-                </div>
-
-                <FieldLabel className="mb-2.5 mt-[18px]">
-                  Gallery — additional photos for your detail page
-                </FieldLabel>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  {gallery.map((slotId) => (
-                    <div key={slotId} className="relative">
-                      <ImageSlot slotId={slotId} placeholder="Add photo" className="h-[110px]" />
-                      <RemoveImageButton onClick={() => requestRemoveImage(slotId)} small />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {venueTab === "attributes" && <AttributesTab />}
+            {venueTab === "profile" && <ProfileTab />}
+            {venueTab === "menu" && <VenueMenuSection />}
             {venueTab === "hours" && <HoursTab />}
             {venueTab === "links" && <LinksTab />}
+
+            {/* Menu edits publish immediately, so that tab has nothing to save. */}
+            <SaveBar />
           </div>
 
           <VenueAppPreview />
@@ -152,88 +136,196 @@ export function VenuesSection() {
   );
 }
 
-function RemoveImageButton({ onClick, small }: { onClick: () => void; small?: boolean }) {
+/**
+ * Sticky footer for the editor column. Listing edits land in a draft, so this
+ * is the only way they reach the published record the app preview renders.
+ *
+ * The negative `bottom` cancels the scrolling `<main>`'s own padding, so the
+ * bar sits flush to the bottom edge rather than floating above it with page
+ * content showing through the gap.
+ */
+function SaveBar() {
+  const { editingVenue, venueDirty, saveVenue, discardVenue } = useOrganizerDashboard();
+
   return (
-    <button
-      onClick={onClick}
-      title="Remove image"
-      aria-label="Remove image"
-      className={`absolute left-2 top-2 z-10 flex items-center justify-center rounded-full border border-nr-border bg-nr-bg/80 text-nr-text-primary hover:bg-nr-bg ${
-        small ? "h-5 w-5" : "h-6 w-6"
-      }`}
+    <div
+      className="sticky bottom-[-20px] z-[5] -mt-1 flex flex-wrap items-center gap-3 pt-4 pb-5 sm:bottom-[-28px] sm:pb-7"
+      style={{
+        background: "var(--m3-surf)",
+        boxShadow: "0 -12px 16px -8px var(--m3-surf)",
+      }}
     >
-      <X size={small ? 10 : 12} />
-    </button>
+      {venueDirty && (
+        <span
+          className="flex h-7 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium"
+          style={{ background: "var(--m3-warnc)", color: "var(--m3-onwarnc)" }}
+        >
+          <Pencil size={14} />
+          Unsaved changes
+        </span>
+      )}
+      <FilledButton
+        onClick={() => saveVenue(editingVenue)}
+        disabled={!venueDirty}
+        tonal={!venueDirty}
+        className={venueDirty ? undefined : "cursor-default hover:opacity-100"}
+      >
+        Save changes
+      </FilledButton>
+      {venueDirty && (
+        <OutlinedButton onClick={() => discardVenue(editingVenue)}>Discard</OutlinedButton>
+      )}
+      <p className="text-[13px] text-[var(--m3-onv)]">
+        {venueDirty
+          ? "Unsaved edits are only visible to you until you save."
+          : "Edits to a verified venue are reviewed before going live."}
+      </p>
+    </div>
   );
 }
 
-function AttributesTab() {
-  const { profile, editingVenue, toggleVenueSetValue, setVenueField } = useOrganizerDashboard();
+function ProfileTab() {
+  const {
+    profile,
+    editingVenue,
+    toggleVenueSetValue,
+    setVenueField,
+    addSocialLink,
+    removeSocialLink,
+    setSocialLinkField,
+  } = useOrganizerDashboard();
 
   return (
-    <div className="flex flex-col gap-[22px] rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-      <ChipGroup
-        label="Music genres"
-        options={GENRES}
-        isActive={(g) => profile.genres.includes(g)}
-        onToggle={(g) => toggleVenueSetValue(editingVenue, "genres", g)}
-      />
-      <ChipGroup
-        label="Dress code"
-        options={DRESS_CODES}
-        isActive={(d) => profile.dressCode === d}
-        onToggle={(d) => setVenueField(editingVenue, "dressCode", d)}
-      />
-      <ChipGroup
-        label="Age policy"
-        options={AGE_POLICIES}
-        isActive={(a) => profile.agePolicy === a}
-        onToggle={(a) => setVenueField(editingVenue, "agePolicy", a)}
-      />
-      <ChipGroup
-        label="Amenities"
-        options={AMENITIES}
-        isActive={(a) => profile.amenities.includes(a)}
-        onToggle={(a) => toggleVenueSetValue(editingVenue, "amenities", a)}
-      />
-
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-        <div>
-          <FieldLabel className="mb-1.5">Cover min ({profile.currency})</FieldLabel>
-          <SlimInput
-            type="number"
-            mono
-            value={profile.coverMin}
-            onChange={(e) => setVenueField(editingVenue, "coverMin", Number(e.target.value) || 0)}
-            className="w-full py-2"
-          />
-        </div>
-        <div>
-          <FieldLabel className="mb-1.5">Cover max ({profile.currency})</FieldLabel>
-          <SlimInput
-            type="number"
-            mono
-            value={profile.coverMax}
-            onChange={(e) => setVenueField(editingVenue, "coverMax", Number(e.target.value) || 0)}
-            className="w-full py-2"
-          />
-        </div>
-        <div>
-          <FieldLabel className="mb-1.5">Capacity</FieldLabel>
-          <SlimInput
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+      <Card className="flex flex-col gap-6">
+        <TextField
+          label="Venue name"
+          value={profile.name}
+          onChange={(e) => setVenueField(editingVenue, "name", e.target.value)}
+        />
+        <TextField
+          label="Address"
+          value={profile.address}
+          onChange={(e) => setVenueField(editingVenue, "address", e.target.value)}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <TextField
+            label="Capacity"
             type="number"
             mono
             value={profile.capacity}
             onChange={(e) => setVenueField(editingVenue, "capacity", Number(e.target.value) || 0)}
-            className="w-full py-2"
+          />
+          <Select
+            label="Dress code"
+            value={profile.dressCode}
+            onChange={(e) => setVenueField(editingVenue, "dressCode", e.target.value)}
+            options={DRESS_CODES}
           />
         </div>
+        <TextArea
+          label="About this venue"
+          rows={4}
+          value={profile.about}
+          onChange={(e) => setVenueField(editingVenue, "about", e.target.value)}
+        />
+
+        <div>
+          <SectionLabel
+            className="mb-4"
+            trailing={
+              <span className="text-xs text-[var(--m3-outline)]">Handle or full URL</span>
+            }
+          >
+            Social links
+          </SectionLabel>
+          <div className="flex flex-col gap-3">
+            {profile.socialLinks.map((link, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Select
+                  dense
+                  aria-label="Network"
+                  value={link.network}
+                  onChange={(e) => setSocialLinkField(editingVenue, i, "network", e.target.value)}
+                  options={SOCIAL_NETWORKS}
+                  wrapperClassName="w-[132px] shrink-0"
+                />
+                <TextField
+                  dense
+                  aria-label="Handle or URL"
+                  value={link.value}
+                  onChange={(e) => setSocialLinkField(editingVenue, i, "value", e.target.value)}
+                  placeholder="@handle or https://..."
+                  wrapperClassName="min-w-0 flex-1"
+                />
+                <IconButton
+                  danger
+                  onClick={() => removeSocialLink(editingVenue, i)}
+                  aria-label="Remove social link"
+                >
+                  <X size={18} />
+                </IconButton>
+              </div>
+            ))}
+            <FilledButton
+              tonal
+              icon={<Plus size={18} />}
+              onClick={() => addSocialLink(editingVenue)}
+              className="self-start"
+            >
+              Add link
+            </FilledButton>
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex flex-col gap-6">
+        <ChipGroupCard
+          label="Music genres"
+          options={GENRES}
+          isActive={(g) => profile.genres.includes(g)}
+          onToggle={(g) => toggleVenueSetValue(editingVenue, "genres", g)}
+        />
+
+        <ChipGroupCard
+          label="Age policy"
+          options={AGE_POLICIES}
+          isActive={(a) => profile.agePolicy === a}
+          onToggle={(a) => setVenueField(editingVenue, "agePolicy", a)}
+        />
+
+        <ChipGroupCard
+          label="Amenities"
+          options={AMENITIES}
+          isActive={(a) => profile.amenities.includes(a)}
+          onToggle={(a) => toggleVenueSetValue(editingVenue, "amenities", a)}
+        />
+
+        <Card>
+          <SectionLabel className="mb-5">Cover charge ({profile.currency})</SectionLabel>
+          <div className="grid grid-cols-2 gap-4">
+            <TextField
+              label="Minimum"
+              type="number"
+              mono
+              value={profile.coverMin}
+              onChange={(e) => setVenueField(editingVenue, "coverMin", Number(e.target.value) || 0)}
+            />
+            <TextField
+              label="Maximum"
+              type="number"
+              mono
+              value={profile.coverMax}
+              onChange={(e) => setVenueField(editingVenue, "coverMax", Number(e.target.value) || 0)}
+            />
+          </div>
+        </Card>
       </div>
     </div>
   );
 }
 
-function ChipGroup({
+function ChipGroupCard({
   label,
   options,
   isActive,
@@ -245,14 +337,14 @@ function ChipGroup({
   onToggle: (o: string) => void;
 }) {
   return (
-    <div>
-      <FieldLabel className="mb-2.5">{label}</FieldLabel>
+    <Card>
+      <SectionLabel className="mb-4">{label}</SectionLabel>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <Chip key={o} label={o} active={isActive(o)} onClick={() => onToggle(o)} />
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -268,122 +360,138 @@ function HoursTab() {
     toggleExceptionClosed,
   } = useOrganizerDashboard();
 
-  const closedPill = (closed: boolean) =>
-    closed
-      ? "border-red-500/30 bg-red-500/10 text-red-400"
-      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
+  /** Open/closed state chip — 32px like every other chip on the page. */
+  const StateChip = ({ closed, onClick }: { closed: boolean; onClick: () => void }) => (
+    <button
+      onClick={onClick}
+      className="h-8 w-[84px] shrink-0 rounded-lg border text-center font-mono text-[11px] font-medium tracking-wide transition-colors"
+      style={
+        closed
+          ? { borderColor: "var(--m3-errc)", background: "var(--m3-errc)", color: "var(--m3-onerrc)" }
+          : { borderColor: "var(--m3-succ)", background: "var(--m3-succ)", color: "var(--m3-onsucc)" }
+      }
+    >
+      {closed ? "CLOSED" : "OPEN"}
+    </button>
+  );
 
   return (
-    <>
-      <div className="mb-4 rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-        <FieldLabel className="mb-3">Regular opening hours</FieldLabel>
-        {profile.hours.map((h, i) => (
-          <div
-            key={h.day}
-            className="flex flex-wrap items-center gap-3 border-b border-nr-border/60 py-2.5 last:border-b-0"
-          >
-            <span className="w-[38px] text-[13px] font-semibold text-nr-text-primary">{h.day}</span>
-            <button
-              onClick={() => toggleDayClosed(editingVenue, i)}
-              className={`w-16 rounded-full border px-2.5 py-1 text-center font-mono text-[11px] font-semibold ${closedPill(
-                h.closed
-              )}`}
+    <div className="flex flex-col gap-6">
+      <Card>
+        <SectionLabel className="mb-5">Regular opening hours</SectionLabel>
+        <div className="flex flex-col">
+          {profile.hours.map((h, i) => (
+            <div
+              key={h.day}
+              className="flex min-h-14 flex-wrap items-center gap-3 border-b border-[var(--m3-outlinev)] py-2 last:border-b-0"
             >
-              {h.closed ? "CLOSED" : "OPEN"}
-            </button>
-            {!h.closed && (
-              <>
-                <SlimInput
-                  type="time"
-                  mono
-                  value={h.open}
-                  onChange={(e) => setHourField(editingVenue, i, "open", e.target.value)}
-                  className="py-1.5 text-xs"
-                />
-                <span className="text-xs text-nr-text-hint">to</span>
-                <SlimInput
-                  type="time"
-                  mono
-                  value={h.close}
-                  onChange={(e) => setHourField(editingVenue, i, "close", e.target.value)}
-                  className="py-1.5 text-xs"
-                />
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-        <div className="mb-3 flex items-center justify-between">
-          <FieldLabel>Exceptions — holidays, private hire, closures</FieldLabel>
-          <button
-            onClick={() => addException(editingVenue)}
-            className="text-xs font-semibold text-nr-primary hover:text-nr-primary-dark"
-          >
-            + Add exception
-          </button>
+              <span className="w-10 shrink-0 text-[13px] font-medium text-[var(--m3-on)]">
+                {h.day}
+              </span>
+              <StateChip closed={h.closed} onClick={() => toggleDayClosed(editingVenue, i)} />
+              {!h.closed && (
+                <>
+                  <TextField
+                    dense
+                    mono
+                    type="time"
+                    aria-label={`${h.day} opening time`}
+                    value={h.open}
+                    onChange={(e) => setHourField(editingVenue, i, "open", e.target.value)}
+                    wrapperClassName="w-[130px]"
+                  />
+                  <span className="text-[13px] text-[var(--m3-onv)]">to</span>
+                  <TextField
+                    dense
+                    mono
+                    type="time"
+                    aria-label={`${h.day} closing time`}
+                    value={h.close}
+                    onChange={(e) => setHourField(editingVenue, i, "close", e.target.value)}
+                    wrapperClassName="w-[130px]"
+                  />
+                </>
+              )}
+            </div>
+          ))}
         </div>
+      </Card>
+
+      <Card>
+        <SectionLabel
+          className="mb-5"
+          trailing={
+            <TextButton
+              icon={<Plus size={18} />}
+              onClick={() => addException(editingVenue)}
+              className="-mr-2"
+            >
+              Add exception
+            </TextButton>
+          }
+        >
+          Exceptions — holidays, private hire, closures
+        </SectionLabel>
         {profile.exceptions.length === 0 ? (
-          <p className="py-2 text-xs text-nr-text-hint">
+          <p className="text-[13px] text-[var(--m3-outline)]">
             No exceptions set — regular hours apply every week.
           </p>
         ) : (
-          profile.exceptions.map((ex, i) => (
-            <div
-              key={i}
-              className="flex flex-wrap items-center gap-2.5 border-b border-nr-border/60 py-2.5 last:border-b-0"
-            >
-              <SlimInput
-                value={ex.label}
-                onChange={(e) => setExceptionField(editingVenue, i, "label", e.target.value)}
-                placeholder="Reason"
-                className="min-w-0 flex-1 py-2 text-xs"
-              />
-              <SlimInput
-                type="date"
-                mono
-                value={ex.date}
-                onChange={(e) => setExceptionField(editingVenue, i, "date", e.target.value)}
-                className="py-2 text-xs"
-              />
-              <button
-                onClick={() => toggleExceptionClosed(editingVenue, i)}
-                className={`whitespace-nowrap rounded-full border px-2.5 py-1 font-mono text-[11px] font-semibold ${closedPill(
-                  ex.closed
-                )}`}
+          <div className="flex flex-col">
+            {profile.exceptions.map((ex, i) => (
+              <div
+                key={i}
+                className="flex min-h-14 flex-wrap items-center gap-3 border-b border-[var(--m3-outlinev)] py-2 last:border-b-0"
               >
-                {ex.closed ? "CLOSED" : "OPEN"}
-              </button>
-              <button
-                onClick={() => removeException(editingVenue, i)}
-                className="px-1 text-nr-text-hint hover:text-red-400"
-                aria-label={`Remove exception ${ex.label}`}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))
+                <TextField
+                  dense
+                  aria-label="Exception reason"
+                  value={ex.label}
+                  onChange={(e) => setExceptionField(editingVenue, i, "label", e.target.value)}
+                  placeholder="Reason"
+                  wrapperClassName="min-w-[160px] flex-1"
+                />
+                <TextField
+                  dense
+                  mono
+                  type="date"
+                  aria-label="Exception date"
+                  value={ex.date}
+                  onChange={(e) => setExceptionField(editingVenue, i, "date", e.target.value)}
+                  wrapperClassName="w-[160px]"
+                />
+                <StateChip
+                  closed={ex.closed}
+                  onClick={() => toggleExceptionClosed(editingVenue, i)}
+                />
+                <IconButton
+                  danger
+                  onClick={() => removeException(editingVenue, i)}
+                  aria-label={`Remove exception ${ex.label}`}
+                >
+                  <X size={18} />
+                </IconButton>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
-    </>
+      </Card>
+    </div>
   );
 }
 
 function LinksTab() {
   const { profile, editingVenue, setVenueField } = useOrganizerDashboard();
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-nr-border bg-nr-surface p-[18px]">
-      <div>
-        <FieldLabel className="mb-1.5">Table / booking link</FieldLabel>
-        <SlimInput
-          mono
-          value={profile.tableLink}
-          onChange={(e) => setVenueField(editingVenue, "tableLink", e.target.value)}
-          placeholder="https://..."
-          className="w-full"
-        />
-      </div>
-    </div>
+    <Card className="flex flex-col gap-6">
+      <SectionLabel>Booking</SectionLabel>
+      <TextField
+        label="Table / booking link"
+        mono
+        value={profile.tableLink}
+        onChange={(e) => setVenueField(editingVenue, "tableLink", e.target.value)}
+        placeholder="https://..."
+      />
+    </Card>
   );
 }

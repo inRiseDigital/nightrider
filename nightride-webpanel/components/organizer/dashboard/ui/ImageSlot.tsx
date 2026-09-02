@@ -78,11 +78,19 @@ export function ImageSlot({
         className={cn(
           "group flex h-full w-full items-center justify-center overflow-hidden border border-dashed transition-colors",
           rounded,
-          src
-            ? "border-transparent"
-            : "border-nr-border bg-nr-surface-raised hover:border-nr-primary/60 hover:bg-white/5",
-          dragging && "border-nr-primary bg-nr-primary/10"
+          src ? "border-transparent" : "hover:bg-white/5",
+          dragging && "!border-[var(--m3-pri)]"
         )}
+        style={
+          src
+            ? undefined
+            : {
+                borderColor: dragging ? "var(--m3-pri)" : "var(--m3-outline)",
+                background: dragging
+                  ? "color-mix(in srgb, var(--m3-pri) 10%, transparent)"
+                  : "var(--m3-surf2)",
+              }
+        }
       >
         {src ? (
           // A data URL of arbitrary dimensions — next/image would need a loader
@@ -92,9 +100,10 @@ export function ImageSlot({
         ) : (
           <span
             className={cn(
-              "flex flex-col items-center gap-1.5 px-2 text-center text-nr-text-hint transition-colors group-hover:text-nr-text-secondary",
+              "flex flex-col items-center gap-1.5 px-2 text-center transition-colors",
               compact ? "text-[10px]" : "text-xs"
             )}
+            style={{ color: "var(--m3-outline)" }}
           >
             <ImagePlus size={compact ? 14 : 18} />
             {!compact && <span className="leading-tight">{placeholder}</span>}

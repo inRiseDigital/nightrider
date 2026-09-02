@@ -6,22 +6,28 @@ import { Button } from "@/components/admin/ui/Button";
 import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { Snackbar } from "./ui/Snackbar";
 
 /**
  * Sidebar + topbar chrome shared by every organizer dashboard route.
  *
- * The remove-image confirmation lives here rather than in `ImageSlot` so a
- * single dialog serves every slot on the page, matching the design.
+ * The remove-image confirmation and the snackbar live here rather than in the
+ * sections so a single instance of each serves every destination, matching the
+ * design.
  */
 export function DashboardShell({ children }: { children: ReactNode }) {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { confirmRemoveSlotId, cancelRemoveImage, confirmRemoveImage } = useOrganizerDashboard();
 
   return (
     <div className="flex h-full min-h-0 w-full">
-      <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <Sidebar
+        drawerOpen={drawerOpen}
+        onOpen={() => setDrawerOpen(true)}
+        onClose={() => setDrawerOpen(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onMenuClick={() => setMobileNavOpen(true)} />
+        <Topbar onMenuClick={() => setDrawerOpen(true)} />
         <main className="flex-1 overflow-y-auto p-5 sm:p-7">{children}</main>
       </div>
 
@@ -41,10 +47,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </>
         }
       >
-        <p className="text-sm text-nr-text-secondary">
+        <p className="text-sm text-[var(--m3-onv)]">
           This can&apos;t be undone. The photo will be removed from your venue listing.
         </p>
       </Modal>
+
+      <Snackbar />
     </div>
   );
 }

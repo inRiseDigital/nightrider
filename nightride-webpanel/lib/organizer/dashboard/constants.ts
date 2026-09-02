@@ -31,24 +31,36 @@ export const DRESS_CODES = ["Casual", "Smart Casual", "Dress to Impress", "No Sp
 
 export const AGE_POLICIES = ["18+", "21+", "25+ Mature Crowd"];
 
+/** Toggleable labels on a menu item. */
+export const MENU_TAGS = ["Signature", "Vegan", "Alcohol-free", "Halal", "New"];
+
+/** Single-letter night chips on a menu item, Monday-first like `DAYS`. */
+export const NIGHT_INITIALS = ["M", "T", "W", "T", "F", "S", "S"];
+
 /** Week starts Monday — the calendar grid and `hours` arrays both rely on this order. */
 export const DAYS: DayName[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export const TEAM_ROLES: TeamRole[] = ["Marketing", "Manager"];
+export const TEAM_ROLES: TeamRole[] = ["Owner", "Manager", "Door staff"];
 
 /**
- * Status chip styling. Translucent fill + solid text + subtle ring, matching
- * `components/admin/ui/Badge.tsx` so admin and organizer chips read alike.
+ * Status chip styling — M3 tone containers (solid container + on-container
+ * text), matching the "Organizer Dashboard Material.dc.html" design source.
  */
 export const EVENT_STATUS_STYLES: Record<EventStatus, { label: string; className: string }> = {
-  draft: { label: "DRAFT", className: "bg-white/5 text-nr-text-secondary ring-white/10" },
+  draft: { label: "DRAFT", className: "bg-[var(--m3-surf3)] text-[var(--m3-onv)] ring-white/5" },
   scheduled: {
     label: "SCHEDULED",
-    className: "bg-nr-primary-light/10 text-nr-primary-light ring-nr-primary-light/30",
+    className: "bg-[var(--m3-terc)] text-[var(--m3-onterc)] ring-white/5",
   },
-  in_review: { label: "IN REVIEW", className: "bg-amber-500/10 text-amber-400 ring-amber-500/30" },
-  live: { label: "LIVE", className: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30" },
-  cancelled: { label: "CANCELLED", className: "bg-red-500/10 text-red-400 ring-red-500/30" },
+  in_review: {
+    label: "IN REVIEW",
+    className: "bg-[var(--m3-warnc)] text-[var(--m3-onwarnc)] ring-white/5",
+  },
+  live: { label: "LIVE", className: "bg-[var(--m3-succ)] text-[var(--m3-onsucc)] ring-white/5" },
+  cancelled: {
+    label: "CANCELLED",
+    className: "bg-[var(--m3-errc)] text-[var(--m3-onerrc)] ring-white/5",
+  },
 };
 
 /**
@@ -57,28 +69,39 @@ export const EVENT_STATUS_STYLES: Record<EventStatus, { label: string; className
  */
 export const UPCOMING_STYLE = {
   label: "UPCOMING",
-  className: "bg-nr-primary-light/10 text-nr-primary-light ring-nr-primary-light/30",
+  className: "bg-[var(--m3-terc)] text-[var(--m3-onterc)] ring-white/5",
 };
 
 export const DOOR_STATUSES: { id: DoorStatus; label: string; className: string }[] = [
-  { id: "open", label: "Open", className: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30" },
-  { id: "filling", label: "Filling Up", className: "bg-nr-accent/10 text-nr-accent ring-nr-accent/30" },
-  { id: "capacity", label: "At Capacity", className: "bg-amber-500/10 text-amber-400 ring-amber-500/30" },
+  { id: "open", label: "Open", className: "bg-[var(--m3-succ)] text-[var(--m3-onsucc)] ring-white/5" },
+  {
+    id: "filling",
+    label: "Filling Up",
+    className: "bg-[var(--m3-pric)] text-[var(--m3-onpric)] ring-white/5",
+  },
+  {
+    id: "capacity",
+    label: "At Capacity",
+    className: "bg-[var(--m3-warnc)] text-[var(--m3-onwarnc)] ring-white/5",
+  },
   {
     id: "guestlist",
     label: "Guest List Only",
-    className: "bg-nr-primary-light/10 text-nr-primary-light ring-nr-primary-light/30",
+    className: "bg-[var(--m3-terc)] text-[var(--m3-onterc)] ring-white/5",
   },
-  { id: "closed", label: "Closed", className: "bg-red-500/10 text-red-400 ring-red-500/30" },
+  { id: "closed", label: "Closed", className: "bg-[var(--m3-errc)] text-[var(--m3-onerrc)] ring-white/5" },
 ];
 
 export const INBOX_TYPE_STYLES: Record<InboxType, { label: string; className: string }> = {
   policy: {
     label: "POLICY",
-    className: "bg-nr-primary-light/10 text-nr-primary-light ring-nr-primary-light/30",
+    className: "bg-[var(--m3-terc)] text-[var(--m3-onterc)] ring-white/5",
   },
-  violation: { label: "VIOLATION", className: "bg-amber-500/10 text-amber-400 ring-amber-500/30" },
-  appeal: { label: "APPEAL", className: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30" },
+  violation: {
+    label: "VIOLATION",
+    className: "bg-[var(--m3-warnc)] text-[var(--m3-onwarnc)] ring-white/5",
+  },
+  appeal: { label: "APPEAL", className: "bg-[var(--m3-succ)] text-[var(--m3-onsucc)] ring-white/5" },
 };
 
 export const VERIFY_STEPS: { id: VerifyStepId; label: string; detail: string }[] = [

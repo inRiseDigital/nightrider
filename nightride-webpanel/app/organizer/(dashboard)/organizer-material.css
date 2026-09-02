@@ -1,0 +1,58 @@
+/**
+ * Material Design 3 dark token set, scoped to the approved-organizer
+ * dashboard only (`.organizer-m3`). Ported 1:1 from the "Organizer Dashboard
+ * Material.dc.html" design source's `:root` block — these are deliberately
+ * separate from the NightRide brand tokens in app/globals.css (--nr-*), which
+ * the apply flow and admin panel still use.
+ */
+.organizer-m3 {
+  --m3-surf: #121212;
+  --m3-surf1: #1a1a1b;
+  --m3-surf2: #1f1f21;
+  --m3-surf3: #282829;
+  --m3-surf4: #323234;
+  --m3-on: #e6e4e4;
+  --m3-onv: #c6c4c5;
+  --m3-outline: #8e8c8d;
+  --m3-outlinev: #3e3e40;
+  --m3-pri: #ff3d73;
+  --m3-onpri: #ffffff;
+  --m3-pric: #ff3d73;
+  --m3-onpric: #ffffff;
+  --m3-ter: #83d5ca;
+  --m3-onter: #00382f;
+  --m3-terc: #005046;
+  --m3-onterc: #9ef2e4;
+  --m3-err: #f2b8b5;
+  --m3-errc: #8c1d18;
+  --m3-onerrc: #f9dedc;
+  --m3-suc: #7fd8a4;
+  --m3-succ: #0f4f31;
+  --m3-onsucc: #c8ebd5;
+  --m3-warn: #ffb95c;
+  --m3-warnc: #6b3e00;
+  --m3-onwarnc: #ffddb3;
+  --m3-track: #323234;
+
+  background: var(--m3-surf);
+  color: var(--m3-on);
+}
+
+.organizer-m3 .msi {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+.organizer-m3 input::placeholder,
+.organizer-m3 textarea::placeholder {
+  color: var(--m3-outline);
+}

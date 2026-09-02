@@ -29,11 +29,43 @@ export interface HoursException {
 export type VerifyStepId = "license" | "gps" | "video";
 export type VerifyStepStatus = "active" | "done";
 
+export interface SocialLink {
+  network: string;
+  value: string;
+}
+
+/** One line on a venue's food & drinks menu. */
+export interface MenuItem {
+  id: string;
+  name: string;
+  /** In the venue's `currency`. */
+  price: number;
+  desc: string;
+  /** Free text serving size — "1.5L magnum", "75cl". */
+  size: string;
+  /** Free text head count — "6". */
+  serves: string;
+  /** Labels from `MENU_TAGS`. */
+  tags: string[];
+  /** Indices into `DAYS` (0 = Mon). Empty means available every night. */
+  nights: number[];
+  soldOut: boolean;
+}
+
+export interface MenuSection {
+  id: string;
+  name: string;
+  items: MenuItem[];
+}
+
 export interface VenueProfile {
   /** False until an admin approves the venue; gates the editor and the app preview. */
   verified: boolean;
   name: string;
   city: string;
+  address: string;
+  about: string;
+  socialLinks: SocialLink[];
   genres: string[];
   dressCode: string;
   agePolicy: string;
@@ -44,6 +76,8 @@ export interface VenueProfile {
   amenities: string[];
   hours: OpeningHours[];
   exceptions: HoursException[];
+  /** Food & drinks, grouped into sections. Edits go live without review. */
+  menu: MenuSection[];
   tableLink: string;
   /** Only present while `verified` is false. */
   verificationSteps?: Record<VerifyStepId, VerifyStepStatus>;
@@ -82,12 +116,18 @@ export interface OrganizerEvent {
   moderationFlag: ModerationFlag;
   moderationEta: string;
   cancelReason: string;
+  /** Tickets sold so far. 0 for anything not on sale yet. */
+  sold: number;
+  /** Gross take in the venue's currency. 0 for anything not on sale yet. */
+  revenue: number;
 }
 
 export type DoorStatus = "open" | "filling" | "capacity" | "guestlist" | "closed";
 
 export interface TonightState {
   status: DoorStatus;
+  /** Head count currently inside — shown against the venue's capacity. */
+  inVenue: number;
   queueMinutes: number;
   emergencyActive: boolean;
   flashActive: boolean;
@@ -121,9 +161,11 @@ export interface BoostSlot {
   price: number;
 }
 
-export type TeamRole = "Marketing" | "Manager";
+export type TeamRole = "Owner" | "Manager" | "Door staff";
 
 export interface TeamMember {
+  /** Stable across role edits and removals, so rows keep their identity. */
+  id: string;
   name: string;
   email: string;
   role: TeamRole;
@@ -140,7 +182,12 @@ export interface VenueReview {
   author: string;
   rating: number;
   text: string;
+  /** Draft text in the composer — becomes `posted` when sent. */
   reply: string;
+  /** The public reply guests see. Empty until one is sent. */
+  posted: string;
+  /** When `posted` was published, e.g. "Aug 6". Empty when nothing is posted. */
+  postedWhen: string;
   flagged: boolean;
 }
 

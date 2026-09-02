@@ -1,12 +1,19 @@
 "use client";
 
-import { ArrowLeft, X } from "lucide-react";
-import {
-  eventSlotIds,
-  useOrganizerDashboard,
-} from "@/lib/organizer/dashboard/store";
+import { CalendarDays, Plus, Trash2, X } from "lucide-react";
+import { eventSlotIds, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { ImageSlot } from "../ui/ImageSlot";
-import { Chip, FieldLabel, SlimInput, Toggle } from "../ui/Primitives";
+import {
+  FilledButton,
+  IconButton,
+  OutlinedButton,
+  SectionLabel,
+  Select,
+  SlimInput,
+  TextButton,
+  TextField,
+  Toggle,
+} from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
 
 const MODERATION_STYLES = {
@@ -20,8 +27,16 @@ const MODERATION_STYLES = {
   },
 } as const;
 
+/** The dialog sits on --m3-surf2, so notched field labels must mask that tone. */
+const SURFACE = "var(--m3-surf2)";
+
+/**
+ * Event editor — a modal over the events list, matching the design. Submissions
+ * enter the platform review queue rather than publishing straight away.
+ */
 export function EventEditor() {
   const {
+    eventEditorOpen,
     eventDraft,
     editingEventId,
     venueOrder,
@@ -39,7 +54,7 @@ export function EventEditor() {
     submitEvent,
   } = useOrganizerDashboard();
 
-  if (!eventDraft) return null;
+  if (!eventEditorOpen || !eventDraft) return null;
 
   const isEditingExisting = !!editingEventId;
   const slots = eventSlotIds(editingEventId ?? "new");
@@ -51,139 +66,134 @@ export function EventEditor() {
         : null;
 
   // Only verified venues can host a submission.
-  const selectableVenues = venueOrder.filter((id) => venues[id].verified);
+  const selectableVenues = venueOrder
+    .filter((id) => venues[id].verified)
+    .map((id) => ({ value: id, label: venues[id].name }));
 
   return (
-    <div className="max-w-[760px]">
-      <button
-        onClick={closeEditor}
-        className="mb-3.5 flex items-center gap-1.5 text-xs text-nr-primary-light hover:text-nr-accent"
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-8">
+      <div className="absolute inset-0 bg-black/60" onClick={closeEditor} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEditingExisting ? "Edit event" : "New event"}
+        className="relative max-h-full w-full max-w-[680px] overflow-y-auto rounded-[28px] p-6 shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+        style={{ background: SURFACE }}
       >
-        <ArrowLeft size={13} /> Back to events
-      </button>
-
-      <div className="flex flex-col gap-[18px] rounded-lg border border-nr-border bg-nr-surface p-5">
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[2fr_1fr]">
-          <div>
-            <FieldLabel className="mb-1.5">Event name</FieldLabel>
-            <SlimInput
-              value={eventDraft.name}
-              onChange={(e) => updateDraft("name", e.target.value)}
-              placeholder="e.g. Full Moon Rooftop"
-              className="w-full"
-            />
+        <div className="mb-5 flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "var(--m3-pric)", color: "var(--m3-onpric)" }}
+          >
+            <CalendarDays size={20} />
           </div>
-          <div>
-            <FieldLabel className="mb-1.5">Venue</FieldLabel>
-            <div className="flex gap-2">
-              {selectableVenues.map((id) => (
-                <Chip
-                  key={id}
-                  label={venues[id].name}
-                  active={eventDraft.venue === id}
-                  onClick={() => updateDraft("venue", id)}
-                  shape="rounded"
-                  className="flex-1 px-2.5 py-2.5 text-center"
-                />
-              ))}
-            </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[22px] leading-7" style={{ color: "var(--m3-on)" }}>
+              {isEditingExisting ? "Edit event" : "New event"}
+            </h2>
+            <p className="mt-0.5 text-[13px]" style={{ color: "var(--m3-onv)" }}>
+              Submissions go to platform review before publishing.
+            </p>
           </div>
+          <IconButton onClick={closeEditor} aria-label="Close">
+            <X size={20} />
+          </IconButton>
         </div>
 
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-          <div>
-            <FieldLabel className="mb-1.5">Date</FieldLabel>
-            <SlimInput
+        <div className="flex flex-col gap-[22px]">
+          <TextField
+            label="Event name"
+            surface={SURFACE}
+            value={eventDraft.name}
+            onChange={(e) => updateDraft("name", e.target.value)}
+            placeholder="Full Moon Rooftop"
+          />
+
+          <div className="flex flex-wrap gap-4">
+            <Select
+              label="Venue"
+              surface={SURFACE}
+              options={selectableVenues}
+              value={eventDraft.venue}
+              onChange={(e) => updateDraft("venue", e.target.value)}
+              wrapperClassName="min-w-[180px] flex-1"
+            />
+            <TextField
+              label="Date"
+              surface={SURFACE}
               type="date"
               mono
               value={eventDraft.date}
               onChange={(e) => updateDraft("date", e.target.value)}
-              className="w-full"
+              wrapperClassName="min-w-[150px] flex-1"
             />
           </div>
-          <div>
-            <FieldLabel className="mb-1.5">Start time</FieldLabel>
-            <SlimInput
+
+          <div className="flex gap-4">
+            <TextField
+              label="Doors"
+              surface={SURFACE}
               type="time"
               mono
               value={eventDraft.startTime}
               onChange={(e) => updateDraft("startTime", e.target.value)}
-              className="w-full"
+              wrapperClassName="flex-1"
             />
-          </div>
-          <div>
-            <FieldLabel className="mb-1.5">End time</FieldLabel>
-            <SlimInput
+            <TextField
+              label="Close"
+              surface={SURFACE}
               type="time"
               mono
               value={eventDraft.endTime}
               onChange={(e) => updateDraft("endTime", e.target.value)}
-              className="w-full"
+              wrapperClassName="flex-1"
             />
           </div>
-        </div>
 
-        <div>
-          <FieldLabel className="mb-2">Lineup / DJs</FieldLabel>
-          <div className="mb-2.5 flex gap-2">
-            <SlimInput
-              value={lineupInput}
-              onChange={(e) => setLineupInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addLineup();
-                }
-              }}
-              placeholder="Add a DJ or act"
-              className="flex-1"
-            />
-            <button
-              onClick={addLineup}
-              className="whitespace-nowrap rounded-lg border border-nr-border bg-nr-surface-raised px-4 text-xs font-semibold text-nr-text-primary hover:border-nr-primary/50"
-            >
-              Add
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {eventDraft.lineup.map((name, i) => (
-              <span
-                key={`${name}-${i}`}
-                className="flex items-center gap-1.5 rounded-full border border-nr-primary/30 bg-nr-primary/10 px-2.5 py-1.5 text-xs text-nr-primary"
-              >
-                {name}
-                <button
-                  onClick={() => removeLineup(i)}
-                  className="text-nr-text-secondary hover:text-nr-text-primary"
-                  aria-label={`Remove ${name}`}
+          <div>
+            <SectionLabel className="mb-2.5">Lineup</SectionLabel>
+            <div className="flex flex-wrap items-center gap-2">
+              {eventDraft.lineup.map((name, i) => (
+                <span
+                  key={`${name}-${i}`}
+                  className="flex h-8 items-center gap-1.5 rounded-lg pl-3.5 pr-2 text-sm font-medium"
+                  style={{ background: "var(--m3-surf3)", color: "var(--m3-on)" }}
                 >
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
+                  {name}
+                  <button
+                    onClick={() => removeLineup(i)}
+                    aria-label={`Remove ${name}`}
+                    className="text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              ))}
+              <input
+                value={lineupInput}
+                onChange={(e) => setLineupInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addLineup();
+                  }
+                }}
+                placeholder="Add artist + Enter"
+                className="min-w-[160px] flex-1 rounded-lg border border-dashed bg-transparent px-3 py-2 text-sm outline-none placeholder:text-[var(--m3-outline)]"
+                style={{ borderColor: "var(--m3-outline)", color: "var(--m3-on)" }}
+              />
+            </div>
           </div>
-        </div>
 
-        <div>
-          <div className="mb-2.5 flex items-center justify-between">
-            <FieldLabel>Ticket tiers</FieldLabel>
-            <button
-              onClick={addTier}
-              className="text-xs font-semibold text-nr-primary hover:text-nr-primary-dark"
-            >
-              + Add tier
-            </button>
-          </div>
-          {eventDraft.tiers.length === 0 ? (
-            <p className="py-1.5 text-xs text-nr-text-hint">No ticket tiers yet.</p>
-          ) : (
-            eventDraft.tiers.map((tier, i) => (
-              <div key={i} className="flex items-center gap-2.5 border-b border-nr-border/60 py-2">
+          <div>
+            <SectionLabel className="mb-2.5">Ticket tiers</SectionLabel>
+            {eventDraft.tiers.map((tier, i) => (
+              <div key={i} className="mb-2.5 flex items-center gap-3">
                 <SlimInput
                   value={tier.name}
                   onChange={(e) => updateTier(i, "name", e.target.value)}
                   placeholder="Tier name"
-                  className="min-w-0 flex-1 py-2 text-xs"
+                  className="min-w-0 flex-[2]"
                 />
                 <SlimInput
                   type="number"
@@ -191,7 +201,7 @@ export function EventEditor() {
                   value={tier.price}
                   onChange={(e) => updateTier(i, "price", e.target.value)}
                   placeholder="Price"
-                  className="w-[90px] py-2 text-xs"
+                  className="min-w-0 flex-1"
                 />
                 <SlimInput
                   type="number"
@@ -199,106 +209,105 @@ export function EventEditor() {
                   value={tier.qty}
                   onChange={(e) => updateTier(i, "qty", e.target.value)}
                   placeholder="Qty"
-                  className="w-[90px] py-2 text-xs"
+                  className="min-w-0 flex-1"
                 />
-                <button
-                  onClick={() => removeTier(i)}
-                  className="px-1 text-nr-text-hint hover:text-red-400"
-                  aria-label={`Remove tier ${tier.name}`}
-                >
-                  <X size={14} />
-                </button>
+                <IconButton onClick={() => removeTier(i)} danger aria-label={`Remove tier ${tier.name}`}>
+                  <Trash2 size={18} />
+                </IconButton>
               </div>
-            ))
-          )}
-        </div>
-
-        <div>
-          <FieldLabel className="mb-2">Images</FieldLabel>
-          <div className="grid grid-cols-2 gap-2.5">
-            <ImageSlot slotId={slots.cover} placeholder="Cover image" className="h-[140px]" />
-            <ImageSlot slotId={slots.poster} placeholder="Poster image" className="h-[140px]" />
+            ))}
+            <OutlinedButton onClick={addTier} icon={<Plus size={16} />} className="h-9 text-[13px]">
+              Add tier
+            </OutlinedButton>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-nr-border bg-nr-surface-raised p-3.5">
-          <Toggle
-            checked={eventDraft.recurring}
-            onChange={() => updateDraft("recurring", !eventDraft.recurring)}
-            label="Recurring residency"
-          />
-          <div className="flex-1">
-            <p className="text-[13px] font-semibold text-nr-text-primary">Recurring residency</p>
-            <p className="mt-px text-[11px] text-nr-text-hint">
-              e.g. &ldquo;Techno Fridays&rdquo; — repeats without re-entering it every week
-            </p>
+          <div>
+            <SectionLabel className="mb-2.5">Images</SectionLabel>
+            <div className="grid grid-cols-2 gap-2.5">
+              <ImageSlot slotId={slots.cover} placeholder="Cover image" className="h-[140px]" />
+              <ImageSlot slotId={slots.poster} placeholder="Poster image" className="h-[140px]" />
+            </div>
           </div>
-          {eventDraft.recurring && (
-            <SlimInput
-              value={eventDraft.recurrenceLabel}
-              onChange={(e) => updateDraft("recurrenceLabel", e.target.value)}
-              placeholder="Every Friday"
-              className="w-[160px] bg-nr-surface py-2 text-xs"
+
+          <div
+            className="flex flex-wrap items-center gap-3 rounded-xl p-3.5"
+            style={{ background: "var(--m3-surf1)" }}
+          >
+            <Toggle
+              checked={eventDraft.recurring}
+              onChange={() => updateDraft("recurring", !eventDraft.recurring)}
+              label="Recurring residency"
             />
-          )}
-        </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium" style={{ color: "var(--m3-on)" }}>
+                Recurring residency
+              </p>
+              <p className="mt-px text-[11px]" style={{ color: "var(--m3-outline)" }}>
+                e.g. &ldquo;Techno Fridays&rdquo; — repeats without re-entering it every week
+              </p>
+            </div>
+            {eventDraft.recurring && (
+              <SlimInput
+                value={eventDraft.recurrenceLabel}
+                onChange={(e) => updateDraft("recurrenceLabel", e.target.value)}
+                placeholder="Every Friday"
+                className="w-[160px] py-2 text-xs"
+              />
+            )}
+          </div>
 
-        <div>
-          <FieldLabel className="mb-1.5">
-            Schedule publish (optional — goes out even if you&apos;re not online)
-          </FieldLabel>
-          <SlimInput
+          <TextField
+            label="Schedule publish (optional)"
+            surface={SURFACE}
             type="datetime-local"
             mono
             value={eventDraft.scheduledPublish}
             onChange={(e) => updateDraft("scheduledPublish", e.target.value)}
           />
+
+          {isEditingExisting && (
+            <button
+              onClick={() => updateDraft("notifyOnChange", !eventDraft.notifyOnChange)}
+              className="flex items-center gap-2.5 rounded-xl px-3.5 py-3 text-left"
+              style={{ background: "var(--m3-surf1)" }}
+            >
+              <span
+                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm border-2 text-[12px] font-bold"
+                style={{
+                  borderColor: eventDraft.notifyOnChange ? "var(--m3-pri)" : "var(--m3-outline)",
+                  background: eventDraft.notifyOnChange ? "var(--m3-pri)" : "transparent",
+                  color: "var(--m3-onpri)",
+                }}
+              >
+                {eventDraft.notifyOnChange ? "✓" : ""}
+              </span>
+              <span className="text-xs" style={{ color: "var(--m3-onv)" }}>
+                Notify everyone who saved this event if I change the date, price, or lineup
+              </span>
+            </button>
+          )}
+
+          {moderation && (
+            <div
+              className="flex flex-wrap items-center gap-2.5 rounded-xl px-3.5 py-3"
+              style={{ background: "var(--m3-surf1)" }}
+            >
+              <StatusChip label={moderation.label} className={moderation.className} size="sm" />
+              <span className="text-[11px]" style={{ color: "var(--m3-onv)" }}>
+                {eventDraft.moderationEta}
+              </span>
+            </div>
+          )}
         </div>
 
-        {isEditingExisting && (
-          <button
-            onClick={() => updateDraft("notifyOnChange", !eventDraft.notifyOnChange)}
-            className="flex items-center gap-2.5 rounded-lg border border-nr-border bg-nr-surface-raised px-3.5 py-3 text-left"
-          >
-            <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border border-nr-primary-light text-[10px] text-nr-bg ${
-                eventDraft.notifyOnChange ? "bg-nr-primary-light" : "bg-transparent"
-              }`}
-            >
-              {eventDraft.notifyOnChange ? "✓" : ""}
-            </span>
-            <span className="text-xs text-nr-text-secondary">
-              Notify everyone who saved this event if I change the date, price, or lineup
-            </span>
-          </button>
-        )}
-
-        {moderation && (
-          <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-nr-border bg-nr-surface-raised px-3.5 py-3">
-            <StatusChip label={moderation.label} className={moderation.className} size="sm" />
-            <span className="text-[11px] text-nr-text-secondary">{eventDraft.moderationEta}</span>
-          </div>
-        )}
-
-        <div className="flex flex-wrap justify-end gap-2.5 border-t border-nr-border/60 pt-4">
-          <button
-            onClick={closeEditor}
-            className="rounded-lg px-4 py-2.5 text-[13px] font-semibold text-nr-text-secondary hover:text-nr-text-primary"
-          >
-            Discard
-          </button>
-          <button
-            onClick={saveDraftEvent}
-            className="rounded-lg border border-nr-border px-4 py-2.5 text-[13px] font-semibold text-nr-text-primary hover:border-nr-primary/50"
-          >
-            Save as Draft
-          </button>
-          <button
-            onClick={submitEvent}
-            className="rounded-lg bg-nr-accent px-[18px] py-2.5 text-[13px] font-semibold text-nr-bg hover:bg-nr-accent/80"
-          >
-            {eventDraft.scheduledPublish ? "Schedule Publish" : "Submit for Review"}
-          </button>
+        <div className="mt-7 flex flex-wrap items-center justify-end gap-2">
+          <TextButton onClick={closeEditor}>Cancel</TextButton>
+          <FilledButton onClick={saveDraftEvent} tonal>
+            Save draft
+          </FilledButton>
+          <FilledButton onClick={submitEvent}>
+            {eventDraft.scheduledPublish ? "Schedule publish" : "Submit for review"}
+          </FilledButton>
         </div>
       </div>
     </div>

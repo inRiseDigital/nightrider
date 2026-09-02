@@ -1,133 +1,59 @@
 /**
- * Sidebar nav, grouped exactly as the design's `navGroups`. Each entry also
- * carries the topbar title/subtitle for its route.
+ * Sidebar nav — 5 flat destinations, matching the design's rail (Home, Events,
+ * Venue, Audience, Account). Each destination is a single route; sub-views
+ * within it are switched by an in-page tab strip (see each destination's
+ * `page.tsx` and the corresponding `*Tab` state in the dashboard store), not
+ * by separate nav entries.
  */
 export interface OrganizerNavItem {
   href: string;
   label: string;
   title: string;
   subtitle: string;
-  /** Set on "My Events" — filled in at render time with the live event count. */
+  /** Material Symbols icon name, used by the icon rail and drawer. */
+  icon: string;
+  /** Set on "Events" — filled in at render time with the live event count. */
   badge?: "liveEvents";
 }
 
-export interface OrganizerNavGroup {
-  label: string;
-  items: OrganizerNavItem[];
-}
-
-export const ORGANIZER_NAV_GROUPS: OrganizerNavGroup[] = [
+export const ORGANIZER_NAV_ITEMS: OrganizerNavItem[] = [
   {
-    label: "OVERVIEW",
-    items: [
-      {
-        href: "/organizer/dashboard",
-        label: "Dashboard",
-        title: "Dashboard",
-        subtitle: "Your events and venues at a glance",
-      },
-    ],
+    href: "/organizer/dashboard",
+    label: "Home",
+    title: "Home",
+    subtitle: "Tonight's live ops and your events at a glance",
+    icon: "space_dashboard",
   },
   {
-    label: "EVENTS",
-    items: [
-      {
-        href: "/organizer/events",
-        label: "My Events",
-        title: "My Events",
-        subtitle: "Drafts, submissions, and published events",
-        badge: "liveEvents",
-      },
-      {
-        href: "/organizer/calendar",
-        label: "Calendar",
-        title: "Calendar",
-        subtitle: "Your month at a glance — conflicts and gaps visible",
-      },
-    ],
+    href: "/organizer/events",
+    label: "Events",
+    title: "Events",
+    subtitle: "Drafts, submissions, published events, and your calendar",
+    icon: "event",
+    badge: "liveEvents",
   },
   {
-    label: "VENUES",
-    items: [
-      {
-        href: "/organizer/venues",
-        label: "My Venues",
-        title: "My Venues",
-        subtitle: "Gallery, attributes, hours & links — with a live app preview",
-      },
-    ],
+    href: "/organizer/venues",
+    label: "Venue",
+    title: "Venue",
+    subtitle: "Gallery, attributes, hours & links — with a live app preview",
+    icon: "storefront",
   },
   {
-    label: "TONIGHT",
-    items: [
-      {
-        href: "/organizer/tonight",
-        label: "Tonight",
-        title: "Tonight",
-        subtitle: "Live door status, queue, and instant broadcasts",
-      },
-    ],
+    href: "/organizer/performance",
+    label: "Audience",
+    title: "Audience",
+    subtitle: "Funnel, reviews, and AI visibility",
+    icon: "insights",
   },
   {
-    label: "PERFORMANCE",
-    items: [
-      {
-        href: "/organizer/performance",
-        label: "Performance",
-        title: "Performance",
-        subtitle: "Per-event funnel and trend comparisons",
-      },
-      {
-        href: "/organizer/ai-visibility",
-        label: "AI Visibility",
-        title: "AI Visibility",
-        subtitle: "How the AI companion discovers and recommends you",
-      },
-    ],
-  },
-  {
-    label: "PROMOTION",
-    items: [
-      {
-        href: "/organizer/promotion",
-        label: "Promotion",
-        title: "Promotion",
-        subtitle: "Push, guest list, perks, and boosted placement",
-      },
-    ],
-  },
-  {
-    label: "ACCOUNT",
-    items: [
-      {
-        href: "/organizer/team",
-        label: "Team & Access",
-        title: "Team & Access",
-        subtitle: "Scoped roles and an activity trail",
-      },
-      {
-        href: "/organizer/reviews",
-        label: "Reviews",
-        title: "Reviews",
-        subtitle: "Reply and flag from one place",
-      },
-      {
-        href: "/organizer/inbox",
-        label: "Inbox",
-        title: "Inbox",
-        subtitle: "Admin, policy, and appeal messages",
-      },
-      {
-        href: "/organizer/settings",
-        label: "Settings",
-        title: "Settings",
-        subtitle: "Organizer profile and preferences",
-      },
-    ],
+    href: "/organizer/account",
+    label: "Account",
+    title: "Account",
+    subtitle: "Team, inbox, promotion, and settings",
+    icon: "manage_accounts",
   },
 ];
-
-export const ORGANIZER_NAV_ITEMS = ORGANIZER_NAV_GROUPS.flatMap((g) => g.items);
 
 export function findNavItem(pathname: string | null): OrganizerNavItem | undefined {
   if (!pathname) return undefined;

@@ -39,6 +39,13 @@ export const MOCK_VENUES: Record<string, VenueProfile> = {
     verified: true,
     name: "Sirens Dubai",
     city: "Dubai, UAE",
+    address: "Marina Walk, Dubai Marina, Dubai, UAE",
+    about:
+      "Rooftop techno and house on the Marina skyline. Open-air terrace, resident DJs Thu–Sat, and a strict door policy after 23:00.",
+    socialLinks: [
+      { network: "instagram", value: "@sirensdubai" },
+      { network: "tiktok", value: "@sirensdubai" },
+    ],
     genres: ["Techno", "House"],
     dressCode: "Smart Casual",
     agePolicy: "21+",
@@ -49,12 +56,130 @@ export const MOCK_VENUES: Record<string, VenueProfile> = {
     amenities: ["Rooftop", "Cloakroom"],
     hours: hours(["Mon", "Tue"], "22:00", "04:00"),
     exceptions: [{ label: "Eid Al Adha — Private Hire", date: "2026-08-19", closed: true }],
+    menu: [
+      {
+        id: "ms1",
+        name: "Bottle service & tables",
+        items: [
+          {
+            id: "mi1",
+            name: "Skyline table — Grey Goose",
+            price: 3200,
+            desc: "Reserved terrace table with skyline view, two mixers per bottle.",
+            size: "1.5L magnum",
+            serves: "6",
+            tags: ["Signature"],
+            nights: [4, 5],
+            soldOut: false,
+          },
+          {
+            id: "mi2",
+            name: "Dom Pérignon 2013",
+            price: 2900,
+            desc: "Served with sparklers on request.",
+            size: "75cl",
+            serves: "4",
+            tags: [],
+            nights: [],
+            soldOut: false,
+          },
+          {
+            id: "mi3",
+            name: "Booth minimum — main deck",
+            price: 1500,
+            desc: "Minimum spend, redeemable against anything on the menu.",
+            size: "",
+            serves: "8",
+            tags: [],
+            nights: [3, 4, 5],
+            soldOut: true,
+          },
+        ],
+      },
+      {
+        id: "ms2",
+        name: "Cocktails",
+        items: [
+          {
+            id: "mi4",
+            name: "Marasi Spritz",
+            price: 75,
+            desc: "Aperol, cava, blood orange, rosemary smoke.",
+            size: "",
+            serves: "",
+            tags: ["Signature"],
+            nights: [],
+            soldOut: false,
+          },
+          {
+            id: "mi5",
+            name: "Sober Sunset",
+            price: 45,
+            desc: "Seedlip, passionfruit, lime, soda.",
+            size: "",
+            serves: "",
+            tags: ["Alcohol-free", "New"],
+            nights: [],
+            soldOut: false,
+          },
+        ],
+      },
+      {
+        id: "ms3",
+        name: "Food",
+        items: [
+          {
+            id: "mi6",
+            name: "Wagyu sliders (3)",
+            price: 95,
+            desc: "Truffle mayo, aged cheddar, brioche.",
+            size: "",
+            serves: "2",
+            tags: ["Halal"],
+            nights: [],
+            soldOut: false,
+          },
+          {
+            id: "mi7",
+            name: "Charred padrón peppers",
+            price: 40,
+            desc: "Sea salt, lemon.",
+            size: "",
+            serves: "",
+            tags: ["Vegan"],
+            nights: [],
+            soldOut: false,
+          },
+        ],
+      },
+      {
+        id: "ms4",
+        name: "Happy hour",
+        items: [
+          {
+            id: "mi8",
+            name: "Two-for-one house pours",
+            price: 55,
+            desc: "House spirits and wines by the glass.",
+            size: "",
+            serves: "",
+            tags: [],
+            nights: [3, 4],
+            soldOut: false,
+          },
+        ],
+      },
+    ],
     tableLink: "https://booking.sirensdubai.com/reserve",
   },
   warehouse9: {
     verified: true,
     name: "Warehouse 9",
     city: "Tokyo, Japan",
+    address: "9 Chome, Shibuya, Tokyo, Japan",
+    about:
+      "Industrial main room built for deep house and techno. Outdoor terrace for smoke breaks, VIP tables on request.",
+    socialLinks: [{ network: "instagram", value: "@warehouse9tokyo" }],
     genres: ["Deep House", "Techno", "Commercial"],
     dressCode: "Casual",
     agePolicy: "18+",
@@ -65,6 +190,53 @@ export const MOCK_VENUES: Record<string, VenueProfile> = {
     amenities: ["Smoking Area", "VIP Tables", "Outdoor Terrace"],
     hours: hours(["Mon"], "21:00", "05:00"),
     exceptions: [{ label: "Closed for Renovation", date: "2026-09-01", closed: true }],
+    menu: [
+      {
+        id: "mw1",
+        name: "Bar",
+        items: [
+          {
+            id: "mwi1",
+            name: "Beer bucket",
+            price: 4500,
+            desc: "Five bottles on ice.",
+            size: "5 × 33cl",
+            serves: "3",
+            tags: [],
+            nights: [5, 6],
+            soldOut: false,
+          },
+          {
+            id: "mwi2",
+            name: "Espresso martini",
+            price: 1800,
+            desc: "Double shot, house cold brew.",
+            size: "",
+            serves: "",
+            tags: ["Signature"],
+            nights: [],
+            soldOut: false,
+          },
+        ],
+      },
+      {
+        id: "mw2",
+        name: "Late food",
+        items: [
+          {
+            id: "mwi3",
+            name: "Loaded fries",
+            price: 1200,
+            desc: "Served until 04:00 from the yard hatch.",
+            size: "",
+            serves: "2",
+            tags: ["Vegan"],
+            nights: [],
+            soldOut: false,
+          },
+        ],
+      },
+    ],
     tableLink: "",
   },
 };
@@ -90,6 +262,8 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "clean",
     moderationEta: "",
     cancelReason: "",
+    sold: 268,
+    revenue: 21440,
   },
   {
     id: "e2",
@@ -108,6 +282,8 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "clean",
     moderationEta: "",
     cancelReason: "",
+    sold: 112,
+    revenue: 336000,
   },
   {
     id: "e3",
@@ -126,6 +302,8 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "pending",
     moderationEta: "~2h remaining",
     cancelReason: "",
+    sold: 0,
+    revenue: 0,
   },
   {
     id: "e4",
@@ -144,11 +322,14 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "",
     moderationEta: "",
     cancelReason: "",
+    sold: 0,
+    revenue: 0,
   },
 ];
 
 export const MOCK_TONIGHT: TonightState = {
   status: "open",
+  inVenue: 412,
   queueMinutes: 15,
   emergencyActive: false,
   flashActive: false,
@@ -172,8 +353,9 @@ export const MOCK_PERKS: RankPerk[] = [
 export const MOCK_BOOST: BoostSlot = { active: false, night: "2026-08-15", price: 40 };
 
 export const MOCK_TEAM: TeamMember[] = [
-  { name: "Jamie Rios", email: "jamie@neonfox.co", role: "Manager" },
-  { name: "Priya Shah", email: "priya@neonfox.co", role: "Marketing" },
+  { id: "tm1", name: "Rana Aziz", email: "rana@sirensdubai.com", role: "Owner" },
+  { id: "tm2", name: "Marco Reyes", email: "marco@sirensdubai.com", role: "Manager" },
+  { id: "tm3", name: "Leila Haddad", email: "leila@sirensdubai.com", role: "Door staff" },
 ];
 
 export const MOCK_ACTIVITY: ActivityEntry[] = [
@@ -187,8 +369,10 @@ export const MOCK_REVIEWS: VenueReview[] = [
     id: "r1",
     author: "@mira_k",
     rating: 5,
-    text: "Best rooftop set of the summer.",
+    text: "Best rooftop set of the summer. Door was quick even at 1am and the terrace never felt packed.",
     reply: "",
+    posted: "Thank you Mira — Kalima is back on the decks the first Friday of every month.",
+    postedWhen: "Aug 6",
     flagged: false,
   },
   {
@@ -197,7 +381,9 @@ export const MOCK_REVIEWS: VenueReview[] = [
     rating: 1,
     text: "Obvious spam review with a promo link.",
     reply: "",
-    flagged: false,
+    posted: "",
+    postedWhen: "",
+    flagged: true,
   },
   {
     id: "r3",
@@ -205,6 +391,8 @@ export const MOCK_REVIEWS: VenueReview[] = [
     rating: 4,
     text: "Sound system needs work but great crowd.",
     reply: "",
+    posted: "",
+    postedWhen: "",
     flagged: false,
   },
 ];
@@ -240,11 +428,51 @@ export const MOCK_INBOX: InboxMessage[] = [
 ];
 
 /** Overview KPIs and the analytics panels are presentational placeholders. */
-export const MOCK_KPIS = [
-  { label: "Upcoming Events", value: "5", delta: "2 this week", deltaClass: "text-nr-text-secondary" },
-  { label: "Tickets Sold", value: "2,340", delta: "+412 this week", deltaClass: "text-emerald-400" },
-  { label: "Revenue (30d)", value: "$58.2K", delta: "+12% vs last mo.", deltaClass: "text-emerald-400" },
-  { label: "Avg. Fill Rate", value: "87%", delta: "across 2 venues", deltaClass: "text-nr-text-secondary" },
+/**
+ * The four headline metrics on Home → Live operations. `icon` is a key the
+ * section maps to a lucide component; `tone` picks the icon/delta colours from
+ * the M3 token set.
+ */
+export const MOCK_KPIS: {
+  icon: "rsvp" | "revenue" | "views" | "ai";
+  value: string;
+  label: string;
+  delta: string;
+  tone: "primary" | "tertiary";
+  deltaTone: "up" | "down";
+}[] = [
+  {
+    icon: "rsvp",
+    value: "268",
+    label: "RSVPs tonight",
+    delta: "+18%",
+    tone: "primary",
+    deltaTone: "up",
+  },
+  {
+    icon: "revenue",
+    value: "21.4k",
+    label: "Ticket revenue (AED)",
+    delta: "+7%",
+    tone: "tertiary",
+    deltaTone: "up",
+  },
+  {
+    icon: "views",
+    value: "9,120",
+    label: "Profile views, 7d",
+    delta: "−4%",
+    tone: "primary",
+    deltaTone: "down",
+  },
+  {
+    icon: "ai",
+    value: "74",
+    label: "AI recommendation score",
+    delta: "+6",
+    tone: "tertiary",
+    deltaTone: "up",
+  },
 ];
 
 export const MOCK_FUNNEL = { views: 8400, saves: 1120, directions: 640 };

@@ -44,6 +44,16 @@ export function venueName(venues: Record<string, VenueProfile>, id: string): str
   return venues[id]?.name ?? id;
 }
 
+/**
+ * The accent a venue is drawn in wherever venues sit side by side — the
+ * calendar's event bars and the day dialog. First venue takes the primary
+ * accent, second the tertiary, and any further ones alternate.
+ */
+export function venueAccent(venueOrder: string[], id: string): string {
+  const idx = venueOrder.indexOf(id);
+  return idx % 2 === 1 ? "var(--m3-ter)" : "var(--m3-pri)";
+}
+
 export function coverText(profile: VenueProfile): string {
   return `${profile.currency}${profile.coverMin}–${profile.currency}${profile.coverMax}`;
 }
@@ -69,7 +79,9 @@ export interface CalendarCell {
   /** Empty string for the leading blanks before the 1st. */
   dayNum: number | "";
   dateISO: string;
-  events: { id: string; name: string }[];
+  /** "Aug 14" — the heading the day dialog opens with. */
+  label: string;
+  events: { id: string; name: string; venue: string }[];
   /** Venue is shut that day — only knowable when a single venue is selected. */
   isClosed: boolean;
   closedLabel: string;
@@ -102,6 +114,7 @@ export function buildCalendar(
       key: `blank-${i}`,
       dayNum: "",
       dateISO: "",
+      label: "",
       events: [],
       isClosed: false,
       closedLabel: "",
@@ -124,7 +137,8 @@ export function buildCalendar(
       key: dateISO,
       dayNum: d,
       dateISO,
-      events: dayEvents.map((e) => ({ id: e.id, name: e.name })),
+      label: `${first.toLocaleString("en-US", { month: "short" })} ${d}`,
+      events: dayEvents.map((e) => ({ id: e.id, name: e.name, venue: e.venue })),
       isClosed,
       closedLabel: exception ? exception.label : "closed",
     });

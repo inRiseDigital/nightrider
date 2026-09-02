@@ -100,18 +100,16 @@ export function blankVenueProfile(name: string, city: string): VenueProfile {
 }
 
 /**
- * Fields that bypass the venue draft. The Menu tab is bannered "edits skip
- * review and update in the app straight away", and verification state is set
- * by an admin, so both write to the published record directly. They are
- * excluded from the dirty check and preserved when a draft commits.
+ * Fields that bypass the venue draft. Verification state is set by an admin
+ * rather than the organizer, so it writes to the published record directly:
+ * it is excluded from the dirty check and preserved when a draft commits.
  */
-const LIVE_VENUE_FIELDS = ["menu", "verified", "verificationSteps", "openVerifyStep"] as const;
+const LIVE_VENUE_FIELDS = ["verified", "verificationSteps", "openVerifyStep"] as const;
 
 /** The draft with live fields overlaid — what the editor should render. */
 function withLiveFields(draft: VenueProfile, saved: VenueProfile): VenueProfile {
   return {
     ...draft,
-    menu: saved.menu,
     verified: saved.verified,
     verificationSteps: saved.verificationSteps,
     openVerifyStep: saved.openVerifyStep,
@@ -561,7 +559,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   /** Rewrites one item in place; every per-item edit funnels through here. */
   const patchMenuItem = useCallback(
     (id: string, sectionId: string, itemId: string, patch: Partial<MenuItem>) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((sec) =>
           sec.id !== sectionId
@@ -573,39 +571,39 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
         ),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const addMenuSection = useCallback(
     (id: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: [...p.menu, { id: nextMenuId("sec"), name: "New section", items: [] }],
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const removeMenuSection = useCallback(
     (id: string, sectionId: string) => {
-      updateVenue(id, (p) => ({ ...p, menu: p.menu.filter((s) => s.id !== sectionId) }));
+      updateVenueListing(id, (p) => ({ ...p, menu: p.menu.filter((s) => s.id !== sectionId) }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const setMenuSectionName = useCallback(
     (id: string, sectionId: string, name: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((s) => (s.id === sectionId ? { ...s, name } : s)),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const addMenuItem = useCallback(
     (id: string, sectionId: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((s) =>
           s.id !== sectionId
@@ -630,19 +628,19 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
         ),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const removeMenuItem = useCallback(
     (id: string, sectionId: string, itemId: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((s) =>
           s.id !== sectionId ? s : { ...s, items: s.items.filter((it) => it.id !== itemId) }
         ),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const setMenuItemField = useCallback(
@@ -660,7 +658,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
 
   const toggleMenuItemSoldOut = useCallback(
     (id: string, sectionId: string, itemId: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((s) =>
           s.id !== sectionId
@@ -674,12 +672,12 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
         ),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const toggleMenuItemTag = useCallback(
     (id: string, sectionId: string, itemId: string, tag: string) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((s) =>
           s.id !== sectionId
@@ -700,12 +698,12 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
         ),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const toggleMenuItemNight = useCallback(
     (id: string, sectionId: string, itemId: string, night: number) => {
-      updateVenue(id, (p) => ({
+      updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((s) =>
           s.id !== sectionId
@@ -726,7 +724,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
         ),
       }));
     },
-    [updateVenue]
+    [updateVenueListing]
   );
 
   const toggleVerifyStep = useCallback(

@@ -32,10 +32,10 @@ export function VenueMenuSection() {
           style={{ background: "var(--m3-succ)", color: "var(--m3-onsucc)" }}
         >
           <CheckCircle2 size={14} />
-          LIVE INSTANTLY
+          NO REVIEW
         </span>
         <p className="text-[13px] text-[var(--m3-onv)]">
-          Menu edits skip review and update in the app straight away · prices in{" "}
+          Menu changes go live as soon as you save — no review needed · prices in{" "}
           {profile.currency} · {itemCount} {itemCount === 1 ? "item" : "items"} · {soldOutCount}{" "}
           sold out
         </p>

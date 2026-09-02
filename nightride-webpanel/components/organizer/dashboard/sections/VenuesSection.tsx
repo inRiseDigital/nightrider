@@ -126,7 +126,7 @@ export function VenuesSection() {
             {venueTab === "links" && <LinksTab />}
 
             {/* Menu edits publish immediately, so that tab has nothing to save. */}
-            {venueTab !== "menu" && <SaveBar />}
+            <SaveBar />
           </div>
 
           <VenueAppPreview />

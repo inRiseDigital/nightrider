@@ -85,7 +85,34 @@ export interface VenueProfile {
   openVerifyStep?: VerifyStepId | null;
 }
 
-export type EventStatus = "draft" | "scheduled" | "in_review" | "live" | "cancelled";
+export interface VenueMeta {
+  id: string;
+  ownerUid: string;
+  city: string;
+  countryCode: string; // ISO-3166 alpha-2, uppercase
+  timeZone: string; // IANA, e.g. "Asia/Dubai"
+  geo: { latitude: number; longitude: number } | null;
+  status: "active" | "closed";
+  verified: boolean;
+}
+
+export interface OrganizerProfile {
+  name: string;
+  initials: string;
+  email: string;
+  phone: string;
+}
+
+export type EventStatus =
+  | "draft"
+  | "scheduled"
+  | "in_review"
+  | "published"
+  | "cancelled"
+  | "archived";
+
+/** `"live"` and `"upcoming"` are derived at render time, never stored. */
+export type EventDisplayStatus = EventStatus | "live" | "upcoming";
 
 /** Result of the platform's automated content scan. "" means not yet scanned. */
 export type ModerationFlag = "" | "pending" | "clean";

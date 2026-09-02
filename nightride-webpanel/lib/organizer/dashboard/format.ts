@@ -1,5 +1,6 @@
-import { EVENT_STATUS_STYLES, UPCOMING_STYLE } from "./constants";
-import type { OrganizerEvent, VenueProfile } from "./types";
+import { EVENT_STATUS_STYLES } from "./constants";
+import type { EventDisplayStatus, OrganizerEvent, VenueProfile } from "./types";
+import type { EventFilter } from "./store";
 
 /** ISO "YYYY-MM-DD" in local time — `toISOString` would shift across the date line. */
 export function toISODate(d: Date): string {
@@ -17,27 +18,85 @@ export function minutesOf(time: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
+/** `ev.date` ("YYYY-MM-DD") + a "HH:mm" time, as a local-time `Date`. */
+function dateTimeOf(dateISO: string, time: string): Date {
+  const [y, mo, d] = dateISO.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  return new Date(y || 0, (mo || 1) - 1, d || 1, h || 0, mi || 0);
+}
+
 /**
- * The chip shown for an event in a list.
+ * Is `ev` actually running right now?
  *
- * A `live` event is only labelled LIVE while it is actually running tonight;
- * outside that window it reads UPCOMING. `now` is null until the client has
- * mounted (the server has no meaningful clock for the organizer's timezone),
- * in which case a `live` event falls back to UPCOMING.
+ * `status == 'published' && startAt <= now && (endAt == null || now <= endAt)`,
+ * expressed here against the event's own `date` + `startTime`/`endTime`
+ * fields rather than a stored `startAt`/`endAt` timestamp pair. Handles the
+ * overnight case (e.g. 22:00-04:00) by rolling the end instant onto the
+ * following calendar day whenever it is not after the start instant — so an
+ * event that starts one night and ends the next morning is still live after
+ * midnight. `now` is null until the client has mounted (the server has no
+ * meaningful clock for the organizer's timezone) — in that case the event is
+ * never live.
  */
+export function isEventLive(ev: OrganizerEvent, now: Date | null): boolean {
+  if (!now) return false;
+  if (ev.status !== "published") return false;
+
+  const start = dateTimeOf(ev.date, ev.startTime);
+  let end = dateTimeOf(ev.date, ev.endTime);
+  if (end.getTime() <= start.getTime()) {
+    end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // closing time is after midnight
+  }
+
+  return now.getTime() >= start.getTime() && now.getTime() <= end.getTime();
+}
+
+/**
+ * The chip status to render for an event. `'live'` and `'upcoming'` are
+ * derived, never stored — a `published` event reads `'live'` while it is
+ * actually running (see `isEventLive`) and `'upcoming'` otherwise. Every
+ * other stored status passes through unchanged. When `now` is null, a
+ * `published` event falls back to its stored status (`'published'`) rather
+ * than guessing live/upcoming.
+ */
+export function displayStatusOf(ev: OrganizerEvent, now: Date | null): EventDisplayStatus {
+  if (ev.status !== "published") return ev.status;
+  if (!now) return ev.status;
+  return isEventLive(ev, now) ? "live" : "upcoming";
+}
+
+/** The chip shown for an event in a list. */
 export function deriveEventChip(ev: OrganizerEvent, now: Date | null) {
-  if (ev.status !== "live") return EVENT_STATUS_STYLES[ev.status];
-  if (!now) return UPCOMING_STYLE;
-  if (ev.date !== toISODate(now)) return UPCOMING_STYLE;
+  return EVENT_STATUS_STYLES[displayStatusOf(ev, now)];
+}
 
-  const startMins = minutesOf(ev.startTime);
-  let endMins = minutesOf(ev.endTime);
-  if (endMins <= startMins) endMins += 24 * 60; // closing time is after midnight
-  const nowMins = now.getHours() * 60 + now.getMinutes();
+/**
+ * The events-table filter predicate. `filter === "live"` consults the clock
+ * via `isEventLive`; every other filter id matches on the stored status.
+ */
+export function matchesFilter(ev: OrganizerEvent, filter: EventFilter, now: Date | null): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "live":
+      return isEventLive(ev, now);
+    default:
+      return ev.status === filter;
+  }
+}
 
-  return nowMins >= startMins && nowMins <= endMins
-    ? EVENT_STATUS_STYLES.live
-    : UPCOMING_STYLE;
+/**
+ * "Neon Fox Collective" -> "NF". Initials are always derived, never stored.
+ * Uses the first letter of up to the first two words; empty input yields "".
+ */
+export function initialsOf(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]!.toUpperCase())
+    .join("");
 }
 
 export function venueName(venues: Record<string, VenueProfile>, id: string): string {

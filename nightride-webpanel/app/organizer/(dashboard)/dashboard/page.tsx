@@ -2,13 +2,12 @@
 
 import { useOrganizerDashboard, type HomeTab } from "@/lib/organizer/dashboard/store";
 import { TabStrip } from "@/components/organizer/dashboard/ui/Primitives";
-import { TonightSection } from "@/components/organizer/dashboard/sections/TonightSection";
-import { OverviewSection } from "@/components/organizer/dashboard/sections/OverviewSection";
+import { LiveOperationsSection } from "@/components/organizer/dashboard/sections/LiveOperationsSection";
 import { ActivitySection } from "@/components/organizer/dashboard/sections/ActivitySection";
 
 const HOME_TABS: { id: HomeTab; label: string }[] = [
-  { id: "tonight", label: "Tonight" },
-  { id: "activity", label: "Activity" },
+  { id: "tonight", label: "Live operations" },
+  { id: "activity", label: "Recent activity" },
 ];
 
 export default function Page() {
@@ -17,14 +16,7 @@ export default function Page() {
   return (
     <>
       <TabStrip tabs={HOME_TABS} active={homeTab} onChange={setHomeTab} />
-      {homeTab === "tonight" ? (
-        <div className="flex flex-col gap-5">
-          <TonightSection />
-          <OverviewSection />
-        </div>
-      ) : (
-        <ActivitySection />
-      )}
+      {homeTab === "tonight" ? <LiveOperationsSection /> : <ActivitySection />}
     </>
   );
 }

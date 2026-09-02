@@ -160,6 +160,7 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
 
 export const MOCK_TONIGHT: TonightState = {
   status: "open",
+  inVenue: 412,
   queueMinutes: 15,
   emergencyActive: false,
   flashActive: false,
@@ -251,11 +252,51 @@ export const MOCK_INBOX: InboxMessage[] = [
 ];
 
 /** Overview KPIs and the analytics panels are presentational placeholders. */
-export const MOCK_KPIS = [
-  { label: "Upcoming Events", value: "5", delta: "2 this week", deltaClass: "text-nr-text-secondary" },
-  { label: "Tickets Sold", value: "2,340", delta: "+412 this week", deltaClass: "text-emerald-400" },
-  { label: "Revenue (30d)", value: "$58.2K", delta: "+12% vs last mo.", deltaClass: "text-emerald-400" },
-  { label: "Avg. Fill Rate", value: "87%", delta: "across 2 venues", deltaClass: "text-nr-text-secondary" },
+/**
+ * The four headline metrics on Home → Live operations. `icon` is a key the
+ * section maps to a lucide component; `tone` picks the icon/delta colours from
+ * the M3 token set.
+ */
+export const MOCK_KPIS: {
+  icon: "rsvp" | "revenue" | "views" | "ai";
+  value: string;
+  label: string;
+  delta: string;
+  tone: "primary" | "tertiary";
+  deltaTone: "up" | "down";
+}[] = [
+  {
+    icon: "rsvp",
+    value: "268",
+    label: "RSVPs tonight",
+    delta: "+18%",
+    tone: "primary",
+    deltaTone: "up",
+  },
+  {
+    icon: "revenue",
+    value: "21.4k",
+    label: "Ticket revenue (AED)",
+    delta: "+7%",
+    tone: "tertiary",
+    deltaTone: "up",
+  },
+  {
+    icon: "views",
+    value: "9,120",
+    label: "Profile views, 7d",
+    delta: "−4%",
+    tone: "primary",
+    deltaTone: "down",
+  },
+  {
+    icon: "ai",
+    value: "74",
+    label: "AI recommendation score",
+    delta: "+6",
+    tone: "tertiary",
+    deltaTone: "up",
+  },
 ];
 
 export const MOCK_FUNNEL = { views: 8400, saves: 1120, directions: 640 };

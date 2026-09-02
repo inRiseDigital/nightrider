@@ -96,6 +96,8 @@ export type DoorStatus = "open" | "filling" | "capacity" | "guestlist" | "closed
 
 export interface TonightState {
   status: DoorStatus;
+  /** Head count currently inside — shown against the venue's capacity. */
+  inVenue: number;
   queueMinutes: number;
   emergencyActive: boolean;
   flashActive: boolean;

@@ -116,6 +116,10 @@ export interface OrganizerEvent {
   moderationFlag: ModerationFlag;
   moderationEta: string;
   cancelReason: string;
+  /** Tickets sold so far. 0 for anything not on sale yet. */
+  sold: number;
+  /** Gross take in the venue's currency. 0 for anything not on sale yet. */
+  revenue: number;
 }
 
 export type DoorStatus = "open" | "filling" | "capacity" | "guestlist" | "closed";

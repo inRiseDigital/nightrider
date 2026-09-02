@@ -44,6 +44,8 @@ import type {
 } from "./types";
 
 export type VenueTab = "profile" | "menu" | "hours" | "links";
+/** Status filter above the events table — "all" plus the statuses worth filtering by. */
+export type EventFilter = "all" | "in_review" | "scheduled" | "live" | "draft";
 export type HomeTab = "tonight" | "activity";
 export type EventsTab = "list" | "calendar";
 export type AudienceTab = "performance" | "reviews" | "ai-visibility";
@@ -149,6 +151,8 @@ export function blankEventDraft(date?: string, venue = MOCK_VENUE_ORDER[0]): Org
     moderationFlag: "",
     moderationEta: "",
     cancelReason: "",
+    sold: 0,
+    revenue: 0,
   };
 }
 
@@ -219,6 +223,8 @@ interface OrganizerDashboardValue {
 
   // ---- Events ----
   events: OrganizerEvent[];
+  eventFilter: EventFilter;
+  setEventFilter: (f: EventFilter) => void;
   eventEditorOpen: boolean;
   editingEventId: string | null;
   eventDraft: OrganizerEvent | null;
@@ -246,6 +252,10 @@ interface OrganizerDashboardValue {
   // ---- Calendar ----
   calendarOffset: number;
   calendarVenueFilter: string;
+  /** The day whose event list is open, or null. */
+  dayDialog: { iso: string; label: string } | null;
+  openDayDialog: (iso: string, label: string) => void;
+  closeDayDialog: () => void;
   shiftCalendar: (delta: number) => void;
   setCalendarVenueFilter: (id: string) => void;
 
@@ -361,6 +371,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
 
   // ---- Events ----
   const [events, setEvents] = useState<OrganizerEvent[]>(MOCK_EVENTS);
+  const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [eventEditorOpen, setEventEditorOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventDraft, setEventDraft] = useState<OrganizerEvent | null>(null);
@@ -371,6 +382,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   // ---- Calendar / performance filters ----
   const [calendarOffset, setCalendarOffset] = useState(0);
   const [calendarVenueFilter, setCalendarVenueFilter] = useState("all");
+  const [dayDialog, setDayDialog] = useState<{ iso: string; label: string } | null>(null);
   const [perfVenueFilter, setPerfVenueFilterState] = useState("all");
   const [perfEventId, setPerfEventId] = useState<string | null>("e1");
 
@@ -929,10 +941,19 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
           status: "draft",
           recurring: false,
           cancelReason: "",
+          // A copy starts from scratch — takings belong to the original night.
+          sold: 0,
+          revenue: 0,
         },
       ];
     });
   }, []);
+
+  const openDayDialog = useCallback((iso: string, label: string) => {
+    setDayDialog({ iso, label });
+  }, []);
+
+  const closeDayDialog = useCallback(() => setDayDialog(null), []);
 
   const startCancel = useCallback((id: string) => {
     setCancelingEventId(id);
@@ -1259,6 +1280,8 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       setAccountTab,
 
       events,
+      eventFilter,
+      setEventFilter,
       eventEditorOpen,
       editingEventId,
       eventDraft,
@@ -1287,6 +1310,9 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       calendarVenueFilter,
       shiftCalendar: (delta: number) => setCalendarOffset((o) => o + delta),
       setCalendarVenueFilter,
+      dayDialog,
+      openDayDialog,
+      closeDayDialog,
 
       tonight,
       setDoorStatus,
@@ -1375,11 +1401,12 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       setMenuItemField, toggleMenuItemSoldOut, toggleMenuItemTag, toggleMenuItemNight,
       toggleVerifyStep, approveVenue,
       homeTab, eventsTab, audienceTab, accountTab,
-      events, eventEditorOpen, editingEventId, eventDraft, lineupInput, cancelingEventId,
+      events, eventFilter, eventEditorOpen, editingEventId, eventDraft, lineupInput,
+      cancelingEventId,
       cancelReasonInput, openNewEvent, openEditEvent, closeEditor, updateDraft, addLineup,
       removeLineup, addTier, updateTier, removeTier, saveDraftEvent, submitEvent, duplicateEvent,
       startCancel, cancelCancelFlow, confirmCancel,
-      calendarOffset, calendarVenueFilter,
+      calendarOffset, calendarVenueFilter, dayDialog, openDayDialog, closeDayDialog,
       tonight, setDoorStatus, setQueueMinutes, setFlashText, setFlashUntil, toggleFlash,
       toggleEmergency,
       perfVenueFilter, perfEventId, setPerfVenueFilter,

@@ -262,6 +262,8 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "clean",
     moderationEta: "",
     cancelReason: "",
+    sold: 268,
+    revenue: 21440,
   },
   {
     id: "e2",
@@ -280,6 +282,8 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "clean",
     moderationEta: "",
     cancelReason: "",
+    sold: 112,
+    revenue: 336000,
   },
   {
     id: "e3",
@@ -298,6 +302,8 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "pending",
     moderationEta: "~2h remaining",
     cancelReason: "",
+    sold: 0,
+    revenue: 0,
   },
   {
     id: "e4",
@@ -316,6 +322,8 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
     moderationFlag: "",
     moderationEta: "",
     cancelReason: "",
+    sold: 0,
+    revenue: 0,
   },
 ];
 

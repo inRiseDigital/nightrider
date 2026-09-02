@@ -33,7 +33,7 @@ import {
   useOrganizerDashboard,
 } from "@/lib/organizer/dashboard/store";
 import { DAYS } from "@/lib/organizer/dashboard/constants";
-import { hoursTextFor, isOpenOn, mondayFirstIndex, toISODate } from "@/lib/organizer/dashboard/format";
+import { hoursTextFor, isEventLive, isOpenOn, mondayFirstIndex, toISODate } from "@/lib/organizer/dashboard/format";
 import type { SocialLink } from "@/lib/organizer/dashboard/types";
 import { SectionEyebrow } from "../ui/Primitives";
 
@@ -209,7 +209,7 @@ export function VenueAppPreview() {
 
   const highlights = useMemo(() => {
     const upcoming = events
-      .filter((e) => e.venue === editingVenue && (e.status === "scheduled" || e.status === "live"))
+      .filter((e) => e.venue === editingVenue && (e.status === "scheduled" || isEventLive(e, now)))
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 4)
       .map((e) => {
@@ -228,7 +228,7 @@ export function VenueAppPreview() {
       { key: "h2", title: "Ladies Night", day: "FRI", meta: "Free entry before 12AM" },
       { key: "h3", title: "Cocktail Hour", day: "SAT", meta: "2-for-1 cocktails" },
     ];
-  }, [events, editingVenue]);
+  }, [events, editingVenue, now]);
 
   return (
     <div className="flex flex-col gap-3.5 lg:sticky lg:top-0">

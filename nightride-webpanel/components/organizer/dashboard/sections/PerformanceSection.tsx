@@ -1,6 +1,7 @@
 "use client";
 
-import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
+import { useNow, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
+import { isEventLive } from "@/lib/organizer/dashboard/format";
 import {
   MOCK_AGE_BANDS,
   MOCK_GENRE_FOLLOWS,
@@ -26,11 +27,12 @@ export function PerformanceSection() {
     perfEventId,
     setPerfEventId,
   } = useOrganizerDashboard();
+  const now = useNow();
 
   // Only events an audience can actually see have a funnel.
   const perfEvents = events.filter(
     (e) =>
-      (e.status === "live" || e.status === "scheduled" || e.status === "in_review") &&
+      (isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review") &&
       (perfVenueFilter === "all" || e.venue === perfVenueFilter)
   );
 

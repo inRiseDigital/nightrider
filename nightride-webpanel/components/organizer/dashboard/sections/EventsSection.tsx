@@ -2,7 +2,7 @@
 
 import { Pencil } from "lucide-react";
 import { useNow, useOrganizerDashboard, type EventFilter } from "@/lib/organizer/dashboard/store";
-import { deriveEventChip, venueName } from "@/lib/organizer/dashboard/format";
+import { deriveEventChip, isEventLive, venueName } from "@/lib/organizer/dashboard/format";
 import { Chip, IconButton, SlimTextarea } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
 
@@ -69,7 +69,7 @@ export function EventsSection() {
 
         {rows.map((ev) => {
           const chip = deriveEventChip(ev, now);
-          const cancelable = ev.status === "live" || ev.status === "scheduled";
+          const cancelable = isEventLive(ev, now) || ev.status === "scheduled";
           const currency = venues[ev.venue]?.currency ?? "";
 
           return (

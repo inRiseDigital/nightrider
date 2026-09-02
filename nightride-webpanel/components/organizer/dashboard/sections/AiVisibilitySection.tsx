@@ -10,6 +10,7 @@ import {
   MOCK_AI_TIPS,
   type AiPrompt,
 } from "@/lib/organizer/dashboard/mock-analytics";
+import { isEventLive } from "@/lib/organizer/dashboard/format";
 import { Card, FieldLabel, SectionLabel, VenueSwitcher } from "../ui/Primitives";
 
 /** Chip tone per ranking band — top spots read as success, absence as neutral. */
@@ -47,7 +48,7 @@ export function AiVisibilitySection() {
   const upcomingSoon = now
     ? events.some((e) => {
         if (e.venue !== editingVenue) return false;
-        if (!["live", "scheduled", "in_review"].includes(e.status)) return false;
+        if (!(isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review")) return false;
         const days = (new Date(e.date).getTime() - now.getTime()) / 86_400_000;
         return days < 14 && days >= -1;
       })

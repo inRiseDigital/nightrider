@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
+import { useNow, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
+import { isEventLive } from "@/lib/organizer/dashboard/format";
 import { ORGANIZER_NAV_ITEMS } from "./nav-items";
 
 /**
@@ -25,8 +26,9 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const { events, organizer, openNewEvent } = useOrganizerDashboard();
+  const now = useNow();
   const isActiveHref = (href: string) => pathname === href || pathname?.startsWith(href + "/");
-  const liveCount = events.filter((e) => e.status === "live" || e.status === "scheduled").length;
+  const liveCount = events.filter((e) => isEventLive(e, now) || e.status === "scheduled").length;
 
   const drawer = (
     <nav className="flex h-full w-[300px] flex-col overflow-y-auto px-3 py-4 sm:w-[344px]">

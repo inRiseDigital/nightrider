@@ -139,13 +139,17 @@ export function VenuesSection() {
 /**
  * Sticky footer for the editor column. Listing edits land in a draft, so this
  * is the only way they reach the published record the app preview renders.
+ *
+ * The negative `bottom` cancels the scrolling `<main>`'s own padding, so the
+ * bar sits flush to the bottom edge rather than floating above it with page
+ * content showing through the gap.
  */
 function SaveBar() {
   const { editingVenue, venueDirty, saveVenue, discardVenue } = useOrganizerDashboard();
 
   return (
     <div
-      className="sticky bottom-0 z-[5] -mt-1 flex flex-wrap items-center gap-3 py-4"
+      className="sticky bottom-[-20px] z-[5] -mt-1 flex flex-wrap items-center gap-3 pt-4 pb-5 sm:bottom-[-28px] sm:pb-7"
       style={{
         background: "var(--m3-surf)",
         boxShadow: "0 -12px 16px -8px var(--m3-surf)",

@@ -466,7 +466,9 @@ function resolveGeo(d) {
 function resolveStatus(d) {
   const raw = String(d.status ?? "").toLowerCase().trim();
   if (raw === "draft" || raw === "published" || raw === "archived") return raw;
-  if (raw === "cancelled" || raw === "canceled" || raw === "completed") return "archived";
+  if (raw === "scheduled" || raw === "in_review") return raw; // passthrough
+  if (raw === "cancelled" || raw === "canceled") return "cancelled"; // now a real status, not archived
+  if (raw === "completed") return "archived"; // unchanged
   return "draft"; // unknown/missing — hidden by default rather than surfaced unverified
 }
 
@@ -696,6 +698,200 @@ async function migrateVenuesFromClubs() {
 
   await commitInChunks(ops);
   return { venueIdByClubName, venueIdByClubDocId, migratedClubIds };
+}
+
+// ── venues (in place) — organizer-dashboard backfill ─────────────────────────
+// Runs over every document already in `venues` (including the ones
+// migrateVenuesFromClubs() just wrote) to backfill the organizer-dashboard
+// fields and clean up any snake_case seed_venues.py residue. Idempotent: a
+// doc that already has every target field and no legacy key is skipped.
+
+// IANA zone per ISO-3166 country code — one zone per country is a
+// simplification, overridden below for the handful of multi-zone countries
+// this dataset actually contains (AU). Not a general-purpose tz database;
+// covers COUNTRY_NAME_TO_ISO2's codes plus the ones seed.mjs uses.
+const IANA_TZ_BY_COUNTRY = {
+  AE: "Asia/Dubai",
+  JP: "Asia/Tokyo",
+  GB: "Europe/London",
+  US: "America/New_York",
+  CA: "America/Toronto",
+  MX: "America/Mexico_City",
+  NZ: "Pacific/Auckland",
+  FR: "Europe/Paris",
+  DE: "Europe/Berlin",
+  IT: "Europe/Rome",
+  ES: "Europe/Madrid",
+  PT: "Europe/Lisbon",
+  NL: "Europe/Amsterdam",
+  BE: "Europe/Brussels",
+  CH: "Europe/Zurich",
+  AT: "Europe/Vienna",
+  IE: "Europe/Dublin",
+  SE: "Europe/Stockholm",
+  NO: "Europe/Oslo",
+  DK: "Europe/Copenhagen",
+  FI: "Europe/Helsinki",
+  PL: "Europe/Warsaw",
+  GR: "Europe/Athens",
+  TR: "Europe/Istanbul",
+  RU: "Europe/Moscow",
+  CN: "Asia/Shanghai",
+  IN: "Asia/Kolkata",
+  ID: "Asia/Jakarta",
+  MY: "Asia/Kuala_Lumpur",
+  SG: "Asia/Singapore",
+  TH: "Asia/Bangkok",
+  PH: "Asia/Manila",
+  VN: "Asia/Ho_Chi_Minh",
+  KR: "Asia/Seoul",
+  HK: "Asia/Hong_Kong",
+  BR: "America/Sao_Paulo",
+  AR: "America/Argentina/Buenos_Aires",
+  CL: "America/Santiago",
+  CO: "America/Bogota",
+  PE: "America/Lima",
+  ZA: "Africa/Johannesburg",
+  EG: "Africa/Cairo",
+  SA: "Asia/Riyadh",
+  QA: "Asia/Qatar",
+  KW: "Asia/Kuwait",
+  BH: "Asia/Bahrain",
+  OM: "Asia/Muscat",
+  IL: "Asia/Jerusalem",
+  JO: "Asia/Amman",
+  LB: "Asia/Beirut",
+  MA: "Africa/Casablanca",
+  NG: "Africa/Lagos",
+  KE: "Africa/Nairobi",
+  PK: "Asia/Karachi",
+  BD: "Asia/Dhaka",
+  LK: "Asia/Colombo",
+  NP: "Asia/Kathmandu",
+  AU: "Australia/Sydney", // default; overridden per-city below
+};
+
+// City-level overrides, keyed on the lowercased `city` field, for countries
+// that span more than one IANA zone. Extend this table rather than the
+// country default when a new multi-zone city shows up in real data.
+const IANA_TZ_BY_CITY = {
+  melbourne: "Australia/Melbourne",
+  sydney: "Australia/Sydney",
+  brisbane: "Australia/Brisbane",
+  perth: "Australia/Perth",
+  adelaide: "Australia/Adelaide",
+  "gold coast": "Australia/Brisbane",
+  "new york": "America/New_York",
+  miami: "America/New_York",
+  "las vegas": "America/Los_Angeles",
+  "los angeles": "America/Los_Angeles",
+  "san francisco": "America/Los_Angeles",
+  chicago: "America/Chicago",
+  nashville: "America/Chicago",
+  austin: "America/Chicago",
+  "new orleans": "America/Chicago",
+  toronto: "America/Toronto",
+  vancouver: "America/Vancouver",
+  montreal: "America/Toronto",
+};
+
+function resolveTimeZone(d) {
+  if (typeof d.timeZone === "string" && d.timeZone) return { zone: d.timeZone, alreadySet: true };
+  const cityKey = String(d.city ?? "").trim().toLowerCase();
+  if (cityKey && IANA_TZ_BY_CITY[cityKey]) return { zone: IANA_TZ_BY_CITY[cityKey], alreadySet: false };
+  const countryCode = resolveCountryCode(d) ?? (typeof d.countryCode === "string" ? d.countryCode : null);
+  if (countryCode && IANA_TZ_BY_COUNTRY[countryCode]) {
+    return { zone: IANA_TZ_BY_COUNTRY[countryCode], alreadySet: false };
+  }
+  // No city or country match — fall back to UTC rather than guess, and say so.
+  return { zone: "UTC", alreadySet: false, unresolved: true };
+}
+
+async function migrateVenues() {
+  const coll = "venues (backfill)";
+  const snap = await db.collection("venues").get();
+  const ops = [];
+
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    const before = { ...d };
+    const patch = {};
+    let changed = false;
+
+    // editorUids / editors — dashboard's primary query key.
+    if (!Array.isArray(d.editorUids)) {
+      const ownerUid = typeof d.ownerUid === "string" && d.ownerUid ? d.ownerUid : null;
+      patch.editorUids = ownerUid ? [ownerUid] : [];
+      patch.editors = ownerUid ? { [ownerUid]: "owner" } : {};
+      changed = true;
+    }
+
+    // capacity — present-and-zero means "unknown", not absent.
+    if (typeof d.capacity !== "number") {
+      patch.capacity = 0;
+      changed = true;
+    }
+
+    // timeZone — load-bearing for date/startTime → startAt mapping.
+    const tz = resolveTimeZone(d);
+    if (!tz.alreadySet) {
+      patch.timeZone = tz.zone;
+      changed = true;
+      if (tz.unresolved) {
+        recordNote(coll, `${doc.id}: could not resolve timeZone from countryCode/city — defaulted to UTC`);
+      }
+    }
+
+    // snake_case residue from seed_venues.py / the pre-migration OSM importer.
+    let geo = d.geo instanceof GeoPoint ? d.geo : null;
+    if (!geo) {
+      const resolved = resolveGeo(d);
+      if (resolved) {
+        geo = resolved;
+        patch.geo = resolved;
+        changed = true;
+        if ("lat" in d) patch.lat = FieldValue.delete();
+        if ("lng" in d) patch.lng = FieldValue.delete();
+      }
+    }
+    if (geo && typeof d.geohash !== "string") {
+      patch.geohash = encodeGeohash(geo.latitude, geo.longitude, 9);
+      changed = true;
+    }
+    if (typeof d.countryCode !== "string" && typeof d.country_code === "string") {
+      const cc = resolveCountryCode(d);
+      if (cc) {
+        patch.countryCode = cc;
+        patch.country_code = FieldValue.delete();
+        changed = true;
+      }
+    }
+    if (typeof d.openingHours !== "string" && typeof d.opening_hours === "string") {
+      patch.openingHours = d.opening_hours;
+      patch.opening_hours = FieldValue.delete();
+      changed = true;
+    }
+    if (typeof d.typeLabel !== "string" && typeof d.type_label === "string") {
+      patch.typeLabel = d.type_label;
+      patch.type_label = FieldValue.delete();
+      changed = true;
+    }
+    if (typeof d.osmId !== "string" && typeof d.osm_id === "string") {
+      patch.osmId = d.osm_id;
+      patch.osm_id = FieldValue.delete();
+      changed = true;
+    }
+
+    if (!changed) {
+      recordSkipped(coll, doc.id, "already migrated");
+      continue;
+    }
+
+    ops.push({ type: "update", ref: doc.ref, data: patch });
+    recordMigrated(coll, doc.id, before, { ...before, ...patch });
+  }
+
+  await commitInChunks(ops);
 }
 
 // ── Deterministic target-id resolution for docs moving collections ──────────
@@ -1143,6 +1339,7 @@ function printSummary() {
 async function main() {
   await migrateEventsInPlace();
   const venueLookup = await migrateVenuesFromClubs();
+  await migrateVenues();
   const reportsResult = await migrateVenueReports(venueLookup);
   const socialResult = await migrateEventsFromSocial(venueLookup);
   const usersResult = await migrateUsersAndOrganizerRequests();

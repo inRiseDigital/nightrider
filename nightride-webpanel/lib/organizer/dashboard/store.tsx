@@ -30,6 +30,7 @@ import type {
   BoostSlot,
   DoorStatus,
   InboxMessage,
+  MenuItem,
   OrganizerEvent,
   PromoCode,
   PushState,
@@ -42,7 +43,7 @@ import type {
   VerifyStepId,
 } from "./types";
 
-export type VenueTab = "profile" | "hours" | "links";
+export type VenueTab = "profile" | "menu" | "hours" | "links";
 export type HomeTab = "tonight" | "activity";
 export type EventsTab = "list" | "calendar";
 export type AudienceTab = "performance" | "reviews" | "ai-visibility";
@@ -61,6 +62,9 @@ export function gallerySlotId(venueId: string, index: number) {
 }
 export function gallerySlotIds(venueId: string) {
   return Array.from({ length: GALLERY_SLOT_COUNT }, (_, i) => gallerySlotId(venueId, i));
+}
+export function menuItemSlotId(venueId: string, itemId: string) {
+  return `menu-${venueId}-${itemId}`;
 }
 export function eventSlotIds(eventKey: string) {
   return {
@@ -90,8 +94,17 @@ export function blankVenueProfile(name: string, city: string): VenueProfile {
     amenities: [],
     hours: DAYS.map((day) => ({ day, closed: false, open: "22:00", close: "04:00" })),
     exceptions: [],
+    menu: [],
     tableLink: "",
   };
+}
+
+/** Menu sections and items are added client-side only, so a timestamp plus a
+ *  counter is enough to keep React keys unique without a uuid dependency. */
+let menuIdSeq = 0;
+function nextMenuId(prefix: string) {
+  menuIdSeq += 1;
+  return `${prefix}-${Date.now().toString(36)}-${menuIdSeq}`;
 }
 
 export function blankEventDraft(date?: string, venue = MOCK_VENUE_ORDER[0]): OrganizerEvent {
@@ -145,6 +158,21 @@ interface OrganizerDashboardValue {
   removeException: (id: string, idx: number) => void;
   setExceptionField: (id: string, idx: number, field: "label" | "date", value: string) => void;
   toggleExceptionClosed: (id: string, idx: number) => void;
+  addMenuSection: (id: string) => void;
+  removeMenuSection: (id: string, sectionId: string) => void;
+  setMenuSectionName: (id: string, sectionId: string, name: string) => void;
+  addMenuItem: (id: string, sectionId: string) => void;
+  removeMenuItem: (id: string, sectionId: string, itemId: string) => void;
+  setMenuItemField: <K extends keyof MenuItem>(
+    id: string,
+    sectionId: string,
+    itemId: string,
+    field: K,
+    value: MenuItem[K]
+  ) => void;
+  toggleMenuItemSoldOut: (id: string, sectionId: string, itemId: string) => void;
+  toggleMenuItemTag: (id: string, sectionId: string, itemId: string, tag: string) => void;
+  toggleMenuItemNight: (id: string, sectionId: string, itemId: string, night: number) => void;
   toggleVerifyStep: (id: string, step: VerifyStepId) => void;
   approveVenue: (id: string) => void;
 
@@ -438,6 +466,178 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       updateVenue(id, (p) => ({
         ...p,
         exceptions: p.exceptions.map((e, i) => (i === idx ? { ...e, closed: !e.closed } : e)),
+      }));
+    },
+    [updateVenue]
+  );
+
+  // ---- Menu mutators ----
+  /** Rewrites one item in place; every per-item edit funnels through here. */
+  const patchMenuItem = useCallback(
+    (id: string, sectionId: string, itemId: string, patch: Partial<MenuItem>) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: p.menu.map((sec) =>
+          sec.id !== sectionId
+            ? sec
+            : {
+                ...sec,
+                items: sec.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)),
+              }
+        ),
+      }));
+    },
+    [updateVenue]
+  );
+
+  const addMenuSection = useCallback(
+    (id: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: [...p.menu, { id: nextMenuId("sec"), name: "New section", items: [] }],
+      }));
+    },
+    [updateVenue]
+  );
+
+  const removeMenuSection = useCallback(
+    (id: string, sectionId: string) => {
+      updateVenue(id, (p) => ({ ...p, menu: p.menu.filter((s) => s.id !== sectionId) }));
+    },
+    [updateVenue]
+  );
+
+  const setMenuSectionName = useCallback(
+    (id: string, sectionId: string, name: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: p.menu.map((s) => (s.id === sectionId ? { ...s, name } : s)),
+      }));
+    },
+    [updateVenue]
+  );
+
+  const addMenuItem = useCallback(
+    (id: string, sectionId: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: p.menu.map((s) =>
+          s.id !== sectionId
+            ? s
+            : {
+                ...s,
+                items: [
+                  ...s.items,
+                  {
+                    id: nextMenuId("item"),
+                    name: "",
+                    price: 0,
+                    desc: "",
+                    size: "",
+                    serves: "",
+                    tags: [],
+                    nights: [],
+                    soldOut: false,
+                  },
+                ],
+              }
+        ),
+      }));
+    },
+    [updateVenue]
+  );
+
+  const removeMenuItem = useCallback(
+    (id: string, sectionId: string, itemId: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: p.menu.map((s) =>
+          s.id !== sectionId ? s : { ...s, items: s.items.filter((it) => it.id !== itemId) }
+        ),
+      }));
+    },
+    [updateVenue]
+  );
+
+  const setMenuItemField = useCallback(
+    <K extends keyof MenuItem>(
+      id: string,
+      sectionId: string,
+      itemId: string,
+      field: K,
+      value: MenuItem[K]
+    ) => {
+      patchMenuItem(id, sectionId, itemId, { [field]: value } as Partial<MenuItem>);
+    },
+    [patchMenuItem]
+  );
+
+  const toggleMenuItemSoldOut = useCallback(
+    (id: string, sectionId: string, itemId: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: p.menu.map((s) =>
+          s.id !== sectionId
+            ? s
+            : {
+                ...s,
+                items: s.items.map((it) =>
+                  it.id === itemId ? { ...it, soldOut: !it.soldOut } : it
+                ),
+              }
+        ),
+      }));
+    },
+    [updateVenue]
+  );
+
+  const toggleMenuItemTag = useCallback(
+    (id: string, sectionId: string, itemId: string, tag: string) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: p.menu.map((s) =>
+          s.id !== sectionId
+            ? s
+            : {
+                ...s,
+                items: s.items.map((it) =>
+                  it.id !== itemId
+                    ? it
+                    : {
+                        ...it,
+                        tags: it.tags.includes(tag)
+                          ? it.tags.filter((t) => t !== tag)
+                          : [...it.tags, tag],
+                      }
+                ),
+              }
+        ),
+      }));
+    },
+    [updateVenue]
+  );
+
+  const toggleMenuItemNight = useCallback(
+    (id: string, sectionId: string, itemId: string, night: number) => {
+      updateVenue(id, (p) => ({
+        ...p,
+        menu: p.menu.map((s) =>
+          s.id !== sectionId
+            ? s
+            : {
+                ...s,
+                items: s.items.map((it) =>
+                  it.id !== itemId
+                    ? it
+                    : {
+                        ...it,
+                        nights: it.nights.includes(night)
+                          ? it.nights.filter((n) => n !== night)
+                          : [...it.nights, night].sort((a, b) => a - b),
+                      }
+                ),
+              }
+        ),
       }));
     },
     [updateVenue]
@@ -784,6 +984,15 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       removeException,
       setExceptionField,
       toggleExceptionClosed,
+      addMenuSection,
+      removeMenuSection,
+      setMenuSectionName,
+      addMenuItem,
+      removeMenuItem,
+      setMenuItemField,
+      toggleMenuItemSoldOut,
+      toggleMenuItemTag,
+      toggleMenuItemNight,
       toggleVerifyStep,
       approveVenue,
 
@@ -896,6 +1105,8 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       openAddVenue, cancelAddVenue, createVenue, setVenueField, toggleVenueSetValue,
       addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
       toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,
+      addMenuSection, removeMenuSection, setMenuSectionName, addMenuItem, removeMenuItem,
+      setMenuItemField, toggleMenuItemSoldOut, toggleMenuItemTag, toggleMenuItemNight,
       toggleVerifyStep, approveVenue,
       homeTab, eventsTab, audienceTab, accountTab,
       events, eventEditorOpen, editingEventId, eventDraft, lineupInput, cancelingEventId,

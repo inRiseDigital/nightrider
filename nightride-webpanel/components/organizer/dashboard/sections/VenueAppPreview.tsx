@@ -18,18 +18,16 @@ import {
   Martini,
   MessageCircle,
   Music2,
-  Sandwich,
   Sparkle,
   ThumbsUp,
   Users,
-  Utensils,
   Wifi,
-  Wine,
   X as CloseIcon,
 } from "lucide-react";
 import {
   gallerySlotIds,
   heroSlotId,
+  menuItemSlotId,
   useNow,
   useOrganizerDashboard,
 } from "@/lib/organizer/dashboard/store";
@@ -44,11 +42,12 @@ const INK = "#191519";
 const MUTED = "#6E6469";
 const HAIRLINE = "#EFE4DA";
 
+/** Shown only while the venue has no menu of its own. */
 const FOOD_CARDS = [
-  { title: "Signature Drinks", body: "Creative cocktails, premium spirits & local beers.", Icon: Martini },
-  { title: "Bar Bites", body: "Tasty bites to keep you going all night.", Icon: Utensils },
-  { title: "Bottle Service", body: "Premium bottles & VIP packages available.", Icon: Wine },
-  { title: "Late Night Menu", body: "Kitchen open until 3AM every night.", Icon: Sandwich },
+  { key: "f1", title: "Signature Drinks", body: "Creative cocktails, premium spirits & local beers." },
+  { key: "f2", title: "Bar Bites", body: "Tasty bites to keep you going all night." },
+  { key: "f3", title: "Bottle Service", body: "Premium bottles & VIP packages available." },
+  { key: "f4", title: "Late Night Menu", body: "Kitchen open until 3AM every night." },
 ];
 
 function priceTier(coverMin: number, currency: string) {
@@ -181,6 +180,24 @@ export function VenueAppPreview() {
   const tier = priceTier(profile.coverMin, profile.currency);
 
   const ageBadge = profile.agePolicy.match(/\d+/)?.[0];
+
+  /** Real menu items, sold-out ones hidden — guests only see what they can order. */
+  const menuCards = useMemo(() => {
+    const cards = profile.menu.flatMap((section) =>
+      section.items
+        .filter((item) => !item.soldOut && item.name.trim())
+        .map((item) => ({
+          key: item.id,
+          title: item.name,
+          body: item.desc || section.name,
+          price: item.price ? `${profile.currency}${item.price.toLocaleString()}` : "",
+          photo: images[menuItemSlotId(editingVenue, item.id)],
+        }))
+    );
+
+    if (cards.length) return cards;
+    return FOOD_CARDS.map((c) => ({ ...c, price: "", photo: undefined as string | undefined }));
+  }, [profile.menu, profile.currency, images, editingVenue]);
 
   const highlights = useMemo(() => {
     const upcoming = events
@@ -371,18 +388,28 @@ export function VenueAppPreview() {
 
             <Section title="FOOD & DRINKS" action="View menu">
               <div className="nr-phone-scroll flex gap-3 overflow-x-auto pb-1">
-                {FOOD_CARDS.map((card) => (
+                {menuCards.map((card) => (
                   <div
-                    key={card.title}
+                    key={card.key}
                     className="flex w-[200px] shrink-0 overflow-hidden rounded-xl border"
                     style={{ background: "#FFFDFA", borderColor: HAIRLINE }}
                   >
-                    <div className="w-20 shrink-0" style={{ background: "#2A1A10" }} />
-                    <div className="flex flex-col gap-1 px-3 py-2.5">
+                    <div className="w-20 shrink-0 overflow-hidden" style={{ background: "#2A1A10" }}>
+                      {card.photo && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={card.photo} alt="" className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
                       <p className="text-[12px] font-semibold leading-tight">{card.title}</p>
                       <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
                         {card.body}
                       </p>
+                      {card.price && (
+                        <p className="text-[10px] font-semibold" style={{ color: PINK }}>
+                          {card.price}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -34,6 +34,30 @@ export interface SocialLink {
   value: string;
 }
 
+/** One line on a venue's food & drinks menu. */
+export interface MenuItem {
+  id: string;
+  name: string;
+  /** In the venue's `currency`. */
+  price: number;
+  desc: string;
+  /** Free text serving size — "1.5L magnum", "75cl". */
+  size: string;
+  /** Free text head count — "6". */
+  serves: string;
+  /** Labels from `MENU_TAGS`. */
+  tags: string[];
+  /** Indices into `DAYS` (0 = Mon). Empty means available every night. */
+  nights: number[];
+  soldOut: boolean;
+}
+
+export interface MenuSection {
+  id: string;
+  name: string;
+  items: MenuItem[];
+}
+
 export interface VenueProfile {
   /** False until an admin approves the venue; gates the editor and the app preview. */
   verified: boolean;
@@ -52,6 +76,8 @@ export interface VenueProfile {
   amenities: string[];
   hours: OpeningHours[];
   exceptions: HoursException[];
+  /** Food & drinks, grouped into sections. Edits go live without review. */
+  menu: MenuSection[];
   tableLink: string;
   /** Only present while `verified` is false. */
   verificationSteps?: Record<VerifyStepId, VerifyStepStatus>;

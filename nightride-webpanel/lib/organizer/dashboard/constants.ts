@@ -31,6 +31,12 @@ export const DRESS_CODES = ["Casual", "Smart Casual", "Dress to Impress", "No Sp
 
 export const AGE_POLICIES = ["18+", "21+", "25+ Mature Crowd"];
 
+/** Toggleable labels on a menu item. */
+export const MENU_TAGS = ["Signature", "Vegan", "Alcohol-free", "Halal", "New"];
+
+/** Single-letter night chips on a menu item, Monday-first like `DAYS`. */
+export const NIGHT_INITIALS = ["M", "T", "W", "T", "F", "S", "S"];
+
 /** Week starts Monday — the calendar grid and `hours` arrays both rely on this order. */
 export const DAYS: DayName[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 

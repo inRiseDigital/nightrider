@@ -10,10 +10,12 @@ import {
 } from "@/lib/organizer/dashboard/constants";
 import { Chip, FieldLabel, SlimInput, SlimTextarea, VenueSwitcher } from "../ui/Primitives";
 import { VenueAppPreview } from "./VenueAppPreview";
+import { VenueMenuSection } from "./VenueMenuSection";
 import { VenueVerifyPending } from "./VenueVerifyPending";
 
 const TABS: { id: VenueTab; label: string }[] = [
   { id: "profile", label: "Profile" },
+  { id: "menu", label: "Menu" },
   { id: "hours", label: "Hours" },
   { id: "links", label: "Links" },
 ];
@@ -116,6 +118,7 @@ export function VenuesSection() {
             </div>
 
             {venueTab === "profile" && <ProfileTab />}
+            {venueTab === "menu" && <VenueMenuSection />}
             {venueTab === "hours" && <HoursTab />}
             {venueTab === "links" && <LinksTab />}
           </div>

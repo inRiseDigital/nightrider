@@ -7,11 +7,12 @@ import {
   getDocs,
   collection,
   deleteDoc,
+  updateDoc,
   writeBatch,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { createTestEnv, baseUser, baseVenueReport, uid } from './helpers.js';
+import { createTestEnv, baseUser, baseVenue, baseVenueReport, uid } from './helpers.js';
 
 let testEnv;
 
@@ -26,6 +27,12 @@ async function seedUsers(users) {
 async function seedReport(id, data) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await setDoc(doc(ctx.firestore(), `venueReports/${id}`), data);
+  });
+}
+
+async function seedVenue(id, data) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `venues/${id}`), data);
   });
 }
 
@@ -196,5 +203,161 @@ describe('venueReports/{reportId}', () => {
     await seedReport('r-anon', baseVenueReport());
     const ctx = testEnv.unauthenticatedContext();
     await assertSucceeds(getDocs(collection(ctx.firestore(), 'venueReports')));
+  });
+
+  it('85a. owner of the reported venue posts a reply -> ALLOW', async () => {
+    const owner = uid('owner');
+    await seedUsers({ [owner]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v85a', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85a', baseVenueReport({ venueId: 'v85a' }));
+    const ctx = testEnv.authenticatedContext(owner);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85a'), {
+        reply: { text: 'Thanks for the feedback!', byUid: owner, byName: 'Owner', at: serverTimestamp() },
+      }),
+    );
+  });
+
+  it('85b. manager posts a reply -> ALLOW', async () => {
+    const owner = uid('owner');
+    const manager = uid('manager');
+    await seedUsers({
+      [owner]: baseUser({ organizerStatus: 'approved' }),
+      [manager]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue('v85b', {
+      ownerUid: owner, editorUids: [owner, manager], editors: { [owner]: 'owner', [manager]: 'manager' },
+    });
+    await seedReport('r85b', baseVenueReport({ venueId: 'v85b' }));
+    const ctx = testEnv.authenticatedContext(manager);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85b'), {
+        reply: { text: 'Thanks for the feedback!', byUid: manager, byName: 'Manager', at: serverTimestamp() },
+      }),
+    );
+  });
+
+  it('85c. door-staff posts a reply -> DENY', async () => {
+    const owner = uid('owner');
+    const door = uid('door');
+    await seedUsers({
+      [owner]: baseUser({ organizerStatus: 'approved' }),
+      [door]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue('v85c', {
+      ownerUid: owner, editorUids: [owner, door], editors: { [owner]: 'owner', [door]: 'door' },
+    });
+    await seedReport('r85c', baseVenueReport({ venueId: 'v85c' }));
+    const ctx = testEnv.authenticatedContext(door);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85c'), {
+        reply: { text: 'Thanks!', byUid: door, byName: 'Door', at: serverTimestamp() },
+      }),
+    );
+  });
+
+  it('85d. an unrelated organizer posts a reply -> DENY', async () => {
+    const owner = uid('owner');
+    const otherOrg = uid('otherOrg');
+    await seedUsers({
+      [owner]: baseUser({ organizerStatus: 'approved' }),
+      [otherOrg]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue('v85d', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85d', baseVenueReport({ venueId: 'v85d' }));
+    const ctx = testEnv.authenticatedContext(otherOrg);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85d'), {
+        reply: { text: 'Not my venue', byUid: otherOrg, byName: 'Other', at: serverTimestamp() },
+      }),
+    );
+  });
+
+  it('85e. reply.byUid != auth.uid -> DENY', async () => {
+    const owner = uid('owner');
+    const other = uid('other');
+    await seedUsers({ [owner]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v85e', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85e', baseVenueReport({ venueId: 'v85e' }));
+    const ctx = testEnv.authenticatedContext(owner);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85e'), {
+        reply: { text: 'Thanks!', byUid: other, byName: 'Owner', at: serverTimestamp() },
+      }),
+    );
+  });
+
+  it('85f. reply.at is a client clock -> DENY', async () => {
+    const owner = uid('owner');
+    await seedUsers({ [owner]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v85f', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85f', baseVenueReport({ venueId: 'v85f' }));
+    const ctx = testEnv.authenticatedContext(owner);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85f'), {
+        reply: { text: 'Thanks!', byUid: owner, byName: 'Owner', at: Timestamp.fromDate(new Date('2020-01-01')) },
+      }),
+    );
+  });
+
+  it('85g. reply over 1000 chars -> DENY', async () => {
+    const owner = uid('owner');
+    await seedUsers({ [owner]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v85g', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85g', baseVenueReport({ venueId: 'v85g' }));
+    const ctx = testEnv.authenticatedContext(owner);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85g'), {
+        reply: { text: 'x'.repeat(1001), byUid: owner, byName: 'Owner', at: serverTimestamp() },
+      }),
+    );
+  });
+
+  it('85h. owner sets flaggedByOwner: true -> ALLOW', async () => {
+    const owner = uid('owner');
+    await seedUsers({ [owner]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v85h', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85h', baseVenueReport({ venueId: 'v85h' }));
+    const ctx = testEnv.authenticatedContext(owner);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85h'), { flaggedByOwner: true }),
+    );
+  });
+
+  it('85i. owner touches comment alongside reply -> DENY', async () => {
+    const owner = uid('owner');
+    await seedUsers({ [owner]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v85i', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85i', baseVenueReport({ venueId: 'v85i' }));
+    const ctx = testEnv.authenticatedContext(owner);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85i'), {
+        reply: { text: 'Thanks!', byUid: owner, byName: 'Owner', at: serverTimestamp() },
+        comment: 'edited by owner',
+      }),
+    );
+  });
+
+  it('85j. anonymous read of a replied report -> ALLOW (the reply is public)', async () => {
+    await seedReport('r85j', baseVenueReport({
+      venueId: 'v85j',
+      reply: { text: 'Thanks!', byUid: 'owner-uid', byName: 'Owner', at: new Date() },
+    }));
+    const ctx = testEnv.unauthenticatedContext();
+    await assertSucceeds(getDoc(doc(ctx.firestore(), 'venueReports/r85j')));
+  });
+
+  it('85k. owner clears reply to null (delete the posted reply) -> ALLOW', async () => {
+    const owner = uid('owner');
+    await seedUsers({ [owner]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v85k', { ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } });
+    await seedReport('r85k', baseVenueReport({
+      venueId: 'v85k',
+      reply: { text: 'Thanks!', byUid: owner, byName: 'Owner', at: new Date() },
+    }));
+    const ctx = testEnv.authenticatedContext(owner);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'venueReports/r85k'), { reply: null }),
+    );
   });
 });

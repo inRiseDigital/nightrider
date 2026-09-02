@@ -11,9 +11,10 @@ because the client already uses it.
 ## Privilege model
 
 There are no Cloud Functions. Admin actions are ordinary client writes
-authorised by `users/{uid}.isAdmin`, a field only the Admin SDK can set. Four
-things genuinely require an Admin SDK context, and all four belong to the
-webpanel's server side:
+authorised by `users/{uid}.isAdmin`, a field only the Admin SDK can set. Six
+things genuinely require an Admin SDK or Netlify Function context — four of
+them the original set, plus team mutation and scheduled publish — and all six
+belong to the webpanel's server side:
 
 | Operation | Why it cannot be a client write |
 |---|---|
@@ -21,6 +22,14 @@ webpanel's server side:
 | Delete KYC objects | Storage rules deny `delete` to every client |
 | Delete an account | Client delete on `users/{uid}` would strand immutable KYC objects |
 | Rewrite existing documents | One-off migration of pre-schema data |
+| Team mutation (`/api/organizer/team`) | Must fan out atomically across `venues.editors`/`.editorUids`, `team/{memberId}`, `venueInvites/{id}` and an activity entry, and accepting an invite is chicken-and-egg — the invitee is not yet an editor and so cannot write `editorUids` itself |
+| Scheduled event publish | Rules cannot poll the clock; a Netlify function queries `status == 'scheduled' && scheduledPublish <= now` and flips the status |
+
+Arguably eight, counting two named follow-ups rather than shipped code: FCM
+push fanout (`pushCampaigns` create is shape-validated, but the rate limit
+itself is enforced by the fanout function, not by rules — rules cannot count
+documents) and boost payments. Both are called out where they occur below
+rather than counted as live today.
 
 Two invariants carry most of the security weight:
 
@@ -250,10 +259,18 @@ Three shape questions this document was silent on, settled:
   attempt's evidence still sits at its own immutable `kyc/{uid}/{step}/{n}/…`
   path until retention deletes it, and each decision is a `logs` entry. An
   in-document history array would duplicate both and grow unbounded.
-- `venues.live` may be structurally absent. A venue nobody has reported on has
-  no door status, and inventing `'closed'` for it would be a lie rather than a
-  default — hence the `!touched(['live'])` escape in the rules and the "N minutes
-  ago" label rendering from `live.updatedAt` only when the map exists.
+- `venues.live` may be structurally absent, and that now covers the whole map,
+  numerics included: a venue nobody has reported on has no door status, no
+  queue count, and no crowd count, and inventing zeroes for `inVenue` or
+  `queueMinutes` would be as much of a lie as inventing `'closed'` — hence the
+  `!touched(['live'])` escape in the rules and the "N minutes ago" label
+  rendering from `live.updatedAt` only when the map exists. `doorStatus` exists
+  as its own field rather than as a widened `live.status` for the Flutter
+  reasons given above (five-value app enum vs. four-value stored enum, and two
+  exhaustive switches with no `default:`); the panel projects
+  `doorStatus → status` for the fields the app already reads:
+  `filling → open`, `capacity → soldOut`, `guestlist → vipOnly`,
+  `open → open`, `closed → closed`.
 
 There is no `sha256`, no `extraSteps`, no postcard or video-call step type, and
 no scheduling. Five pieces of evidence from a handful of applicants do not need
@@ -325,9 +342,44 @@ events/{eventId} {
   interestedCount: number            // marker-subcollection increments only
   popularityScore: number            // Admin SDK ingest only, 0 for hand-entered
 
-  status: 'draft' | 'published' | 'archived'
+  status: 'draft' | 'scheduled' | 'in_review' | 'published' | 'cancelled' | 'archived'
+        // `live` is NEVER stored. Derived at read time:
+        // status == 'published' && startAt <= now && (endAt == null || now <= endAt)
   source: 'organizer' | 'admin' | 'scraped'
   organizerUid: string | null
+
+  scheduledPublish: Timestamp | null // required non-null iff status == 'scheduled'
+  cancelReason: string               // "", required non-empty iff status == 'cancelled'
+  notifyOnChange: bool
+  recurring: bool
+  recurrenceLabel: string            // free text; nothing expands it server-side
+  posterImage: string                // coverImage stays the card hero
+
+  tickets: { currency: string, tiers: [{ name: string, price: number, qty: number }] }
+        // <= 12 tiers. price.min/max/isFree is derived from this by the client on
+        // every write, because price is what six Flutter queries and every list
+        // card read, and rules cannot sum a list — that derivation is
+        // client-enforced, and it is documented as such rather than pretended away.
+
+  moderation: {                      // admin/producer-owned, pinned
+    flag: '' | 'pending' | 'clean' | 'rejected'
+    requestedAt: Timestamp
+    eta: Timestamp | null            // a Timestamp, not the UI's free-text "~2h" —
+                                      // a string can't be compared, sorted, or
+                                      // re-rendered against the viewer's clock, and
+                                      // the panel only ever displays it as elapsed
+                                      // time anyway
+    reviewedBy: string | null
+    note: string
+  }
+  sales: {                           // producer-owned, pinned
+    sold, gross: number
+    currency: string
+    updatedAt: Timestamp | null      // null means no producer has ever run for this
+                                      // event; the panel renders that as "—", never
+                                      // as "0" — a confident zero claims a sellout
+                                      // count that nobody has actually taken
+  }
 
   createdAt, updatedAt: Timestamp
 }
@@ -342,10 +394,32 @@ home, and trending rather than rendering badly, and a missing `geo` puts a map
 pin at (0,0). Three clients write here and nothing normalises on the way in.
 
 `title`, `date`, `start_time`, `created_at`, `price_hint`, `country_code`,
-`cover_image`, `venue_name`, `watchingCount`, `isTrending` and a free-text price
-do not exist. Trending is the top N by `interestedCount` among published events.
-`status` has no review states: an admin unpublishes by setting `archived`. A
-moderation queue would be a system with no operators at this scale.
+`cover_image`, `venue_name`, `watchingCount`, `isTrending`, a free-text price,
+and a separate `lineup: string[]` do not exist — `performers` already carries
+name and bio, and a second lineup field on one document is the same
+parallel-pipeline defect this document calls out below for the retired Live Hub
+split; the panel projects `lineup[i] ↔ performers[i].name` with `type: 'DJ'` on
+write. Trending is the top N by `interestedCount` among published events.
+`endAt` is required non-null when `source == 'organizer'`: derived `live`
+cannot guess an end time, and every organizer-authored event has one in the UI.
+Scraped events keep `endAt: null`.
+
+This document used to say "`status` has no review states: an admin unpublishes
+by setting `archived`. A moderation queue would be a system with no operators
+at this scale." That is no longer true, and the change is a reversal, not an
+amendment: `in_review` plus the `moderation` map above *is* exactly the
+moderation queue that sentence rejected, now that the operator exists — an
+automated content scan flags events into `in_review`, and admins triage what it
+flags. `archived` remains the unpublish verb. `cancelled` is not an
+administrative state at all: it is a public statement about a night that is not
+happening, which is why it is the one non-`published` status that stays
+publicly readable (`status in ['published','cancelled']`) rather than dropping
+out of every list the moment it changes. Nothing in the rules stops an
+organizer moving `in_review` straight to `published`: rules cannot cheaply
+express a transition matrix, and since the organizer already owns the event and
+can publish directly from `draft`, gating `in_review` would be theatre —
+`in_review` is a queue marker for the scan and for admins, not a lock on the
+organizer.
 
 Registering interest is a two-write batch — `events/{id}/interested/{uid}` and
 the `interestedCount` increment together. The order is load-bearing: committed
@@ -354,8 +428,12 @@ on its own first, the marker makes the increment denied forever.
 ## venues/{venueId}
 
 Globally seeded from OpenStreetMap. Document ids are `osm_{osmId}` for seeded
-venues, auto-generated for the rest. Organizers cannot create venue documents;
-accepting an applicant's `venueAddress` step is what creates one.
+venues, auto-generated for the rest. There are now two ways a venue document
+comes into existence: an admin accepting an applicant's `venueAddress` step, as
+before, and an organizer creating one directly (`source == 'organizer'`,
+`verified == false`, `ownerUid == auth.uid`, exactly one editor, that editor
+holding `'owner'`). `verified` stays the thing only an admin grants, on either
+path — self-creation buys an organizer a venue document, not standing.
 
 ```
 venues/{venueId} {
@@ -365,39 +443,134 @@ venues/{venueId} {
   type, typeLabel: string            // OSM amenity + display form
   city, countryCode, address: string
   openingHours, phone, website: string
-  photos: string[]
+  photos: string[]                   // <= 5; [0] hero, [1..4] gallery
   source: 'osm' | 'organizer' | 'admin'
   osmId: string | null
   ownerUid: string | null            // the approved organizer who manages door status
   verified: bool
   status: 'active' | 'closed'
 
+  // Listing (mirrors VenueProfile). Edits route through venueEdits, never here.
+  about: string                      // <= 2000
+  socialLinks: [{ network: string, value: string }]                 // <= 8
+  genres: string[]                   // <= 10
+  dressCode, agePolicy, tableLink: string
+  cover: { min: number, max: number, currency: string }
+  capacity: number                   // 0 means unknown
+  amenities: string[]                // <= 20
+  hours: [{ day, closed, open, close }]                             // exactly 7
+  exceptions: [{ label, date, closed }]                             // <= 20
+  timeZone: string                   // IANA, e.g. "Asia/Dubai" — see below
+
+  // Authorization, denormalised
+  editorUids: string[]               // query key: where editorUids array-contains uid
+  editors: { <uid>: 'owner' | 'manager' | 'door' }                  // rules + role UI
+
+  verification: { license: VenueVerifyStep, gps: VenueVerifyStep, video: VenueVerifyStep }
+
   live: {                            // door status, owner- or admin-written
     status:      'open' | 'closed' | 'vipOnly' | 'soldOut'
     crowdLevel:  'empty' | 'quiet' | 'moderate' | 'busy' | 'packed'
     queueStatus: 'noQueue' | 'short' | 'moderate' | 'long' | 'closed'
+    doorStatus:  'open' | 'filling' | 'capacity' | 'guestlist' | 'closed'
     ticketsAvailable, tablesAvailable: bool
     tonightDj, offer: string
+    inVenue: number                  // >= 0
+    queueMinutes: number             // 0..600
+    emergencyActive: bool
+    flash: { active: bool, text: string, until: string } | null    // text <= 200
     updatedAt: Timestamp             // == request.time, enforced
   }
 
   createdAt, updatedAt: Timestamp
 }
+
+VenueVerifyStep { status: 'active'|'submitted'|'needs_info'|'done', attempt: 0..3,
+                  note: string, reviewedAt, reviewedBy }
 ```
+
+`timeZone` is a hard prerequisite, not a nicety: `OrganizerEvent` is `date` plus
+local `startTime`/`endTime` strings, Firestore is `startAt`/`endAt` Timestamps,
+and there is no correct mapping between the two without an IANA zone on the
+venue. The browser fallback
+(`Intl.DateTimeFormat().resolvedOptions().timeZone`) is right only for a Dubai
+organizer sitting at a Dubai laptop — log it and fall back, never trust it as
+the source of truth.
+
+`doorStatus` is a new field rather than a widening of `live.status`, and the
+reason is Flutter, not taste. `TonightState.status` in the app has five values
+and `live.status` has four; any mapping between them collapses `open` and
+`filling` into one bucket, which means a reload can silently change what the
+organizer themselves selected. Widening the stored `live.status` enum instead
+was not available either: `Nightride/lib/pages/live_hub_page.dart:27-62` and
+`lib/pages/clubs_page.dart:29-64` each hold a five-value exhaustive switch with
+no `default:` branch, so a sixth value would fail to compile on both screens.
+`liveOk()` does not join `hasOnly`, so adding `doorStatus` and the two new
+numerics costs the existing Flutter client nothing.
 
 `live` is a map on the venue document rather than a `live/current`
 subcollection: a subcollection turns the Live Hub club list into 1 + N reads
 over a globally seeded collection. The "N minutes ago" label is rendered from
-`live.updatedAt`, never stored as text.
+`live.updatedAt`, never stored as text. `menuSections` (below) is the opposite
+call for the opposite reason: `live` is read by the 50-document Live Hub list,
+so it has to be inline; the menu is read only by the venue-detail view that a
+user has already opened, so a subcollection there costs 1+N on a screen that
+was going to make a request anyway, and keeps a payload that can run to
+hundreds of items off the list read entirely. Same reasoning, opposite
+conclusion, because the read path differs.
 
 `geohash` replaces the live Overpass call the app currently makes on every load.
-`lat`/`lng`/`country_code`/`type_label`/`opening_hours`/`osm_id` and a `stats`
-map do not exist — three counters with no maintainer go stale; a venue's event
-count is a query and its vibe average comes from the reports the Live Hub
-already reads.
+`lat`/`lng`/`country_code`/`type_label`/`opening_hours`/`osm_id` do not exist.
+
+Element shapes *inside* `hours`, `exceptions`, `socialLinks`, and `photos` are
+checked client-side only: rules cannot iterate a list, the same limitation
+already noted above for `script.lines`, so the only server-side backstop
+against a malformed entry is Firestore's own 1 MB document limit. Written down
+rather than left implied, the same way it is for the script.
+
+This document used to say a `stats` map does not exist because "three counters
+with no maintainer go stale." That objection still holds against exactly what
+it was aimed at — unmaintained counters living on the hot venue document,
+read on every Live Hub load as if they were current. It does not hold against
+what's being added now, and the honest framing is a narrowing of the original
+position, not a vindication of it: `venues/{venueId}/metrics/{periodId}` (below)
+lives in a subcollection off the 50-document read path, is written only by a
+named producer, and carries its own `updatedAt` so the dashboard renders "as of
+[time]" rather than implying live freshness. If that producer is never built,
+the subcollection is simply absent and the panel shows an empty state — the
+same structural-absence pattern `venues.live` already uses, not a fallback
+value pretending to be data.
 
 Country-scoped venue queries must carry a `limit`. The seeded collection is
 global, and an unbounded `where countryCode == …` pulls all of it.
+
+### Organizer activity
+
+The admin panel's pattern of batching a mutation together with a `logs` entry
+does not transfer to organizers as-is. `logs` stays admin-create *and*
+admin-read, and it has to stay that way: it is the collection admins use to
+reconstruct their own decisions, and an organizer who could write into it could
+forge entries in that record. Nothing is added to `logs` here.
+
+The pattern does transfer to a venue-scoped collection instead:
+
+```
+venues/{venueId}/activity/{entryId} {
+  actorUid, actorName: string
+  what: string
+  targetType, targetId: string
+  at: Timestamp                      // == request.time, enforced
+}
+```
+
+which organizers can write, so each mutation an editor makes commits its
+activity entry in the same batch as the mutation itself. This is
+accountability among teammates — "who changed my venue, and when" — not a
+tamper-proof ledger; an editor with write access to the venue also has write
+access to their own activity trail. It also grows unbounded, the same way
+`logs` would without pruning, so it needs its own retention: entries older
+than 180 days join the scheduled sweep (see Retention, below) as a named
+follow-up.
 
 ## venueReports/{reportId}
 
@@ -480,7 +653,24 @@ kyc/{uid}/nic/{attempt}/back.jpg
 kyc/{uid}/selfie/{attempt}/capture.jpg
 kyc/{uid}/video/{attempt}/walkthrough.mp4
 kyc/{uid}/video/{attempt}/poster.jpg
+
+venuePhotos/{venueId}/hero.jpg | gallery/{0..3}.jpg | menu/{itemId}.jpg
+eventMedia/{eventId}/cover.jpg | poster.jpg
+venueKyc/{venueId}/{license|gps|video}/{attempt}/…
 ```
+
+`venuePhotos` and `eventMedia` are replaceable content: a hero image or an
+event poster gets swapped, not preserved as evidence, so both allow ordinary
+`write` (not create-only) and `delete` for editors, are publicly readable, and
+sit behind their own sibling `match` blocks rather than one shared wildcard so
+each prefix stays a known, bounded object set. `venueKyc` is the opposite case
+— immutable evidence, copying the `kyc/` semantics on this page exactly, the
+`resource == null` clause included, keyed on `venues.verification.<id>.attempt`
+(pinned against organizer writes) so the retry cap is structural for venue
+verification the same way it is for applicant KYC. The `resource == null`
+reasoning below applies to `venueKyc` and does not apply to `venuePhotos` or
+`eventMedia` — copying it onto them would make re-uploading a hero image
+permanently denied, which is the opposite of what replaceable content needs.
 
 `{attempt}` is `organizerReview.steps.<id>.attempt`, which only an admin
 advances. With create-only permission and an explicit `resource == null` check,
@@ -526,7 +716,7 @@ Not a Next route handler: the panel sets `output: "export"` in
 Next server to host one. Netlify Functions are the runtime this project already
 deploys, which is what keeps the "no Cloud Functions" position honest rather than
 merely stated — the alternative was standing up a Firebase Functions runtime, its
-deploy pipeline, and its IAM surface for four operations.
+deploy pipeline, and its IAM surface for what is now six operations.
 
 | Function | Path | Purpose |
 |---|---|---|
@@ -543,7 +733,11 @@ performed them.
 
 A bucket lifecycle rule of `age > 180 days` on `kyc/**` backstops anything the
 sweep misses. Object Versioning stays off for this prefix: it would resurrect
-deleted identity documents.
+deleted identity documents. `venueKyc/**` joins this sweep, `admin-retention.mts`
+and `admin-scheduled-retention.mts`, and the same 180-day bucket lifecycle rule
+— it is identity evidence, keyed the same way applicant KYC is. `venuePhotos`
+and `eventMedia` do not join it: they are content, not identity documents, and
+retention has no reason to touch them.
 
 Firestore metadata (paths, sizes, reviewer, timestamps, notes) is retained
 permanently, which preserves a provable audit trail at no breach cost. A NIC-
@@ -554,13 +748,17 @@ requirement rather than hygiene.
 ## Client prerequisites
 
 - `firebase_storage` is absent from `Nightride/pubspec.yaml`.
-- `nightride-webpanel/lib/firebase.ts` exports `getAuth` and `getFirestore` but
-  no `getStorage`.
 - The `camera` package is absent. The selfie liveness prompt and the 60-second
   recorder need it rather than `image_picker`, and camera/microphone usage
   strings are not declared in `Info.plist` or `AndroidManifest.xml`.
 - Storage CORS is already configured (`cors.json`) and `storageBucket` is
   already in the web Firebase config.
-- `venues` has no seeder yet. Until one exists the collection is empty, and the
-  map plus Live Hub have nothing to read while seven app files still call
-  Overpass live.
+- `nightride-webpanel/lib/firebase.ts` already exports storage — as
+  `getBucket()`, used by `lib/organizer/application-service.ts` and
+  `lib/admin/kyc-evidence.ts` — not as a bare `getStorage`.
+- `venues` is not seeder-less. `scripts/seed-emulator/seed.mjs` writes venues
+  (around line 1454) in the current, post-migration shape. What is stale is
+  the *other* seeder: `scripts/seed_venues.py` writes pre-migration snake_case
+  documents (`lat`/`lng`/`country_code`/`opening_hours`, no `geo`, `geohash`,
+  or `live`) directly into `venues` — the most-read collection in the system —
+  and is being retired rather than kept in sync with this schema.

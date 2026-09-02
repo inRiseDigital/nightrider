@@ -43,11 +43,28 @@ Routes under `app/organizer/`:
 State lives in `lib/organizer/dashboard/store.tsx` (React context) with
 `browser-stores.ts` for local persistence, `types.ts`, `format.ts`, `constants.ts`.
 
-**Status caveat:** the dashboard is UI-first. `lib/organizer/dashboard/mock-data.ts`
-seeds it, and its own comment says nothing is persisted — `venues`, `events`,
-`approvals` in Firestore are the eventual source of truth. Check whether a section
-reads Firestore before assuming a number on screen is real. The `apply/` flow *does*
-write to Firestore.
+**Status caveat:** this describes the target state the schema in
+`docs/FIRESTORE_SCHEMA.md` now supports, not what is wired today — this task
+lands before the sections are rewired to read it, so `mock-data.ts` is still
+what most of them render. Once wired, `Overview`, `Tonight`, `Events`,
+`Calendar`, `Venues`, `Team`, `Inbox`, `Reviews`, and `Settings` read real
+Firestore collections that already exist and are already written by some
+producer — `events`, `venues` (including `live`, `editors`/`editorUids`, and
+listing edits via `venueEdits`), `venueReports`, `users/{uid}/inbox`, and
+`team`/`venueInvites` (client-write denied; the dashboard reads a seeded roster
+until `/api/organizer/team` exists).
+
+Four sections are different in kind, not just in sequencing: `Performance`,
+`AiVisibility`, `Promotion`, and its boost sub-feature read real
+collections — `venues/{id}/metrics`, `venues/{id}/aiVisibility`, the
+promotion trio (`promotions`, `pushCampaigns`, `promoState`), and `boosts` —
+whose *producers* do not exist yet. No job computes a funnel, scores AI
+visibility, or fans out a push, so these collections are seeded from
+`scripts/` for now rather than kept current by anything running in
+production. A section reading its collection and finding data is not evidence
+the number is live; check whether the producer named in
+`docs/FIRESTORE_SCHEMA.md` for that collection has actually been built. The
+`apply/` flow still writes to Firestore directly, as before.
 
 ## Admin surface
 

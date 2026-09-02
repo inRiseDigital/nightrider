@@ -31,6 +31,39 @@
       { "fieldPath": "status", "order": "ASCENDING" },
       { "fieldPath": "startAt", "order": "ASCENDING" } ] },
 
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizerUid", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "startAt", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "organizerUid", "order": "ASCENDING" },
+      { "fieldPath": "startAt", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "scheduledPublish", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "updatedAt", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "events", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "venueId", "order": "ASCENDING" },
+      { "fieldPath": "startAt", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "venues", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "editorUids", "arrayConfig": "CONTAINS" },
+      { "fieldPath": "name", "order": "ASCENDING" } ] },
+
+    { "collectionGroup": "venues", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "verified", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+
+    { "collectionGroup": "venueEdits", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "submittedAt", "order": "ASCENDING" } ] },
+
     { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "organizerApplication.submitted", "order": "ASCENDING" },
       { "fieldPath": "organizerApplication.submittedAt", "order": "ASCENDING" } ] },
@@ -73,6 +106,76 @@
     {
       "collectionGroup": "events",
       "fieldPath": "performers",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "events",
+      "fieldPath": "tickets",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "events",
+      "fieldPath": "moderation",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "events",
+      "fieldPath": "sales",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "venues",
+      "fieldPath": "editors",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "venues",
+      "fieldPath": "hours",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "venues",
+      "fieldPath": "exceptions",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "venues",
+      "fieldPath": "socialLinks",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "venues",
+      "fieldPath": "cover",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "venueEdits",
+      "fieldPath": "listing",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "menuSections",
+      "fieldPath": "items",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "metrics",
+      "fieldPath": "attendance",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "metrics",
+      "fieldPath": "funnel",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "metrics",
+      "fieldPath": "topNights",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "aiVisibility",
+      "fieldPath": "prompts",
       "indexes": []
     }
   ]

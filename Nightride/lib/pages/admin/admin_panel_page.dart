@@ -18,9 +18,19 @@ class AdminPanelPage extends StatefulWidget {
 class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   String _filterStatus = 'All';
-  // 'archived' replaces the legacy 'Cancelled'/'Completed' values, which
-  // never existed in the schema.
-  static const _filters = ['All', 'Published', 'Draft', 'Archived'];
+  static const _filters = [
+    'All', 'Draft', 'Scheduled', 'In Review', 'Published', 'Cancelled', 'Archived',
+  ];
+
+  // Display label -> raw kEventStatuses value ('All' has no raw form).
+  static const _filterToStatus = {
+    'Draft': 'draft',
+    'Scheduled': 'scheduled',
+    'In Review': 'in_review',
+    'Published': 'published',
+    'Cancelled': 'cancelled',
+    'Archived': 'archived',
+  };
 
   @override
   void initState() {
@@ -196,7 +206,7 @@ class _EventsTab extends StatelessWidget {
               final all = snap.data ?? const <Event>[];
               final docs = filterStatus == 'All'
                   ? all
-                  : all.where((e) => e.status == filterStatus.toLowerCase()).toList();
+                  : all.where((e) => e.status == _AdminPanelPageState._filterToStatus[filterStatus]).toList();
               if (docs.isEmpty) return _EmptyState(onAdd: onAdd);
               return ListView.separated(
                 padding: EdgeInsets.fromLTRB(16, AppResponsive.gap(context, 12).clamp(8, 18), 16, AppResponsive.gap(context, 100).clamp(80, 120)),
@@ -692,6 +702,9 @@ class _EventTile extends StatelessWidget {
     switch (s) {
       case 'published': return Colors.greenAccent;
       case 'draft': return Colors.orangeAccent;
+      case 'scheduled': return Colors.blueAccent;
+      case 'in_review': return Colors.amberAccent;
+      case 'cancelled': return Colors.grey;
       case 'archived': return Colors.redAccent;
       default: return Colors.white54;
     }

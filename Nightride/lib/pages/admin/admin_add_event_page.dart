@@ -83,9 +83,21 @@ class _AdminAddEventPageState extends State<AdminAddEventPage> {
   static const _vibes = [
     'Energetic', 'Chill', 'Relaxed', 'Wild', 'Romantic', 'Underground',
   ];
-  // Only the two statuses this form is allowed to write — 'archived' is not
-  // an authoring state and has no input here.
-  static const _statuses = ['Draft', 'Published'];
+  // Display label <-> raw kEventStatuses value. Order here is the dropdown
+  // order.
+  static const _statusDisplay = {
+    'draft': 'Draft',
+    'scheduled': 'Scheduled',
+    'in_review': 'In Review',
+    'published': 'Published',
+    'cancelled': 'Cancelled',
+    'archived': 'Archived',
+  };
+  static final _statuses = _statusDisplay.values.toList();
+  static String _rawToDisplay(String raw) => _statusDisplay[raw] ?? 'Draft';
+  static String _displayToRaw(String display) => _statusDisplay.entries
+      .firstWhere((e) => e.value == display, orElse: () => const MapEntry('draft', 'Draft'))
+      .key;
 
   bool get _isEditing => widget.existing != null;
 
@@ -108,7 +120,7 @@ class _AdminAddEventPageState extends State<AdminAddEventPage> {
     _category = _categories.contains(e?.category) ? e!.category : 'Club';
     _genre = _genres.contains(e?.genre) ? e!.genre : 'EDM';
     _vibe = _vibes.contains(e?.vibe) ? e!.vibe : 'Energetic';
-    _status = (e?.status == 'published') ? 'Published' : 'Draft';
+    _status = e != null ? _rawToDisplay(e.status) : 'Draft';
 
     final startDt = e?.startDateTime;
     _startDate = startDt == null ? null : DateTime(startDt.year, startDt.month, startDt.day);
@@ -216,7 +228,7 @@ class _AdminAddEventPageState extends State<AdminAddEventPage> {
         wheelchairAccessible: _wheelchairAccessible,
         allowPets: _allowPets,
       ),
-      status: _status.toLowerCase(),
+      status: _displayToRaw(_status),
       source: 'admin',
       organizerUid: widget.existing?.organizerUid,
     );

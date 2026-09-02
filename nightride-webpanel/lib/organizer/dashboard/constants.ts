@@ -40,7 +40,7 @@ export const NIGHT_INITIALS = ["M", "T", "W", "T", "F", "S", "S"];
 /** Week starts Monday — the calendar grid and `hours` arrays both rely on this order. */
 export const DAYS: DayName[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export const TEAM_ROLES: TeamRole[] = ["Marketing", "Manager"];
+export const TEAM_ROLES: TeamRole[] = ["Owner", "Manager", "Door staff"];
 
 /**
  * Status chip styling — M3 tone containers (solid container + on-container

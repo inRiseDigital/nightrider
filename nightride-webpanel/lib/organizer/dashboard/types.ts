@@ -157,9 +157,11 @@ export interface BoostSlot {
   price: number;
 }
 
-export type TeamRole = "Marketing" | "Manager";
+export type TeamRole = "Owner" | "Manager" | "Door staff";
 
 export interface TeamMember {
+  /** Stable across role edits and removals, so rows keep their identity. */
+  id: string;
   name: string;
   email: string;
   role: TeamRole;

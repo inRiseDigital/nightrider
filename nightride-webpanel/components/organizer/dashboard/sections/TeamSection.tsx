@@ -1,93 +1,90 @@
 "use client";
 
+import { UserMinus, UserPlus } from "lucide-react";
 import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { TEAM_ROLES } from "@/lib/organizer/dashboard/constants";
-import { Chip, FieldLabel, PanelCard, SlimInput } from "../ui/Primitives";
+import type { TeamRole } from "@/lib/organizer/dashboard/types";
+import { FilledButton, IconButton, PanelCard, Select, TextField } from "../ui/Primitives";
+import { RemoveTeammateDialog } from "./RemoveTeammateDialog";
+
+function initialsFor(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export function TeamSection() {
   const {
-    inviteName,
-    setInviteName,
+    team,
     inviteEmail,
     setInviteEmail,
-    inviteRole,
-    setInviteRole,
-    addTeamMember,
-    team,
-    removeTeamMember,
+    sendInvite,
+    setTeamRole,
+    startRemoveTeamMember,
     activity,
   } = useOrganizerDashboard();
 
   return (
     <>
-      <div className="mb-4 rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-        <FieldLabel className="mb-2.5">Invite staff — scoped roles</FieldLabel>
-        <div className="mb-2.5 flex flex-wrap gap-2.5">
-          <SlimInput
-            value={inviteName}
-            onChange={(e) => setInviteName(e.target.value)}
-            placeholder="Name"
-            className="min-w-[160px] flex-1"
-          />
-          <SlimInput
+      <div className="mb-6 max-w-[820px] overflow-hidden rounded-xl bg-[var(--m3-surf1)] py-2">
+        {team.map((tm) => (
+          <div
+            key={tm.id}
+            className="flex min-h-[72px] flex-wrap items-center gap-4 border-b border-[var(--m3-outlinev)] px-5 py-3 last:border-b-0"
+          >
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium"
+              style={{ background: "var(--m3-surf3)", color: "var(--m3-on)" }}
+            >
+              {initialsFor(tm.name)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-[var(--m3-on)]">{tm.name}</p>
+              <p className="text-[13px] text-[var(--m3-onv)]">{tm.email}</p>
+            </div>
+            <Select
+              dense
+              aria-label={`Role for ${tm.name}`}
+              value={tm.role}
+              onChange={(e) => setTeamRole(tm.id, e.target.value as TeamRole)}
+              options={TEAM_ROLES}
+              wrapperClassName="w-[140px] shrink-0"
+            />
+            <IconButton
+              danger
+              aria-label={`Remove ${tm.name}`}
+              onClick={() => startRemoveTeamMember(tm.id)}
+            >
+              <UserMinus size={19} />
+            </IconButton>
+          </div>
+        ))}
+
+        <div className="flex flex-wrap items-center gap-3 px-5 py-4">
+          <TextField
             type="email"
+            aria-label="Invite by email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="Email"
-            className="min-w-[160px] flex-1"
+            onKeyDown={(e) => e.key === "Enter" && sendInvite()}
+            placeholder="Invite by email"
+            wrapperClassName="min-w-[220px] flex-1"
           />
+          <FilledButton icon={<UserPlus size={17} />} onClick={sendInvite}>
+            Send invite
+          </FilledButton>
         </div>
-        <div className="mb-3 flex gap-2">
-          {TEAM_ROLES.map((r) => (
-            <Chip
-              key={r}
-              label={r}
-              active={inviteRole === r}
-              onClick={() => setInviteRole(r)}
-              className="px-3.5 py-1.5"
-            />
-          ))}
-        </div>
-        <button
-          onClick={addTeamMember}
-          className="rounded-lg bg-[var(--m3-warn)] px-4 py-2.5 text-xs font-semibold text-[var(--m3-onpri)] hover:bg-[var(--m3-warn)]/80"
-        >
-          + Invite
-        </button>
       </div>
 
-      <div className="mb-4 overflow-hidden rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)]">
-        {team.length === 0 ? (
-          <p className="px-[18px] py-5 text-xs text-[var(--m3-outline)]">No team members yet.</p>
-        ) : (
-          team.map((tm, i) => (
-            <div
-              key={`${tm.email}-${i}`}
-              className="flex flex-wrap items-center gap-3.5 border-b border-[var(--m3-outlinev)] px-[18px] py-3 last:border-b-0"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-[var(--m3-on)]">{tm.name}</p>
-                <p className="mt-px font-mono text-[11px] text-[var(--m3-outline)]">{tm.email}</p>
-              </div>
-              <span className="rounded-full border border-[var(--m3-ter)]/30 bg-[var(--m3-ter)]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--m3-ter)]">
-                {tm.role}
-              </span>
-              <button
-                onClick={() => removeTeamMember(i)}
-                className="text-xs text-[var(--m3-outline)] hover:text-red-400"
-              >
-                Remove
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      <PanelCard title="Activity Log">
+      <PanelCard title="Activity Log" className="max-w-[820px]">
         {activity.map((a, i) => (
           <div
             key={i}
-            className="flex flex-wrap gap-3.5 border-b border-[var(--m3-outlinev)] px-[18px] py-3 text-xs last:border-b-0"
+            className="flex flex-wrap gap-3.5 border-b border-[var(--m3-outlinev)] px-5 py-3 text-xs last:border-b-0"
           >
             <span className="w-[110px] shrink-0 font-semibold text-[var(--m3-on)]">{a.who}</span>
             <span className="min-w-[160px] flex-1 text-[var(--m3-onv)]">{a.what}</span>
@@ -95,6 +92,8 @@ export function TeamSection() {
           </div>
         ))}
       </PanelCard>
+
+      <RemoveTeammateDialog />
     </>
   );
 }

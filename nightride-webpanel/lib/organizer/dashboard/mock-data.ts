@@ -345,8 +345,9 @@ export const MOCK_PERKS: RankPerk[] = [
 export const MOCK_BOOST: BoostSlot = { active: false, night: "2026-08-15", price: 40 };
 
 export const MOCK_TEAM: TeamMember[] = [
-  { name: "Jamie Rios", email: "jamie@neonfox.co", role: "Manager" },
-  { name: "Priya Shah", email: "priya@neonfox.co", role: "Marketing" },
+  { id: "tm1", name: "Rana Aziz", email: "rana@sirensdubai.com", role: "Owner" },
+  { id: "tm2", name: "Marco Reyes", email: "marco@sirensdubai.com", role: "Manager" },
+  { id: "tm3", name: "Leila Haddad", email: "leila@sirensdubai.com", role: "Door staff" },
 ];
 
 export const MOCK_ACTIVITY: ActivityEntry[] = [

@@ -281,14 +281,26 @@ interface OrganizerDashboardValue {
   // ---- Team ----
   team: TeamMember[];
   activity: typeof MOCK_ACTIVITY;
-  inviteName: string;
   inviteEmail: string;
-  inviteRole: TeamRole;
-  setInviteName: (v: string) => void;
   setInviteEmail: (v: string) => void;
-  setInviteRole: (v: TeamRole) => void;
-  addTeamMember: () => void;
-  removeTeamMember: (idx: number) => void;
+  sendInvite: () => void;
+  setTeamRole: (id: string, role: TeamRole) => void;
+  /** The member queued for removal — drives the confirm dialog. */
+  removeTarget: TeamMember | null;
+  removePassword: string;
+  removeAck: boolean;
+  removeError: string;
+  startRemoveTeamMember: (id: string) => void;
+  setRemovePassword: (v: string) => void;
+  toggleRemoveAck: () => void;
+  cancelRemoveTeamMember: () => void;
+  confirmRemoveTeamMember: () => void;
+
+  // ---- Snackbar ----
+  /** Empty while nothing is showing. */
+  snack: string;
+  showSnack: (text: string) => void;
+  dismissSnack: () => void;
 
   // ---- Reviews & inbox ----
   reviews: VenueReview[];
@@ -369,9 +381,14 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const [perks, setPerks] = useState<RankPerk[]>(MOCK_PERKS);
   const [boost, setBoost] = useState<BoostSlot>(MOCK_BOOST);
   const [team, setTeam] = useState<TeamMember[]>(MOCK_TEAM);
-  const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<TeamRole>("Marketing");
+  const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);
+  const [removePassword, setRemovePassword] = useState("");
+  const [removeAck, setRemoveAck] = useState(false);
+  const [removeError, setRemoveError] = useState("");
+
+  // ---- Snackbar ----
+  const [snack, setSnack] = useState("");
 
   // ---- Reviews / inbox / account ----
   const [reviews, setReviews] = useState<VenueReview[]>(MOCK_REVIEWS);
@@ -383,6 +400,14 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const [changeValue, setChangeValue] = useState("");
   const [changeOtp, setChangeOtp] = useState("");
   const [changeError, setChangeError] = useState("");
+
+  /**
+   * Every mutation that changes something a guest or teammate would notice
+   * confirms itself here, the way the design does. Declared before the
+   * mutators so they can all reach it.
+   */
+  const showSnack = useCallback((text: string) => setSnack(text), []);
+  const dismissSnack = useCallback(() => setSnack(""), []);
 
   // ---- Image slots ----
   const images = useSyncExternalStore(
@@ -535,25 +560,37 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   );
 
   /** Commits the draft's listing fields, leaving live fields (menu, verification) alone. */
-  const saveVenue = useCallback((id: string) => {
-    setVenueDrafts((prevDrafts) => {
-      const draft = prevDrafts[id];
-      if (!draft) return prevDrafts;
-      setVenues((prev) => ({ ...prev, [id]: { ...prev[id], ...listingFieldsOf(draft) } }));
-      const next = { ...prevDrafts };
-      delete next[id];
-      return next;
-    });
-  }, []);
+  const saveVenue = useCallback(
+    (id: string) => {
+      if (!venueDrafts[id]) {
+        showSnack("No changes to save.");
+        return;
+      }
+      setVenueDrafts((prevDrafts) => {
+        const draft = prevDrafts[id];
+        if (!draft) return prevDrafts;
+        setVenues((prev) => ({ ...prev, [id]: { ...prev[id], ...listingFieldsOf(draft) } }));
+        const next = { ...prevDrafts };
+        delete next[id];
+        return next;
+      });
+      showSnack("Changes saved and submitted for review.");
+    },
+    [venueDrafts, showSnack]
+  );
 
-  const discardVenue = useCallback((id: string) => {
-    setVenueDrafts((prev) => {
-      if (!prev[id]) return prev;
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
+  const discardVenue = useCallback(
+    (id: string) => {
+      if (!venueDrafts[id]) return;
+      setVenueDrafts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      showSnack("Changes discarded.");
+    },
+    [venueDrafts, showSnack]
+  );
 
   // ---- Menu mutators ----
   /** Rewrites one item in place; every per-item edit funnels through here. */
@@ -658,6 +695,10 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
 
   const toggleMenuItemSoldOut = useCallback(
     (id: string, sectionId: string, itemId: string) => {
+      // Menu lives in the draft once edited, so read the draft first.
+      const item = (venueDrafts[id] ?? venues[id])?.menu
+        .find((s) => s.id === sectionId)
+        ?.items.find((it) => it.id === itemId);
       updateVenueListing(id, (p) => ({
         ...p,
         menu: p.menu.map((s) =>
@@ -671,8 +712,10 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
               }
         ),
       }));
+      const name = item?.name || "Item";
+      showSnack(item?.soldOut ? `${name} is back on the menu.` : `${name} marked sold out.`);
     },
-    [updateVenueListing]
+    [venueDrafts, venues, updateVenueListing, showSnack]
   );
 
   const toggleMenuItemTag = useCallback(
@@ -856,7 +899,10 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
     [eventDraft, editingEventId, closeEditor]
   );
 
-  const saveDraftEvent = useCallback(() => commitEvent("draft"), [commitEvent]);
+  const saveDraftEvent = useCallback(() => {
+    commitEvent("draft");
+    showSnack("Draft saved.");
+  }, [commitEvent, showSnack]);
 
   const submitEvent = useCallback(() => {
     // Scheduling publishes later without review; submitting now enters the queue.
@@ -865,7 +911,10 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       scheduled ? "scheduled" : "in_review",
       scheduled ? {} : { moderationFlag: "pending", moderationEta: "~2h remaining" }
     );
-  }, [eventDraft, commitEvent]);
+    showSnack(
+      scheduled ? "Event scheduled to publish." : "Event submitted for review — usually under 2h."
+    );
+  }, [eventDraft, commitEvent, showSnack]);
 
   const duplicateEvent = useCallback((id: string) => {
     setEvents((prev) => {
@@ -896,6 +945,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   }, []);
 
   const confirmCancel = useCallback(() => {
+    const target = events.find((e) => e.id === cancelingEventId);
     setEvents((prev) =>
       prev.map((e) =>
         e.id === cancelingEventId
@@ -905,7 +955,8 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
     );
     setCancelingEventId(null);
     setCancelReasonInput("");
-  }, [cancelingEventId, cancelReasonInput]);
+    showSnack(`${target?.name ?? "Event"} cancelled — ticket holders notified.`);
+  }, [events, cancelingEventId, cancelReasonInput, showSnack]);
 
   // ---- Performance ----
   const setPerfVenueFilter = useCallback(
@@ -926,8 +977,11 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
 
   // ---- Tonight ----
   const setDoorStatus = useCallback(
-    (status: DoorStatus) => setTonight((p) => ({ ...p, status })),
-    []
+    (status: DoorStatus) => {
+      setTonight((p) => ({ ...p, status }));
+      showSnack(`Door status set to ${status}.`);
+    },
+    [showSnack]
   );
   const setQueueMinutes = useCallback(
     (v: number) => setTonight((p) => ({ ...p, queueMinutes: v })),
@@ -935,24 +989,33 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   );
   const setFlashText = useCallback((v: string) => setTonight((p) => ({ ...p, flashText: v })), []);
   const setFlashUntil = useCallback((v: string) => setTonight((p) => ({ ...p, flashUntil: v })), []);
-  const toggleFlash = useCallback(
-    () => setTonight((p) => ({ ...p, flashActive: !p.flashActive })),
-    []
-  );
-  const toggleEmergency = useCallback(
-    () => setTonight((p) => ({ ...p, emergencyActive: !p.emergencyActive })),
-    []
-  );
+  const toggleFlash = useCallback(() => {
+    setTonight((p) => ({ ...p, flashActive: !p.flashActive }));
+    showSnack(tonight.flashActive ? "Flash offer ended." : "Flash offer is live.");
+  }, [tonight.flashActive, showSnack]);
+  const toggleEmergency = useCallback(() => {
+    setTonight((p) => ({ ...p, emergencyActive: !p.emergencyActive }));
+    showSnack(
+      tonight.emergencyActive
+        ? "Venue reopened — you're back on the map."
+        : "Emergency close requested — platform admin notified."
+    );
+  }, [tonight.emergencyActive, showSnack]);
 
   // ---- Promotion ----
   const setPushMessage = useCallback((v: string) => setPush((p) => ({ ...p, message: v })), []);
   const sendPush = useCallback(() => {
-    setPush((p) =>
-      p.rateUsed >= p.rateMax || !p.message.trim()
-        ? p
-        : { ...p, rateUsed: p.rateUsed + 1, message: "" }
-    );
-  }, []);
+    if (push.rateUsed >= push.rateMax) {
+      showSnack("No pushes left this week.");
+      return;
+    }
+    if (!push.message.trim()) {
+      showSnack("Write a message first.");
+      return;
+    }
+    setPush((p) => ({ ...p, rateUsed: p.rateUsed + 1, message: "" }));
+    showSnack("Push queued for 240 followers.");
+  }, [push.rateUsed, push.rateMax, push.message, showSnack]);
   const addPromo = useCallback(
     () => setPromos((p) => [...p, { code: "NEWCODE", desc: "", maxUses: 100, used: 0 }]),
     []
@@ -971,45 +1034,120 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const toggleBoost = useCallback(() => setBoost((b) => ({ ...b, active: !b.active })), []);
 
   // ---- Team ----
-  const addTeamMember = useCallback(() => {
-    if (!inviteName.trim()) return;
-    setTeam((p) => [...p, { name: inviteName.trim(), email: inviteEmail.trim(), role: inviteRole }]);
-    setInviteName("");
+  /** Invited staff start on the narrowest role; the owner widens it after. */
+  const sendInvite = useCallback(() => {
+    const email = inviteEmail.trim();
+    if (!email) {
+      showSnack("Enter an email address first.");
+      return;
+    }
+    const name = email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    setTeam((p) => [...p, { id: `tm${Date.now()}`, name, email, role: "Door staff" }]);
     setInviteEmail("");
-  }, [inviteName, inviteEmail, inviteRole]);
+    showSnack(`Invite sent to ${email}.`);
+  }, [inviteEmail, showSnack]);
 
-  const removeTeamMember = useCallback(
-    (idx: number) => setTeam((p) => p.filter((_, i) => i !== idx)),
-    []
+  const setTeamRole = useCallback(
+    (id: string, role: TeamRole) => {
+      setTeam((p) => p.map((m) => (m.id === id ? { ...m, role } : m)));
+      const member = team.find((m) => m.id === id);
+      if (member) showSnack(`${member.name} is now ${role}.`);
+    },
+    [team, showSnack]
   );
+
+  const removeTarget = team.find((m) => m.id === removeTargetId) ?? null;
+
+  const resetRemoveFlow = useCallback(() => {
+    setRemoveTargetId(null);
+    setRemovePassword("");
+    setRemoveAck(false);
+    setRemoveError("");
+  }, []);
+
+  const startRemoveTeamMember = useCallback((id: string) => {
+    setRemoveTargetId(id);
+    setRemovePassword("");
+    setRemoveAck(false);
+    setRemoveError("");
+  }, []);
+
+  const setRemovePasswordValue = useCallback((v: string) => {
+    setRemovePassword(v);
+    setRemoveError("");
+  }, []);
+
+  const toggleRemoveAck = useCallback(() => {
+    setRemoveAck((v) => !v);
+    setRemoveError("");
+  }, []);
+
+  const confirmRemoveTeamMember = useCallback(() => {
+    if (!removeTarget) return;
+    // Mock auth: any password of a plausible length passes, except one demo
+    // value kept around so the error state is reachable without a backend.
+    if (removePassword.length < 6) {
+      setRemoveError("Enter your account password to continue.");
+      return;
+    }
+    if (removePassword === "wrongpass") {
+      setRemoveError("That password doesn't match our records.");
+      return;
+    }
+    if (!removeAck) {
+      setRemoveError("Tick the box to confirm you understand.");
+      return;
+    }
+    setTeam((p) => p.filter((m) => m.id !== removeTarget.id));
+    resetRemoveFlow();
+    showSnack(`${removeTarget.name} removed — access revoked and the platform admin was notified.`);
+  }, [removeTarget, removePassword, removeAck, resetRemoveFlow, showSnack]);
 
   // ---- Reviews / inbox ----
   const setReviewReply = useCallback((id: string, value: string) => {
     setReviews((p) => p.map((r) => (r.id === id ? { ...r, reply: value } : r)));
   }, []);
-  const toggleReviewFlag = useCallback((id: string) => {
-    setReviews((p) => p.map((r) => (r.id === id ? { ...r, flagged: !r.flagged } : r)));
-  }, []);
+  const toggleReviewFlag = useCallback(
+    (id: string) => {
+      const wasFlagged = reviews.find((r) => r.id === id)?.flagged;
+      setReviews((p) => p.map((r) => (r.id === id ? { ...r, flagged: !r.flagged } : r)));
+      showSnack(wasFlagged ? "Report withdrawn." : "Review reported to Trust & Safety.");
+    },
+    [reviews, showSnack]
+  );
   /** Publishes the composer draft as the public reply guests see. */
-  const sendReviewReply = useCallback((id: string) => {
-    const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    setReviews((p) =>
-      p.map((r) =>
-        r.id === id && r.reply.trim()
-          ? { ...r, posted: r.reply.trim(), postedWhen: today, reply: "" }
-          : r
-      )
-    );
-  }, []);
+  const sendReviewReply = useCallback(
+    (id: string) => {
+      const target = reviews.find((r) => r.id === id);
+      if (!target?.reply.trim()) {
+        showSnack("Write a reply first.");
+        return;
+      }
+      const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      setReviews((p) =>
+        p.map((r) =>
+          r.id === id && r.reply.trim()
+            ? { ...r, posted: r.reply.trim(), postedWhen: today, reply: "" }
+            : r
+        )
+      );
+      showSnack(target.posted ? "Reply updated." : "Reply posted publicly.");
+    },
+    [reviews, showSnack]
+  );
   /** Moves the posted reply back into the composer for another pass. */
   const editPostedReply = useCallback((id: string) => {
     setReviews((p) =>
       p.map((r) => (r.id === id ? { ...r, reply: r.posted, posted: "", postedWhen: "" } : r))
     );
   }, []);
-  const deletePostedReply = useCallback((id: string) => {
-    setReviews((p) => p.map((r) => (r.id === id ? { ...r, posted: "", postedWhen: "" } : r)));
-  }, []);
+  const deletePostedReply = useCallback(
+    (id: string) => {
+      setReviews((p) => p.map((r) => (r.id === id ? { ...r, posted: "", postedWhen: "" } : r)));
+      showSnack("Reply removed.");
+    },
+    [showSnack]
+  );
   const toggleInboxItem = useCallback((id: string) => {
     setInbox((p) => p.map((m) => (m.id === id ? { ...m, open: !m.open } : m)));
   }, []);
@@ -1178,14 +1316,23 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
 
       team,
       activity: MOCK_ACTIVITY,
-      inviteName,
       inviteEmail,
-      inviteRole,
-      setInviteName,
       setInviteEmail,
-      setInviteRole,
-      addTeamMember,
-      removeTeamMember,
+      sendInvite,
+      setTeamRole,
+      removeTarget,
+      removePassword,
+      removeAck,
+      removeError,
+      startRemoveTeamMember,
+      setRemovePassword: setRemovePasswordValue,
+      toggleRemoveAck,
+      cancelRemoveTeamMember: resetRemoveFlow,
+      confirmRemoveTeamMember,
+
+      snack,
+      showSnack,
+      dismissSnack,
 
       reviews,
       setReviewReply,
@@ -1238,7 +1385,10 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       perfVenueFilter, perfEventId, setPerfVenueFilter,
       push, setPushMessage, sendPush, promos, addPromo, updatePromo, removePromo, perks, updatePerk,
       boost, setBoostNight, toggleBoost,
-      team, inviteName, inviteEmail, inviteRole, addTeamMember, removeTeamMember,
+      team, inviteEmail, sendInvite, setTeamRole,
+      removeTarget, removePassword, removeAck, removeError, startRemoveTeamMember,
+      setRemovePasswordValue, toggleRemoveAck, resetRemoveFlow, confirmRemoveTeamMember,
+      snack, showSnack, dismissSnack,
       reviews, setReviewReply, toggleReviewFlag, sendReviewReply, editPostedReply,
       deletePostedReply, inbox, toggleInboxItem, hasUnreadInbox,
       accountEmail, accountPhone, changeField, changeStage, changeValue, changeOtp, changeError,

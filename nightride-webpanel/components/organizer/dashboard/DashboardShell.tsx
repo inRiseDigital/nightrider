@@ -6,12 +6,14 @@ import { Button } from "@/components/admin/ui/Button";
 import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { Snackbar } from "./ui/Snackbar";
 
 /**
  * Sidebar + topbar chrome shared by every organizer dashboard route.
  *
- * The remove-image confirmation lives here rather than in `ImageSlot` so a
- * single dialog serves every slot on the page, matching the design.
+ * The remove-image confirmation and the snackbar live here rather than in the
+ * sections so a single instance of each serves every destination, matching the
+ * design.
  */
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -49,6 +51,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           This can&apos;t be undone. The photo will be removed from your venue listing.
         </p>
       </Modal>
+
+      <Snackbar />
     </div>
   );
 }

@@ -5,6 +5,9 @@ import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { pct } from "@/lib/organizer/dashboard/format";
 import { FieldLabel, SlimInput, SlimTextarea } from "../ui/Primitives";
 
+/** Push copy budget — the count is advisory, matching the design. */
+const PUSH_MAX_CHARS = 140;
+
 export function PromotionSection() {
   const {
     push,
@@ -29,7 +32,7 @@ export function PromotionSection() {
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <FieldLabel>Push to users who favourited your clubs</FieldLabel>
           <span className="font-mono text-[11px] text-[var(--m3-onv)]">
-            {push.rateUsed} of {push.rateMax} pushes this month
+            {push.rateMax - push.rateUsed} of {push.rateMax} pushes left this week
           </span>
         </div>
         <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[var(--m3-surf2)]">
@@ -44,17 +47,27 @@ export function PromotionSection() {
           placeholder="Free entry before midnight — see you tonight."
           className="min-h-[60px] w-full"
         />
-        <button
-          onClick={sendPush}
-          disabled={pushLimited}
-          className={`mt-2.5 rounded-lg border px-4 py-2.5 text-xs font-semibold transition-colors ${
-            pushLimited
-              ? "cursor-not-allowed border-[var(--m3-outlinev)] text-[var(--m3-outline)]"
-              : "border-[var(--m3-pri)] bg-[var(--m3-pri)] text-[var(--m3-on)] hover:bg-[var(--m3-pric)]"
-          }`}
-        >
-          {pushLimited ? "Limit Reached" : "Send Push"}
-        </button>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span
+            className="font-mono text-xs"
+            style={{
+              color: push.message.length > PUSH_MAX_CHARS ? "var(--m3-err)" : "var(--m3-onv)",
+            }}
+          >
+            {push.message.length}/{PUSH_MAX_CHARS}
+          </span>
+          <button
+            onClick={sendPush}
+            disabled={pushLimited}
+            className={`rounded-lg border px-4 py-2.5 text-xs font-semibold transition-colors ${
+              pushLimited
+                ? "cursor-not-allowed border-[var(--m3-outlinev)] text-[var(--m3-outline)]"
+                : "border-[var(--m3-pri)] bg-[var(--m3-pri)] text-[var(--m3-on)] hover:bg-[var(--m3-pric)]"
+            }`}
+          >
+            {pushLimited ? "Limit Reached" : "Send Push"}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">

@@ -54,6 +54,7 @@ export function SettingsSection() {
     cancelChangeField,
     submitNewValue,
     submitOtp,
+    showSnack,
   } = useOrganizerDashboard();
 
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
@@ -101,7 +102,10 @@ export function SettingsSection() {
             rejoin.
           </p>
           <button
-            onClick={() => setRemovalRequested(true)}
+            onClick={() => {
+              setRemovalRequested(true);
+              showSnack("Removal request sent to platform admin.");
+            }}
             disabled={removalRequested}
             className="mt-2 rounded-full px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-60"
             style={{ background: removalRequested ? "var(--m3-outline)" : "#dc2626" }}

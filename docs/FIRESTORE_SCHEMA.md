@@ -299,11 +299,29 @@ users/{uid}/chat_sessions/{sessionId}/messages/{messageId} {
   text: string
   at: Timestamp
 }
+
+users/{uid}/inbox/{messageId} {
+  subject, from: string
+  type: 'policy' | 'violation' | 'appeal'
+  body: string
+  venueId: string
+  at: Timestamp                      // == request.time, enforced
+  readAt: Timestamp | null
+}
 ```
 
 Messages are a subcollection, not an array on the session document: an inline
 array grows without bound against the 1 MiB document limit and rewrites the
 whole document on every turn.
+
+`inbox` is scoped to the person, not to the venue a message is about, even
+though every message here originates from something an admin did to a venue
+the organizer edits. That's deliberate: the topbar shows one inbox with one
+unread dot across every venue an organizer touches, and scoping by person
+means `isSelf(uid)` authorizes read/update with zero venue lookups, rather than
+a fan-in across every venue the organizer has a role on. Admin-create,
+recipient update limited to `onlyTouched(['readAt'])` — the organizer can mark
+a message read and nothing else.
 
 Writes to `chat_sessions` require a verified email. The Auth emulator creates
 accounts with `emailVerified: false`, so local seed data must set it explicitly
@@ -568,9 +586,170 @@ activity entry in the same batch as the mutation itself. This is
 accountability among teammates — "who changed my venue, and when" — not a
 tamper-proof ledger; an editor with write access to the venue also has write
 access to their own activity trail. It also grows unbounded, the same way
-`logs` would without pruning, so it needs its own retention: entries older
-than 180 days join the scheduled sweep (see Retention, below) as a named
-follow-up.
+`logs` would without pruning, so it needs its own retention: pruning
+`venues/*/activity` older than 180 days is a named follow-up, not something the
+existing Retention pipeline (below) already does — that pipeline deletes Cloud
+Storage objects, not Firestore documents, and pointing at it as if it already
+covered this would overstate what's built.
+
+### venues/{venueId}/menuSections/{sectionId}
+
+```
+venues/{venueId}/menuSections/{sectionId} {
+  name: string
+  order: number
+  items: [{ id, name, price, desc, size, serves: string|number, tags: string[],
+            nights: string[], soldOut: bool, image: string }]           // <= 100
+  updatedAt: Timestamp
+}
+```
+
+This is the subcollection the `live`-as-a-map paragraph above promises: the
+menu is read only by the venue-detail view a user has already opened, so a
+subcollection there costs 1+N on a screen that was going to make a request
+anyway, and it keeps a payload that can run to hundreds of items off the
+50-document Live Hub list entirely. Editing one section rewrites one document
+instead of the whole menu.
+
+### venues/{venueId}/metrics/{periodId}
+
+```
+venues/{venueId}/metrics/{periodId} {
+  attendance: {...}
+  funnel: {...}                      // stage counts only
+  topNights: [{...}]
+  updatedAt: Timestamp
+}
+```
+
+This is the subcollection the `stats` reversal above promises. `periodId` is
+deterministic — `last30` or `YYYY-Www` — rather than an auto-id, so the
+dashboard reads one document by a known path: zero queries, zero indexes.
+Only absolute counts are stored. The UI's `FunnelStage.width` (`"64%"`) and
+`value` (`"14,300"`) are presentation the panel derives from the counts at
+render time, and `TopNight.date` (`"Aug 8"`) becomes `at: Timestamp` here — a
+percentage string or a formatted date string is a rendering decision, and
+storing one would mean storing an answer that goes stale the moment the
+denominator changes. If no producer has ever written a period's document, the
+period is simply absent and the panel shows an empty state for it, the same
+structural-absence pattern `venues.live` uses.
+
+### venues/{venueId}/aiVisibility/current
+
+```
+venues/{venueId}/aiVisibility/current {
+  score: number                      // 0..100
+  prompts: [{ prompt: string, weeklyAsks: number, rank: number | null }]
+  tips: string[]
+  updatedAt: Timestamp
+}
+```
+
+`rank: null` means the venue is not shown for that prompt at all; the panel
+derives the `"#1"` / `"Not shown"` text and the colour band from `rank`, not
+the other way around. Absent when no producer has run, same as `metrics`.
+
+### venues/{venueId}/promotions/{promoId}, pushCampaigns, promoState, boosts, rankPerks
+
+```
+venues/{venueId}/promotions/{promoId}     { ..., used: number }
+venues/{venueId}/pushCampaigns/{campaignId} { ..., status: 'queued' | ... }
+venues/{venueId}/promoState/current       { ... }             // display state only
+venues/{venueId}/boosts/{boostId}         { ..., status: 'pending' | ... }
+venues/{venueId}/rankPerks/current        { ... }
+```
+
+The push rate limit is not rules-enforceable, and this is stated plainly rather
+than implied: rules cannot count documents, and nothing in rules can *mandate*
+that a `pushCampaigns` create be accompanied by a matching `promoState`
+increment. So a campaign create is shape-validated only (`status: 'queued'`),
+and the FCM fanout function enforces the real limit before anything sends.
+`promoState/current` is display state the organizer cannot write at all — it
+reflects what the function has already done. A limit that merely looks
+enforced by rules, and isn't, would be worse than this honest note.
+`promotions` allow create with `used == 0` and pin `used` on every later
+update; `boosts` follow the same allow-create-with-initial-state shape.
+`menuSections` and `rankPerks` are public read, since guests see both; the rest
+of this group is editor-read with `write: if false` — producer- or
+function-owned, not organizer-owned.
+
+### venues/{venueId}/team/{memberId}
+
+```
+venues/{venueId}/team/{memberId} {
+  uid: string | null                 // null until the invite is accepted
+  name, email, role: string
+  invitedBy: string
+  invitedAt, acceptedAt: Timestamp | null
+}
+```
+
+Client-write is denied outright; `/api/organizer/team` owns every mutation
+here (see Privilege model, above) because a single team change has to fan out
+atomically across this document, `venues.editors`/`.editorUids`, and
+`venueInvites`, and accepting an invite is chicken-and-egg — the invitee is not
+yet an editor and so cannot write `editorUids` to become one. Until that
+function exists, the dashboard reads a seeded roster.
+
+## venueEdits/{venueId}
+
+```
+venueEdits/{venueId} {                // document id IS the venue id
+  venueId: string
+  status: 'pending' | 'approved' | 'rejected'
+  listing: {...}                      // every venue listing field from above
+  submittedBy: string
+  submittedAt: Timestamp              // == request.time, enforced
+  reviewedBy: string | null
+  reviewedAt: Timestamp | null
+  note: string
+}
+```
+
+This is the reviewable draft for the listing fields on `venues` — `about`,
+`socialLinks`, `genres`, `hours`, and the rest — because those fields are
+denied on the venue document itself and can only be changed by going through
+here. The document id being the venue id, rather than an auto-id, is the whole
+design: saving a draft is one idempotent `setDoc`, discarding it is one
+`deleteDoc`, the admin review queue is a plain single-collection query
+(`status == 'pending'`), and the join back to the venue is free because the id
+already is the join key.
+
+Two alternatives were rejected on read cost and race behaviour respectively.
+A `pendingListing` map on the venue document was rejected because
+`live_hub_service.dart:28` runs `venues where countryCode == X limit 50` and
+Firestore transfers whole documents on a query — a 2-4 KB draft on every one of
+fifty venues is 100-200 KB of unreviewed draft riding along on every Live Hub
+load, on mobile data, for venues nobody is even looking at. A
+`venues/{id}/edits/{editId}` subcollection was rejected because the admin
+queue would then need a collection-group index plus parsing the venue id back
+out of the path, and auto-ids would let one venue have two concurrent drafts
+in flight, which makes "discard" and "which draft actually got approved"
+ambiguous. Resubmitting instead replaces the one draft in place and can never
+carry a verdict — an organizer never writes `status`, `reviewedBy`, or
+`reviewedAt`; approval is admin-only and copies `listing` onto the venue
+document.
+
+## venueInvites/{inviteId}
+
+```
+venueInvites/{inviteId} {
+  venueId, venueName: string
+  email: string
+  role: 'manager' | 'door'
+  invitedBy: string
+  invitedAt, expiresAt: Timestamp
+  acceptedAt: Timestamp | null
+  acceptedByUid: string | null
+}
+```
+
+Function-owned, same as `team`: client writes are denied, and
+`/api/organizer/team` is what creates and resolves invites as part of the
+atomic fan-out described above. The one thing a client may read directly is an
+invite addressed to it — `resource.data.email == request.auth.token.email` —
+so an invitee can see their own pending invite without needing editor access
+to the venue they haven't joined yet.
 
 ## venueReports/{reportId}
 

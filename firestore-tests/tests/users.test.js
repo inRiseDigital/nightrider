@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { createTestEnv, baseUser, uid } from './helpers.js';
+import { createTestEnv, baseUser, baseInboxMessage, uid } from './helpers.js';
 
 let testEnv;
 
@@ -280,6 +280,64 @@ describe('users/{uid}/chat_sessions (email-verification gate)', () => {
         text: 'hello',
         at: serverTimestamp(),
       }),
+    );
+  });
+});
+
+describe('users/{uid}/inbox/{messageId}', () => {
+  async function seedInbox(ownerUid, messageId, data) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `users/${ownerUid}/inbox/${messageId}`), data);
+    });
+  }
+
+  it('86a. self reads users/{uid}/inbox -> ALLOW', async () => {
+    const u = uid('u');
+    await seed({ [u]: baseUser() });
+    await seedInbox(u, 'm1', baseInboxMessage());
+    const ctx = testEnv.authenticatedContext(u);
+    await assertSucceeds(getDoc(doc(ctx.firestore(), `users/${u}/inbox/m1`)));
+  });
+
+  it('86b. self creates an inbox message -> DENY', async () => {
+    const u = uid('u');
+    await seed({ [u]: baseUser() });
+    const ctx = testEnv.authenticatedContext(u);
+    await assertFails(
+      setDoc(doc(ctx.firestore(), `users/${u}/inbox/m1`), baseInboxMessage({ at: serverTimestamp() })),
+    );
+  });
+
+  it('86c. admin creates an inbox message for another user -> ALLOW', async () => {
+    const admin = uid('admin');
+    const other = uid('u');
+    await seed({ [admin]: baseUser({ isAdmin: true }), [other]: baseUser() });
+    const ctx = testEnv.authenticatedContext(admin);
+    await assertSucceeds(
+      setDoc(
+        doc(ctx.firestore(), `users/${other}/inbox/m1`),
+        baseInboxMessage({ at: serverTimestamp() }),
+      ),
+    );
+  });
+
+  it('86d. self sets readAt -> ALLOW', async () => {
+    const u = uid('u');
+    await seed({ [u]: baseUser() });
+    await seedInbox(u, 'm1', baseInboxMessage());
+    const ctx = testEnv.authenticatedContext(u);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), `users/${u}/inbox/m1`), { readAt: serverTimestamp() }),
+    );
+  });
+
+  it('86e. self edits body -> DENY', async () => {
+    const u = uid('u');
+    await seed({ [u]: baseUser() });
+    await seedInbox(u, 'm1', baseInboxMessage());
+    const ctx = testEnv.authenticatedContext(u);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), `users/${u}/inbox/m1`), { body: 'Hacked' }),
     );
   });
 });

@@ -263,6 +263,9 @@ interface OrganizerDashboardValue {
   reviews: VenueReview[];
   setReviewReply: (id: string, value: string) => void;
   toggleReviewFlag: (id: string) => void;
+  sendReviewReply: (id: string) => void;
+  editPostedReply: (id: string) => void;
+  deletePostedReply: (id: string) => void;
   inbox: InboxMessage[];
   toggleInboxItem: (id: string) => void;
   hasUnreadInbox: boolean;
@@ -906,6 +909,26 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const toggleReviewFlag = useCallback((id: string) => {
     setReviews((p) => p.map((r) => (r.id === id ? { ...r, flagged: !r.flagged } : r)));
   }, []);
+  /** Publishes the composer draft as the public reply guests see. */
+  const sendReviewReply = useCallback((id: string) => {
+    const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    setReviews((p) =>
+      p.map((r) =>
+        r.id === id && r.reply.trim()
+          ? { ...r, posted: r.reply.trim(), postedWhen: today, reply: "" }
+          : r
+      )
+    );
+  }, []);
+  /** Moves the posted reply back into the composer for another pass. */
+  const editPostedReply = useCallback((id: string) => {
+    setReviews((p) =>
+      p.map((r) => (r.id === id ? { ...r, reply: r.posted, posted: "", postedWhen: "" } : r))
+    );
+  }, []);
+  const deletePostedReply = useCallback((id: string) => {
+    setReviews((p) => p.map((r) => (r.id === id ? { ...r, posted: "", postedWhen: "" } : r)));
+  }, []);
   const toggleInboxItem = useCallback((id: string) => {
     setInbox((p) => p.map((m) => (m.id === id ? { ...m, open: !m.open } : m)));
   }, []);
@@ -1075,6 +1098,9 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       reviews,
       setReviewReply,
       toggleReviewFlag,
+      sendReviewReply,
+      editPostedReply,
+      deletePostedReply,
       inbox,
       toggleInboxItem,
       hasUnreadInbox,
@@ -1120,7 +1146,8 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
       push, setPushMessage, sendPush, promos, addPromo, updatePromo, removePromo, perks, updatePerk,
       boost, setBoostNight, toggleBoost,
       team, inviteName, inviteEmail, inviteRole, addTeamMember, removeTeamMember,
-      reviews, setReviewReply, toggleReviewFlag, inbox, toggleInboxItem, hasUnreadInbox,
+      reviews, setReviewReply, toggleReviewFlag, sendReviewReply, editPostedReply,
+      deletePostedReply, inbox, toggleInboxItem, hasUnreadInbox,
       accountEmail, accountPhone, changeField, changeStage, changeValue, changeOtp, changeError,
       startChangeField, cancelChangeField, submitNewValue, submitOtp,
       images, setImage, confirmRemoveSlotId, requestRemoveImage, cancelRemoveImage,

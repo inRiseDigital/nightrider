@@ -176,7 +176,12 @@ export interface VenueReview {
   author: string;
   rating: number;
   text: string;
+  /** Draft text in the composer — becomes `posted` when sent. */
   reply: string;
+  /** The public reply guests see. Empty until one is sent. */
+  posted: string;
+  /** When `posted` was published, e.g. "Aug 6". Empty when nothing is posted. */
+  postedWhen: string;
   flagged: boolean;
 }
 

@@ -360,8 +360,10 @@ export const MOCK_REVIEWS: VenueReview[] = [
     id: "r1",
     author: "@mira_k",
     rating: 5,
-    text: "Best rooftop set of the summer.",
+    text: "Best rooftop set of the summer. Door was quick even at 1am and the terrace never felt packed.",
     reply: "",
+    posted: "Thank you Mira — Kalima is back on the decks the first Friday of every month.",
+    postedWhen: "Aug 6",
     flagged: false,
   },
   {
@@ -370,7 +372,9 @@ export const MOCK_REVIEWS: VenueReview[] = [
     rating: 1,
     text: "Obvious spam review with a promo link.",
     reply: "",
-    flagged: false,
+    posted: "",
+    postedWhen: "",
+    flagged: true,
   },
   {
     id: "r3",
@@ -378,6 +382,8 @@ export const MOCK_REVIEWS: VenueReview[] = [
     rating: 4,
     text: "Sound system needs work but great crowd.",
     reply: "",
+    posted: "",
+    postedWhen: "",
     flagged: false,
   },
 ];

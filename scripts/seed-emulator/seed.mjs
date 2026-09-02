@@ -19,6 +19,7 @@
 // See README.md for the full explanation.
 
 import admin from "firebase-admin";
+import { seedOrganizerAnalytics } from "./seed-organizer-analytics.mjs";
 
 // ── Safety rails ─────────────────────────────────────────────────────────────
 // This script must never be pointed at production by accident. If nothing in
@@ -185,6 +186,14 @@ const UID = {
   rejected: "seed-rejected-uid",
 };
 
+// Non-Auth teammate uids for the organizer dashboard's venue team — these
+// don't need real Auth accounts for seed purposes, only stable ids that
+// editorUids/editors/team can agree on.
+const TEAM_UID = {
+  manager: "seed-team-manager-uid",
+  door: "seed-team-door-uid",
+};
+
 const ACCOUNTS = [
   {
     key: "admin",
@@ -250,10 +259,45 @@ function venueGeo(key) {
   return { geo: geo(lat, lng), geohash: encodeGeohash(lat, lng, 9) };
 }
 
+function venueGeoLatLng(lat, lng) {
+  return { geo: geo(lat, lng), geohash: encodeGeohash(lat, lng, 9) };
+}
+
+const MOCK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Mirrors mock-data.ts's hours() helper: every day gets the same open/close,
+ * closedDays get closed:true. */
+function mockHours(closedDays, open, close) {
+  return MOCK_DAYS.map((day) => ({ day, closed: closedDays.includes(day), open, close }));
+}
+
 const VENUE_CREATED = T("2026-01-10T08:00:00Z");
 const VENUE_UPDATED = T("2026-08-10T21:00:00Z");
 
-const VENUES = [
+// IANA zone per city — small, hand-rolled, only covers the cities this seed
+// data actually uses (matches migrate.mjs's backfill logic in spirit).
+const CITY_TZ = {
+  Dubai: "Asia/Dubai",
+  Tokyo: "Asia/Tokyo",
+  London: "Europe/London",
+  Melbourne: "Australia/Melbourne",
+};
+
+/** Backfills editorUids/editors/capacity/timeZone on a venue fixture that
+ * doesn't already set them, mirroring migrate.mjs's production backfill so
+ * seed data is never a step behind what the migration guarantees. */
+function withVenueAuth(v) {
+  const ownerUid = typeof v.ownerUid === "string" && v.ownerUid ? v.ownerUid : null;
+  return {
+    ...v,
+    editorUids: v.editorUids ?? (ownerUid ? [ownerUid] : []),
+    editors: v.editors ?? (ownerUid ? { [ownerUid]: "owner" } : {}),
+    capacity: v.capacity ?? 0,
+    timeZone: v.timeZone ?? CITY_TZ[v.city] ?? "UTC",
+  };
+}
+
+const RAW_VENUES = [
   {
     id: "osm_374829102",
     name: "Base Dubai",
@@ -461,6 +505,174 @@ const VENUES = [
     status: "active",
     // No live map yet — the organizer hasn't set a door status.
   },
+
+  // ── Organizer dashboard fixtures ─────────────────────────────────────────
+  // Mirrors nightride-webpanel/lib/organizer/dashboard/mock-data.ts's
+  // MOCK_VENUES verbatim (names, numbers, strings) so the wired dashboard
+  // renders identically to the mock it replaces. `sirens` and `warehouse9`
+  // are MOCK_VENUE_ORDER; the third is a fresh, unverified organizer venue
+  // with no mock counterpart.
+  {
+    id: "sirens",
+    name: "Sirens Dubai",
+    ...venueGeoLatLng(25.0805, 55.1403),
+    type: "nightclub",
+    typeLabel: "Night Club",
+    city: "Dubai",
+    countryCode: "AE",
+    address: "Marina Walk, Dubai Marina, Dubai, UAE",
+    openingHours: "Th-Sa 22:00-04:00",
+    phone: "",
+    website: "",
+    photos: [
+      emulatorDownloadUrl("venuePhotos/sirens/hero.jpg"),
+      emulatorDownloadUrl("venuePhotos/sirens/gallery/1.jpg"),
+      emulatorDownloadUrl("venuePhotos/sirens/gallery/2.jpg"),
+      emulatorDownloadUrl("venuePhotos/sirens/gallery/3.jpg"),
+      emulatorDownloadUrl("venuePhotos/sirens/gallery/4.jpg"),
+    ],
+    source: "organizer",
+    osmId: null,
+    ownerUid: UID.organizer,
+    verified: true,
+    status: "active",
+    about:
+      "Rooftop techno and house on the Marina skyline. Open-air terrace, resident DJs Thu–Sat, and a strict door policy after 23:00.",
+    socialLinks: [
+      { network: "instagram", value: "@sirensdubai" },
+      { network: "tiktok", value: "@sirensdubai" },
+    ],
+    genres: ["Techno", "House"],
+    dressCode: "Smart Casual",
+    agePolicy: "21+",
+    cover: { min: 50, max: 150, currency: "AED" },
+    capacity: 450,
+    amenities: ["Rooftop", "Cloakroom"],
+    hours: mockHours(["Mon", "Tue"], "22:00", "04:00"),
+    exceptions: [{ label: "Eid Al Adha — Private Hire", date: "2026-08-19", closed: true }],
+    tableLink: "https://booking.sirensdubai.com/reserve",
+    editorUids: [UID.organizer, TEAM_UID.manager, TEAM_UID.door],
+    editors: { [UID.organizer]: "owner", [TEAM_UID.manager]: "manager", [TEAM_UID.door]: "door" },
+    verification: {
+      license: { status: "done", attempt: 1, note: "", reviewedAt: VENUE_UPDATED, reviewedBy: UID.admin },
+      gps: { status: "done", attempt: 1, note: "", reviewedAt: VENUE_UPDATED, reviewedBy: UID.admin },
+      video: { status: "done", attempt: 1, note: "", reviewedAt: VENUE_UPDATED, reviewedBy: UID.admin },
+    },
+    live: {
+      status: "open", // filling→open, capacity→soldOut, guestlist→vipOnly, open→open, closed→closed
+      doorStatus: "open",
+      crowdLevel: "packed", // 412/450 = 0.915 >= 0.90
+      queueStatus: "moderate", // 15 min is 11-30
+      ticketsAvailable: true,
+      tablesAvailable: true,
+      tonightDj: "DJ Kalima",
+      offer: "",
+      inVenue: 412,
+      queueMinutes: 15,
+      emergencyActive: false,
+      flash: { active: false, text: "Free entry before midnight", until: "23:59" },
+      updatedAt: VENUE_UPDATED,
+    },
+  },
+  {
+    id: "warehouse9",
+    name: "Warehouse 9",
+    ...venueGeoLatLng(35.6595, 139.7005),
+    type: "nightclub",
+    typeLabel: "Night Club",
+    city: "Tokyo",
+    countryCode: "JP",
+    address: "9 Chome, Shibuya, Tokyo, Japan",
+    openingHours: "Tu-Su 21:00-05:00",
+    phone: "",
+    website: "",
+    photos: [
+      emulatorDownloadUrl("venuePhotos/warehouse9/hero.jpg"),
+      emulatorDownloadUrl("venuePhotos/warehouse9/gallery/1.jpg"),
+      emulatorDownloadUrl("venuePhotos/warehouse9/gallery/2.jpg"),
+      emulatorDownloadUrl("venuePhotos/warehouse9/gallery/3.jpg"),
+      emulatorDownloadUrl("venuePhotos/warehouse9/gallery/4.jpg"),
+    ],
+    source: "organizer",
+    osmId: null,
+    ownerUid: UID.organizer,
+    verified: true,
+    status: "active",
+    about:
+      "Industrial main room built for deep house and techno. Outdoor terrace for smoke breaks, VIP tables on request.",
+    socialLinks: [{ network: "instagram", value: "@warehouse9tokyo" }],
+    genres: ["Deep House", "Techno", "Commercial"],
+    dressCode: "Casual",
+    agePolicy: "18+",
+    cover: { min: 2000, max: 4000, currency: "JPY" },
+    capacity: 600,
+    amenities: ["Smoking Area", "VIP Tables", "Outdoor Terrace"],
+    hours: mockHours(["Mon"], "21:00", "05:00"),
+    exceptions: [{ label: "Closed for Renovation", date: "2026-09-01", closed: true }],
+    tableLink: "",
+    editorUids: [UID.organizer, TEAM_UID.manager, TEAM_UID.door],
+    editors: { [UID.organizer]: "owner", [TEAM_UID.manager]: "manager", [TEAM_UID.door]: "door" },
+    verification: {
+      license: { status: "done", attempt: 1, note: "", reviewedAt: VENUE_UPDATED, reviewedBy: UID.admin },
+      gps: { status: "done", attempt: 1, note: "", reviewedAt: VENUE_UPDATED, reviewedBy: UID.admin },
+      video: { status: "done", attempt: 1, note: "", reviewedAt: VENUE_UPDATED, reviewedBy: UID.admin },
+    },
+    live: {
+      status: "open",
+      doorStatus: "open",
+      crowdLevel: "moderate", // 180/600 = 0.30
+      queueStatus: "short", // 5 min is 1-10
+      ticketsAvailable: true,
+      tablesAvailable: false,
+      tonightDj: "Resident Crew",
+      offer: "",
+      inVenue: 180,
+      queueMinutes: 5,
+      emergencyActive: false,
+      flash: null,
+      updatedAt: VENUE_UPDATED,
+    },
+  },
+  {
+    id: "neon-annex",
+    name: "Neon Fox Annex",
+    ...venueGeoLatLng(25.0879, 55.1494),
+    type: "bar",
+    typeLabel: "Lounge",
+    city: "Dubai",
+    countryCode: "AE",
+    address: "Business Bay, Dubai, UAE",
+    openingHours: "",
+    phone: "",
+    website: "",
+    photos: [],
+    source: "organizer",
+    osmId: null,
+    ownerUid: UID.organizer,
+    verified: false,
+    status: "active",
+    about: "",
+    socialLinks: [],
+    genres: [],
+    dressCode: "",
+    agePolicy: "",
+    cover: { min: 0, max: 0, currency: "AED" },
+    capacity: 0,
+    amenities: [],
+    hours: mockHours([], "20:00", "03:00"),
+    exceptions: [],
+    tableLink: "",
+    editorUids: [UID.organizer],
+    editors: { [UID.organizer]: "owner" },
+    verification: {
+      license: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null },
+      gps: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null },
+      video: { status: "active", attempt: 0, note: "", reviewedAt: null, reviewedBy: null },
+    },
+    // Deliberately no `live` map — this venue has never gone through admin
+    // verification, so the organizer's editor unlocks but the app preview
+    // and door-status controls do not.
+  },
 ];
 
 const VENUE_ID = {
@@ -472,7 +684,12 @@ const VENUE_ID = {
   ministryOfSound: "osm_812345842",
   revolverUpstairs: "admin-revolver-upstairs",
   sunsetRooftopMelbourne: "admin-sunset-rooftop-melbourne",
+  sirens: "sirens",
+  warehouse9: "warehouse9",
+  neonAnnex: "neon-annex",
 };
+
+const VENUES = RAW_VENUES.map(withVenueAuth);
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
@@ -948,6 +1165,16 @@ function baseEvent(overrides) {
     status: "published",
     source: "admin",
     organizerUid: null,
+    // `live` is never stored — derived at render from status/startAt/endAt.
+    scheduledPublish: null, // required non-null iff status == 'scheduled'
+    cancelReason: "", // required non-empty iff status == 'cancelled'
+    notifyOnChange: true,
+    recurring: false,
+    recurrenceLabel: "",
+    posterImage: "", // coverImage stays the card hero
+    tickets: { currency: "USD", tiers: [] },
+    moderation: { flag: "", requestedAt: null, eta: null, reviewedBy: null, note: "" },
+    sales: { sold: 0, gross: 0, currency: "USD", updatedAt: null }, // null == no producer has run
     createdAt: EVENT_CREATED,
     updatedAt: EVENT_UPDATED,
     ...overrides,
@@ -1242,6 +1469,104 @@ const EVENTS = [
     status: "published",
     source: "scraped",
   }),
+
+  // ── Organizer dashboard fixtures (sirens / warehouse9) ───────────────────
+  // Mirror nightride-webpanel's MOCK_EVENTS verbatim (e1-e4), plus one
+  // cancelled event with a reason (not in the mock — exercises the new
+  // status). `price` is the client-derived min/max/isFree over `tickets.tiers`.
+  baseEvent({
+    id: "e1",
+    name: "Full Moon Rooftop",
+    description: "",
+    ...venueFields("sirens"),
+    startAt: T("2026-08-08T22:00:00+04:00"),
+    endAt: T("2026-08-09T04:00:00+04:00"),
+    price: { min: 80, max: 120, currency: "AED", isFree: false },
+    performers: [
+      { name: "DJ Kalima", type: "DJ", bio: "" },
+      { name: "Nyx", type: "DJ", bio: "" },
+    ],
+    tickets: {
+      currency: "AED",
+      tiers: [
+        { name: "Early Bird", price: 80, qty: 100 },
+        { name: "General", price: 120, qty: 300 },
+      ],
+    },
+    sales: { sold: 268, gross: 21440, currency: "AED", updatedAt: EVENT_UPDATED },
+    moderation: { flag: "clean", requestedAt: EVENT_CREATED, eta: null, reviewedBy: UID.admin, note: "" },
+    notifyOnChange: true,
+    status: "published",
+    source: "organizer",
+    organizerUid: UID.organizer,
+  }),
+  baseEvent({
+    id: "e2",
+    name: "Techno Fridays",
+    description: "",
+    ...venueFields("warehouse9"),
+    startAt: T("2026-08-14T23:00:00+09:00"),
+    endAt: T("2026-08-15T05:00:00+09:00"),
+    price: { min: 3000, max: 3000, currency: "JPY", isFree: false },
+    performers: [{ name: "Resident Crew", type: "DJ", bio: "" }],
+    tickets: { currency: "JPY", tiers: [{ name: "Door", price: 3000, qty: 400 }] },
+    sales: { sold: 112, gross: 336000, currency: "JPY", updatedAt: EVENT_UPDATED },
+    moderation: { flag: "clean", requestedAt: EVENT_CREATED, eta: null, reviewedBy: UID.admin, note: "" },
+    recurring: true,
+    recurrenceLabel: "Every Friday",
+    notifyOnChange: true,
+    status: "published",
+    source: "organizer",
+    organizerUid: UID.organizer,
+  }),
+  baseEvent({
+    id: "e3",
+    name: "Sunset to Sunrise",
+    description: "",
+    ...venueFields("sirens"),
+    startAt: T("2026-08-16T20:00:00+04:00"),
+    endAt: T("2026-08-17T06:00:00+04:00"),
+    price: { min: 100, max: 100, currency: "AED", isFree: false },
+    performers: [{ name: "Anya Frost", type: "DJ", bio: "" }],
+    tickets: { currency: "AED", tiers: [{ name: "General", price: 100, qty: 250 }] },
+    moderation: {
+      flag: "pending",
+      requestedAt: T("2026-08-05T12:00:00Z"),
+      eta: T("2026-08-05T14:00:00Z"),
+      reviewedBy: null,
+      note: "",
+    },
+    notifyOnChange: true,
+    status: "in_review",
+    source: "organizer",
+    organizerUid: UID.organizer,
+  }),
+  baseEvent({
+    id: "e4",
+    name: "Members Only: Vol. 3",
+    description: "",
+    ...venueFields("warehouse9"),
+    startAt: T("2026-08-22T22:00:00+09:00"),
+    endAt: T("2026-08-23T05:00:00+09:00"),
+    scheduledPublish: T("2026-08-19T18:00:00+09:00"),
+    notifyOnChange: true,
+    status: "scheduled",
+    source: "organizer",
+    organizerUid: UID.organizer,
+  }),
+  baseEvent({
+    id: "e5",
+    name: "Ladies Night Vol. 4",
+    description: "",
+    ...venueFields("sirens"),
+    startAt: T("2026-08-21T22:00:00+04:00"),
+    endAt: T("2026-08-22T04:00:00+04:00"),
+    cancelReason: "Venue double-booked for a private buyout.",
+    notifyOnChange: true,
+    status: "cancelled",
+    source: "organizer",
+    organizerUid: UID.organizer,
+  }),
 ];
 
 // Fake "fan" uids used only to populate interested/upvote marker
@@ -1347,6 +1672,225 @@ const VENUE_REPORTS = Array.from({ length: 20 }, (_, i) => {
   };
 });
 
+// Two extra reports on the organizer's own venue exercising the new reply /
+// flaggedByOwner fields from the appended spec (A3 venueReports).
+const EXTRA_VENUE_REPORTS = [
+  {
+    id: "report-21",
+    venueId: VENUE_ID.sirens,
+    uid: "seed-fan-01",
+    username: "@mira_k",
+    avatarUrl: "",
+    city: "Dubai",
+    countryCode: "AE",
+    tag: "vibe",
+    vibeRating: 5,
+    comment: "Best rooftop set of the summer. Door was quick even at 1am.",
+    reply: { text: "Thank you! Kalima is back the first Friday of every month.", byUid: UID.organizer, byName: "Rana Aziz", at: T("2026-08-06T10:00:00Z") },
+    flaggedByOwner: false,
+    upvoteCount: 3,
+    upvoters: ["seed-fan-02", "seed-fan-03", "seed-fan-04"],
+    createdAt: T("2026-08-05T20:00:00Z"),
+  },
+  {
+    id: "report-22",
+    venueId: VENUE_ID.sirens,
+    uid: "seed-fan-02",
+    username: "@johndoe22",
+    avatarUrl: "",
+    city: "Dubai",
+    countryCode: "AE",
+    tag: "safety",
+    vibeRating: 1,
+    comment: "Obvious spam review with a promo link.",
+    reply: null,
+    flaggedByOwner: true,
+    upvoteCount: 0,
+    upvoters: [],
+    createdAt: T("2026-08-06T09:00:00Z"),
+  },
+];
+
+const ALL_VENUE_REPORTS = [...VENUE_REPORTS, ...EXTRA_VENUE_REPORTS];
+
+// ── Organizer dashboard: venueEdits, subcollections, inbox, analytics ────────
+
+const VENUE_EDITS = [
+  {
+    // Document id IS the venue id — the reviewable listing draft.
+    venueId: VENUE_ID.sirens,
+    status: "pending",
+    listing: {
+      about:
+        "Rooftop techno and house on the Marina skyline. Open-air terrace, resident DJs Thu–Sat, and a strict door policy after 23:00. Now serving a late-night tapas menu.",
+      socialLinks: [
+        { network: "instagram", value: "@sirensdubai" },
+        { network: "tiktok", value: "@sirensdubai" },
+      ],
+      genres: ["Techno", "House"],
+      dressCode: "Smart Casual",
+      agePolicy: "21+",
+      cover: { min: 50, max: 150, currency: "AED" },
+      capacity: 450,
+      amenities: ["Rooftop", "Cloakroom", "Late-night kitchen"],
+      hours: mockHours(["Mon", "Tue"], "22:00", "04:00"),
+      exceptions: [{ label: "Eid Al Adha — Private Hire", date: "2026-08-19", closed: true }],
+      photos: [
+        emulatorDownloadUrl("venuePhotos/sirens/hero.jpg"),
+        emulatorDownloadUrl("venuePhotos/sirens/gallery/1.jpg"),
+        emulatorDownloadUrl("venuePhotos/sirens/gallery/2.jpg"),
+        emulatorDownloadUrl("venuePhotos/sirens/gallery/3.jpg"),
+        emulatorDownloadUrl("venuePhotos/sirens/gallery/4.jpg"),
+      ],
+      timeZone: "Asia/Dubai",
+    },
+    submittedBy: TEAM_UID.manager,
+    submittedAt: T("2026-08-10T09:00:00Z"),
+    reviewedBy: null,
+    reviewedAt: null,
+    note: "",
+  },
+];
+
+const MENU_SECTIONS = {
+  sirens: [
+    {
+      id: "ms1",
+      name: "Bottle service & tables",
+      order: 0,
+      items: [
+        { id: "mi1", name: "Skyline table — Grey Goose", price: 3200, desc: "Reserved terrace table with skyline view, two mixers per bottle.", size: "1.5L magnum", serves: "6", tags: ["Signature"], nights: [4, 5], soldOut: false, image: emulatorDownloadUrl("venuePhotos/sirens/menu/0.jpg") },
+        { id: "mi2", name: "Dom Pérignon 2013", price: 2900, desc: "Served with sparklers on request.", size: "75cl", serves: "4", tags: [], nights: [], soldOut: false, image: "" },
+        { id: "mi3", name: "Booth minimum — main deck", price: 1500, desc: "Minimum spend, redeemable against anything on the menu.", size: "", serves: "8", tags: [], nights: [3, 4, 5], soldOut: true, image: "" },
+      ],
+      updatedAt: VENUE_UPDATED,
+    },
+    {
+      id: "ms2",
+      name: "Cocktails",
+      order: 1,
+      items: [
+        { id: "mi4", name: "Marasi Spritz", price: 75, desc: "Aperol, cava, blood orange, rosemary smoke.", size: "", serves: "", tags: ["Signature"], nights: [], soldOut: false, image: "" },
+        { id: "mi5", name: "Sober Sunset", price: 45, desc: "Seedlip, passionfruit, lime, soda.", size: "", serves: "", tags: ["Alcohol-free", "New"], nights: [], soldOut: false, image: "" },
+      ],
+      updatedAt: VENUE_UPDATED,
+    },
+    {
+      id: "ms3",
+      name: "Food",
+      order: 2,
+      items: [
+        { id: "mi6", name: "Wagyu sliders (3)", price: 95, desc: "Truffle mayo, aged cheddar, brioche.", size: "", serves: "2", tags: ["Halal"], nights: [], soldOut: false, image: "" },
+        { id: "mi7", name: "Charred padrón peppers", price: 40, desc: "Sea salt, lemon.", size: "", serves: "", tags: ["Vegan"], nights: [], soldOut: false, image: "" },
+      ],
+      updatedAt: VENUE_UPDATED,
+    },
+    {
+      id: "ms4",
+      name: "Happy hour",
+      order: 3,
+      items: [
+        { id: "mi8", name: "Two-for-one house pours", price: 55, desc: "House spirits and wines by the glass.", size: "", serves: "", tags: [], nights: [3, 4], soldOut: false, image: "" },
+      ],
+      updatedAt: VENUE_UPDATED,
+    },
+  ],
+  warehouse9: [
+    {
+      id: "mw1",
+      name: "Bar",
+      order: 0,
+      items: [
+        { id: "mwi1", name: "Beer bucket", price: 4500, desc: "Five bottles on ice.", size: "5 × 33cl", serves: "3", tags: [], nights: [5, 6], soldOut: false, image: emulatorDownloadUrl("venuePhotos/warehouse9/menu/0.jpg") },
+        { id: "mwi2", name: "Espresso martini", price: 1800, desc: "Double shot, house cold brew.", size: "", serves: "", tags: ["Signature"], nights: [], soldOut: false, image: "" },
+      ],
+      updatedAt: VENUE_UPDATED,
+    },
+    {
+      id: "mw2",
+      name: "Late food",
+      order: 1,
+      items: [
+        { id: "mwi3", name: "Loaded fries", price: 1200, desc: "Served until 04:00 from the yard hatch.", size: "", serves: "2", tags: ["Vegan"], nights: [], soldOut: false, image: "" },
+      ],
+      updatedAt: VENUE_UPDATED,
+    },
+  ],
+};
+
+const ACTIVITY = {
+  sirens: [
+    { actorUid: UID.organizer, actorName: "Rana Aziz", what: "Set live status to Filling Up (Sirens Dubai)", targetType: "venue", targetId: VENUE_ID.sirens, at: T("2026-08-04T23:10:00Z") },
+    { actorUid: TEAM_UID.manager, actorName: "Marco Reyes", what: "Changed Sunset to Sunrise price tier", targetType: "event", targetId: "e3", at: T("2026-08-05T14:02:00Z") },
+    { actorUid: TEAM_UID.door, actorName: "Leila Haddad", what: "Marked Booth minimum sold out", targetType: "menuItem", targetId: "mi3", at: T("2026-08-05T21:30:00Z") },
+    { actorUid: UID.organizer, actorName: "Rana Aziz", what: "Replied to a review from @mira_k", targetType: "venueReport", targetId: "report-21", at: T("2026-08-06T10:00:00Z") },
+  ],
+  warehouse9: [
+    { actorUid: TEAM_UID.manager, actorName: "Marco Reyes", what: "Published Techno Fridays (Aug 14)", targetType: "event", targetId: "e2", at: T("2026-08-02T09:44:00Z") },
+    { actorUid: TEAM_UID.door, actorName: "Leila Haddad", what: "Scheduled Members Only: Vol. 3 for Aug 19 publish", targetType: "event", targetId: "e4", at: T("2026-08-03T11:00:00Z") },
+  ],
+};
+
+const TEAM = {
+  sirens: [
+    { id: "tm1", uid: UID.organizer, name: "Rana Aziz", email: "rana@sirensdubai.com", role: "owner", invitedBy: null, invitedAt: T("2026-01-10T08:00:00Z"), acceptedAt: T("2026-01-10T08:00:00Z") },
+    { id: "tm2", uid: TEAM_UID.manager, name: "Marco Reyes", email: "marco@sirensdubai.com", role: "manager", invitedBy: UID.organizer, invitedAt: T("2026-02-01T08:00:00Z"), acceptedAt: T("2026-02-02T09:00:00Z") },
+    { id: "tm3", uid: TEAM_UID.door, name: "Leila Haddad", email: "leila@sirensdubai.com", role: "door", invitedBy: UID.organizer, invitedAt: T("2026-02-10T08:00:00Z"), acceptedAt: T("2026-02-11T10:00:00Z") },
+  ],
+};
+
+const VENUE_INVITES = [
+  {
+    id: "invite-01",
+    venueId: VENUE_ID.warehouse9,
+    venueName: "Warehouse 9",
+    email: "kenji@warehouse9tokyo.jp",
+    role: "door",
+    invitedBy: UID.organizer,
+    invitedAt: T("2026-08-09T08:00:00Z"),
+    expiresAt: T("2026-08-23T08:00:00Z"),
+    acceptedAt: null,
+    acceptedByUid: null,
+  },
+];
+
+const ORGANIZER_INBOX = [
+  {
+    id: "m1",
+    subject: "Photo policy reminder",
+    from: "Trust & Safety",
+    type: "policy",
+    body: "Hero images must show the actual venue interior or entrance — stock photos will be removed.",
+    venueId: VENUE_ID.sirens,
+    at: T("2026-08-03T09:00:00Z"),
+    readAt: T("2026-08-03T10:00:00Z"),
+  },
+  {
+    id: "m2",
+    subject: "Event flagged for review: Sunset to Sunrise",
+    from: "Content Review",
+    type: "violation",
+    body: "Automated scan flagged the lineup name for duplicate-event review. ETA ~2h.",
+    venueId: VENUE_ID.sirens,
+    at: T("2026-08-05T12:00:00Z"),
+    readAt: null, // the one unread message
+  },
+  {
+    id: "m3",
+    subject: "Appeal decision: Warehouse 9 listing",
+    from: "Trust & Safety",
+    type: "appeal",
+    body: "Your appeal was upheld — the listing has been reinstated.",
+    venueId: VENUE_ID.warehouse9,
+    at: T("2026-07-29T09:00:00Z"),
+    readAt: T("2026-07-29T15:00:00Z"),
+  },
+];
+
+// Metrics, aiVisibility, and the promotion trio (promotions/boosts/
+// pushCampaigns/promoState/rankPerks) live in seed-organizer-analytics.mjs —
+// see seedOrganizerAnalytics() below, called from main().
+
 // ── Logs (6) ──────────────────────────────────────────────────────────────────
 
 const LOGS = [
@@ -1408,16 +1952,38 @@ const LOGS = [
 
 // ── Wipe ──────────────────────────────────────────────────────────────────────
 
+const WIPED_COLLECTIONS = [
+  "users",
+  "venues",
+  "events",
+  "venueReports",
+  "logs",
+  "venueEdits",
+  "venueInvites",
+];
+
 async function wipeAll() {
-  console.log("Wiping collections this script owns (users, venues, events, venueReports, logs)...");
-  for (const name of ["users", "venues", "events", "venueReports", "logs"]) {
+  console.log(`Wiping collections this script owns (${WIPED_COLLECTIONS.join(", ")})...`);
+  for (const name of WIPED_COLLECTIONS) {
     await db.recursiveDelete(db.collection(name));
   }
+  // recursiveDelete already handles venue subcollections (menuSections,
+  // activity, team, promotions, pushCampaigns, promoState, boosts,
+  // rankPerks, aiVisibility, metrics) for free — nothing new to add there.
   await bucket
     .deleteFiles({ prefix: "avatars/" })
     .catch(() => {});
   await bucket
     .deleteFiles({ prefix: "kyc/" })
+    .catch(() => {});
+  await bucket
+    .deleteFiles({ prefix: "venuePhotos/" })
+    .catch(() => {});
+  await bucket
+    .deleteFiles({ prefix: "eventMedia/" })
+    .catch(() => {});
+  await bucket
+    .deleteFiles({ prefix: "venueKyc/" })
     .catch(() => {});
   console.log("Wipe complete.\n");
 }
@@ -1538,17 +2104,17 @@ async function seedEvents() {
 }
 
 async function seedVenueReports() {
-  console.log(`Writing ${VENUE_REPORTS.length} venue reports...`);
+  console.log(`Writing ${ALL_VENUE_REPORTS.length} venue reports...`);
   const batch = db.batch();
-  for (const r of VENUE_REPORTS) {
+  for (const r of ALL_VENUE_REPORTS) {
     const { id, upvoters, ...data } = r;
-    batch.set(db.collection("venueReports").doc(id), data);
+    batch.set(db.collection("venueReports").doc(id), { reply: null, flaggedByOwner: false, ...data });
   }
   await batch.commit();
 
   console.log("Writing venueReports/{id}/upvotes marker docs...");
   const upvoteBatch = db.batch();
-  for (const r of VENUE_REPORTS) {
+  for (const r of ALL_VENUE_REPORTS) {
     for (const voterUid of r.upvoters) {
       upvoteBatch.set(
         db.collection("venueReports").doc(r.id).collection("upvotes").doc(voterUid),
@@ -1557,6 +2123,81 @@ async function seedVenueReports() {
     }
   }
   await upvoteBatch.commit();
+}
+
+// ── Organizer dashboard fixtures ─────────────────────────────────────────────
+
+async function seedVenueEdits() {
+  console.log(`Writing ${VENUE_EDITS.length} venueEdits draft(s)...`);
+  const batch = db.batch();
+  for (const e of VENUE_EDITS) {
+    const { venueId, ...data } = e;
+    batch.set(db.collection("venueEdits").doc(venueId), { venueId, ...data });
+  }
+  await batch.commit();
+}
+
+async function seedVenueInvites() {
+  console.log(`Writing ${VENUE_INVITES.length} venue invite(s)...`);
+  const batch = db.batch();
+  for (const inv of VENUE_INVITES) {
+    const { id, ...data } = inv;
+    batch.set(db.collection("venueInvites").doc(id), data);
+  }
+  await batch.commit();
+}
+
+async function seedOrganizerInbox() {
+  console.log(`Writing ${ORGANIZER_INBOX.length} organizer inbox message(s)...`);
+  const batch = db.batch();
+  for (const msg of ORGANIZER_INBOX) {
+    const { id, ...data } = msg;
+    batch.set(db.collection("users").doc(UID.organizer).collection("inbox").doc(id), data);
+  }
+  await batch.commit();
+}
+
+/** menuSections/activity/team under `venues/{venueId}/...` — the aiVisibility,
+ * metrics, and promotion-trio subcollections are seeded separately by
+ * seedOrganizerAnalytics() (seed-organizer-analytics.mjs), called from main(). */
+async function seedVenueSubcollections() {
+  let menuSectionCount = 0;
+  let activityCount = 0;
+  let teamCount = 0;
+
+  const batch = db.batch();
+
+  for (const [venueKey, sections] of Object.entries(MENU_SECTIONS)) {
+    const venueId = VENUE_ID[venueKey];
+    for (const section of sections) {
+      const { id, ...data } = section;
+      batch.set(db.collection("venues").doc(venueId).collection("menuSections").doc(id), data);
+      menuSectionCount++;
+    }
+  }
+
+  for (const [venueKey, entries] of Object.entries(ACTIVITY)) {
+    const venueId = VENUE_ID[venueKey];
+    entries.forEach((entry, i) => {
+      const id = `activity-${String(i + 1).padStart(2, "0")}`;
+      batch.set(db.collection("venues").doc(venueId).collection("activity").doc(id), entry);
+      activityCount++;
+    });
+  }
+
+  for (const [venueKey, members] of Object.entries(TEAM)) {
+    const venueId = VENUE_ID[venueKey];
+    for (const m of members) {
+      const { id, ...data } = m;
+      batch.set(db.collection("venues").doc(venueId).collection("team").doc(id), data);
+      teamCount++;
+    }
+  }
+
+  console.log(
+    `Writing venue subcollections: menuSections=${menuSectionCount} activity=${activityCount} team=${teamCount}...`
+  );
+  await batch.commit();
 }
 
 async function seedLogs() {
@@ -1594,6 +2235,36 @@ async function seedStorage() {
     contentType: "image/jpeg",
     resumable: false,
   });
+
+  // venuePhotos: hero + 4 gallery per organizer venue, plus one shared menu
+  // photo per venue (referenced from MENU_SECTIONS above).
+  for (const venueId of [VENUE_ID.sirens, VENUE_ID.warehouse9]) {
+    const paths = [
+      `venuePhotos/${venueId}/hero.jpg`,
+      `venuePhotos/${venueId}/gallery/1.jpg`,
+      `venuePhotos/${venueId}/gallery/2.jpg`,
+      `venuePhotos/${venueId}/gallery/3.jpg`,
+      `venuePhotos/${venueId}/gallery/4.jpg`,
+      `venuePhotos/${venueId}/menu/0.jpg`,
+    ];
+    for (const p of paths) {
+      await bucket.file(p).save(TINY_JPEG, { contentType: "image/jpeg", resumable: false });
+    }
+  }
+
+  // eventMedia: cover art for the two published organizer events.
+  for (const eventId of ["e1", "e2"]) {
+    await bucket.file(`eventMedia/${eventId}/cover.jpg`).save(TINY_JPEG, {
+      contentType: "image/jpeg",
+      resumable: false,
+    });
+  }
+
+  // venueKyc: license front page for the unverified organizer venue.
+  await bucket.file(`venueKyc/${VENUE_ID.neonAnnex}/license/0/front.jpg`).save(TINY_JPEG, {
+    contentType: "image/jpeg",
+    resumable: false,
+  });
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -1609,6 +2280,11 @@ async function main() {
   await seedEvents();
   await seedVenueReports();
   await seedLogs();
+  await seedVenueEdits();
+  await seedVenueInvites();
+  await seedOrganizerInbox();
+  await seedVenueSubcollections();
+  await seedOrganizerAnalytics(db, { venueId: VENUE_ID.sirens });
   await seedStorage();
 
   console.log("\nDone.\n");
@@ -1616,8 +2292,11 @@ async function main() {
   console.log(`  users:         ${Object.keys(USERS).length}`);
   console.log(`  venues:        ${VENUES.length}`);
   console.log(`  events:        ${EVENTS.length}`);
-  console.log(`  venueReports:  ${VENUE_REPORTS.length}`);
+  console.log(`  venueReports:  ${ALL_VENUE_REPORTS.length}`);
   console.log(`  logs:          ${LOGS.length}`);
+  console.log(`  venueEdits:    ${VENUE_EDITS.length}`);
+  console.log(`  venueInvites:  ${VENUE_INVITES.length}`);
+  console.log(`  organizer inbox: ${ORGANIZER_INBOX.length}`);
 
   console.log("\nSeeded accounts (copy/paste-friendly — email / password / uid):\n");
   const emailWidth = Math.max(...ACCOUNTS.map((a) => a.email.length)) + 2;

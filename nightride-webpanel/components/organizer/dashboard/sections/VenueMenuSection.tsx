@@ -5,6 +5,7 @@ import { menuItemSlotId, useOrganizerDashboard } from "@/lib/organizer/dashboard
 import { MENU_TAGS, NIGHT_INITIALS } from "@/lib/organizer/dashboard/constants";
 import type { MenuItem, MenuSection } from "@/lib/organizer/dashboard/types";
 import { ImageSlot } from "../ui/ImageSlot";
+import { Card, FilledButton, IconButton, TextField } from "../ui/Primitives";
 
 /**
  * The venue's food & drinks menu — sections of priced items, each with its own
@@ -24,10 +25,10 @@ export function VenueMenuSection() {
   );
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-3">
         <span
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1 text-[12px] font-medium tracking-wide"
+          className="flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium tracking-[0.5px]"
           style={{ background: "var(--m3-succ)", color: "var(--m3-onsucc)" }}
         >
           <CheckCircle2 size={14} />
@@ -50,14 +51,13 @@ export function VenueMenuSection() {
         </p>
       )}
 
-      <button
+      <FilledButton
+        icon={<ListPlus size={18} />}
         onClick={() => addMenuSection(editingVenue)}
-        className="flex h-11 items-center gap-2 self-start rounded-full px-5 text-sm font-medium transition-opacity hover:opacity-90"
-        style={{ background: "var(--m3-pri)", color: "var(--m3-onpri)" }}
+        className="self-start"
       >
-        <ListPlus size={18} />
         Add menu section
-      </button>
+      </FilledButton>
     </div>
   );
 }
@@ -67,24 +67,24 @@ function SectionCard({ section }: { section: MenuSection }) {
     useOrganizerDashboard();
 
   return (
-    <div className="flex flex-col gap-3.5 rounded-2xl bg-[var(--m3-surf1)] p-5">
+    <Card className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <input
           value={section.name}
           onChange={(e) => setMenuSectionName(editingVenue, section.id, e.target.value)}
           aria-label="Section name"
-          className="font-display min-w-0 flex-1 border-b border-transparent bg-transparent py-0.5 text-xl uppercase tracking-wide text-[var(--m3-on)] outline-none focus:border-[var(--m3-pri)]"
+          className="font-display min-w-0 flex-1 border-b border-transparent bg-transparent py-1 text-xl uppercase tracking-wide text-[var(--m3-on)] outline-none focus:border-[var(--m3-pri)]"
         />
         <span className="shrink-0 font-mono text-xs text-[var(--m3-onv)]">
           {section.items.length} {section.items.length === 1 ? "item" : "items"}
         </span>
-        <button
+        <IconButton
+          danger
           onClick={() => removeMenuSection(editingVenue, section.id)}
           aria-label={`Remove section ${section.name}`}
-          className="shrink-0 text-[var(--m3-onv)] transition-colors hover:text-[var(--m3-err)]"
         >
           <Trash2 size={18} />
-        </button>
+        </IconButton>
       </div>
 
       {section.items.map((item) => (
@@ -98,7 +98,7 @@ function SectionCard({ section }: { section: MenuSection }) {
         <Plus size={16} />
         Add item to this section
       </button>
-    </div>
+    </Card>
   );
 }
 
@@ -116,13 +116,14 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
   const set = <K extends keyof MenuItem>(field: K, value: MenuItem[K]) =>
     setMenuItemField(editingVenue, sectionId, item.id, field, value);
 
+  /** Inline affordances all sit on the same 40px row height as a dense field. */
   const boxed =
-    "flex items-center gap-1.5 rounded border border-[var(--m3-outline)] px-2.5";
-  const bare = "bg-transparent py-2 text-[13px] text-[var(--m3-on)] outline-none";
+    "flex h-10 items-center gap-1.5 rounded border border-[var(--m3-outline)] px-3 focus-within:border-[var(--m3-pri)]";
+  const bare = "bg-transparent text-[13px] text-[var(--m3-on)] outline-none";
 
   return (
     <div
-      className="flex gap-3.5 rounded-xl bg-[var(--m3-surf2)] p-3.5"
+      className="flex gap-4 rounded-xl bg-[var(--m3-surf2)] p-4"
       style={{ opacity: item.soldOut ? 0.55 : 1 }}
     >
       {/* ImageSlot fills its parent, so the size lives on the wrapper. */}
@@ -135,14 +136,17 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
         />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-        <div className="flex flex-wrap items-start gap-2.5">
-          <input
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <TextField
+            dense
+            surface="var(--m3-surf2)"
             value={item.name}
             onChange={(e) => set("name", e.target.value)}
             placeholder="Item name"
             aria-label="Item name"
-            className="min-w-[160px] flex-[1_1_200px] rounded border border-[var(--m3-outline)] bg-transparent px-2.5 py-2 text-[15px] font-medium text-[var(--m3-on)] outline-none focus:border-[var(--m3-pri)]"
+            className="font-medium"
+            wrapperClassName="min-w-[160px] flex-[1_1_200px]"
           />
           <div className={`${boxed} shrink-0`}>
             <span className="font-mono text-xs text-[var(--m3-onv)]">{profile.currency}</span>
@@ -153,12 +157,12 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
               min={0}
               placeholder="0"
               aria-label="Price"
-              className={`w-[72px] font-mono text-[15px] ${bare}`}
+              className={`w-[72px] font-mono ${bare}`}
             />
           </div>
           <button
             onClick={() => toggleMenuItemSoldOut(editingVenue, sectionId, item.id)}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-opacity hover:opacity-85"
+            className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-medium transition-opacity hover:opacity-85"
             style={
               item.soldOut
                 ? { background: "var(--m3-errc)", color: "var(--m3-onerrc)" }
@@ -168,24 +172,25 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
             {item.soldOut ? <Ban size={15} /> : <CheckCircle2 size={15} />}
             {item.soldOut ? "Sold out" : "Available"}
           </button>
-          <button
+          <IconButton
+            danger
             onClick={() => removeMenuItem(editingVenue, sectionId, item.id)}
             aria-label={`Remove ${item.name || "item"}`}
-            className="shrink-0 self-center text-[var(--m3-onv)] transition-colors hover:text-[var(--m3-err)]"
           >
             <X size={18} />
-          </button>
+          </IconButton>
         </div>
 
-        <input
+        <TextField
+          dense
+          surface="var(--m3-surf2)"
           value={item.desc}
           onChange={(e) => set("desc", e.target.value)}
           placeholder="Short description guests see under the name"
           aria-label="Item description"
-          className="w-full rounded border border-[var(--m3-outline)] bg-transparent px-2.5 py-2 text-[13px] text-[var(--m3-onv)] outline-none focus:border-[var(--m3-pri)] focus:text-[var(--m3-on)]"
         />
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <div className={boxed}>
             <GlassWater size={15} className="text-[var(--m3-onv)]" />
             <input
@@ -213,7 +218,7 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
                 key={tag}
                 onClick={() => toggleMenuItemTag(editingVenue, sectionId, item.id, tag)}
                 aria-pressed={on}
-                className="h-[30px] rounded-lg border px-3 text-xs font-medium transition-colors"
+                className="h-8 rounded-lg border px-3.5 text-[13px] font-medium transition-colors"
                 style={
                   on
                     ? {
@@ -231,7 +236,7 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="w-[120px] text-xs tracking-wide text-[var(--m3-onv)]">
+          <span className="w-[120px] text-xs tracking-[0.5px] text-[var(--m3-onv)]">
             {item.nights.length ? "Selected nights" : "Every night"}
           </span>
           {NIGHT_INITIALS.map((initial, i) => {
@@ -242,7 +247,7 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
                 onClick={() => toggleMenuItemNight(editingVenue, sectionId, item.id, i)}
                 aria-pressed={on}
                 aria-label={`Night ${i + 1}`}
-                className="flex h-[30px] w-[30px] items-center justify-center rounded-full border font-mono text-xs transition-colors"
+                className="flex h-8 w-8 items-center justify-center rounded-full border font-mono text-xs transition-colors"
                 style={
                   on
                     ? {

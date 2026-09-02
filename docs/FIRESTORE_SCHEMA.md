@@ -586,6 +586,9 @@ venueReports/{reportId} {
   comment: string                    // "", or up to 500 chars
   upvoteCount: number
   createdAt: Timestamp               // == request.time, enforced
+
+  reply: { text: string, byUid: string, byName: string, at: Timestamp } | null
+  flaggedByOwner: bool
 }
 
 venueReports/{reportId}/upvotes/{voterUid} { at: Timestamp }
@@ -602,6 +605,27 @@ number in 1..5 rather than `is int`, because a slider yields `4.0`.
 An upvote is the same two-write batch as event interest, with the same ordering
 requirement. Upvotes are permanent by design: there is no un-upvote, and racing
 batches can over-count by one.
+
+`reply` is public: guests see it posted under the report, not tucked behind an
+admin view. Only a venue's `owner` or `manager` role may write one, and only for
+the venue the report is about — `door` cannot, the same split as listing edits.
+This is the one place in the schema where the `editorUids` denormalisation does
+*not* save a `get()`, because the document being guarded is the report, not the
+venue: checking "is this uid an owner/manager of `report.venueId`" still needs a
+read of that venue document. Everywhere else in this schema the arrays exist
+precisely to avoid that read on a hot path; here the trade runs the other way on
+purpose, because replies are rare enough that one document access per reply
+costs nothing worth optimising away. The write is pinned to
+`onlyTouched(['reply', 'flaggedByOwner'])` — that constraint, not politeness, is
+what stops an owner rewriting the guest's `comment` or `vibeRating` under cover
+of "replying" to it. `reply == null` stays a legal write so "delete the posted
+reply" is just clearing the field, not a special path.
+
+`flaggedByOwner` is a request for admin attention, not a removal, and that
+distinction is the whole point of the field: a flagged report stays publicly
+readable exactly as before, and only an admin can delete it. The obvious
+misreading is "flag hides the report" — it does not hide anything; it queues it
+for a human.
 
 ## Live Hub — composition, not a collection
 

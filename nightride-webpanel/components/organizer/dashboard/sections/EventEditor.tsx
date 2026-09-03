@@ -225,9 +225,24 @@ export function EventEditor() {
 
           <div>
             <SectionLabel className="mb-2.5">Images</SectionLabel>
+            {/* The `eventMedia` storage rule authorizes an upload against the
+                event document existing — save the draft once before either
+                slot can accept a file. */}
             <div className="grid grid-cols-2 gap-2.5">
-              <ImageSlot slotId={slots.cover} placeholder="Cover image" className="h-[140px]" />
-              <ImageSlot slotId={slots.poster} placeholder="Poster image" className="h-[140px]" />
+              <ImageSlot
+                slotId={slots.cover}
+                placeholder="Cover image"
+                className="h-[140px]"
+                disabled={!isEditingExisting}
+                disabledHint="Save draft first"
+              />
+              <ImageSlot
+                slotId={slots.poster}
+                placeholder="Poster image"
+                className="h-[140px]"
+                disabled={!isEditingExisting}
+                disabledHint="Save draft first"
+              />
             </div>
           </div>
 

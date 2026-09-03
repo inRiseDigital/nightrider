@@ -101,6 +101,23 @@ export function useEvents(
   );
   const eventsRef = useLatest(events);
 
+  // Sibling to `OrganizerEvent` per Global Constraint 7 rather than fields on
+  // it — `coverImage`/`posterImage` have no form control of their own (only
+  // the image-slot widgets in `EventEditor`), so there is nothing to gain by
+  // making every existing `OrganizerEvent` literal carry them. Keyed by raw
+  // doc id, straight off `rawDocs`, so it reflects a `patchEventImage` write
+  // the moment `loadEvents` refetches — no separate cache to fall out of sync.
+  const eventMedia = useMemo(() => {
+    const out: Record<string, { coverImage: string; posterImage: string }> = {};
+    for (const [id, raw] of Object.entries(rawDocs)) {
+      out[id] = {
+        coverImage: typeof raw.coverImage === "string" ? raw.coverImage : "",
+        posterImage: typeof raw.posterImage === "string" ? raw.posterImage : "",
+      };
+    }
+    return out;
+  }, [rawDocs]);
+
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [eventsTab, setEventsTab] = useState<EventsTab>("list");
   const [cancelingEventId, setCancelingEventId] = useState<string | null>(null);
@@ -210,6 +227,27 @@ export function useEvents(
       });
     },
     [editor, run, venueMeta, venues, rawDocsRef, uid]
+  );
+
+  /**
+   * T12: patches `coverImage`/`posterImage` after a Storage upload has
+   * already landed the object at `eventMedia/{eventId}/{cover,poster}.jpg`.
+   * Deliberately its own write point rather than routed through
+   * `commitEvent` — the ordering constraint (T12 brief, and the storage rule
+   * itself: `isEventOwner()` has nothing else to authorize against) is
+   * "create the draft, upload, then patch", so this only ever runs against
+   * an event that already exists. Still the raw-remainder merge every event
+   * write uses (Global Constraint 2): spreads the freshest `rawDocs` entry
+   * first so a photo patch can never blank a field this panel doesn't model.
+   */
+  const patchEventImage = useCallback(
+    (eventId: string, field: "coverImage" | "posterImage", url: string) =>
+      run(async () => {
+        const raw = rawDocsRef.current[eventId];
+        if (!raw) throw new Error("Save this event before adding images.");
+        await setDoc(eventDocRef(eventId), { ...raw, [field]: url });
+      }),
+    [run, rawDocsRef]
   );
 
   const saveDraftEvent = useCallback(async () => {
@@ -326,11 +364,12 @@ export function useEvents(
       calendarOffset,
       calendarVenueFilter,
       dayDialog,
+      eventMedia,
     }),
     [
       events, eventsLoading, eventsError, eventFilter, eventsTab, editor.isOpen, editor.editingId,
       editor.draft, editor.lineupInput, cancelingEventId, cancelReasonInput, calendarOffset,
-      calendarVenueFilter, dayDialog,
+      calendarVenueFilter, dayDialog, eventMedia,
     ]
   );
 
@@ -364,12 +403,13 @@ export function useEvents(
       setCalendarVenueFilter,
       openDayDialog,
       closeDayDialog,
+      patchEventImage,
     }),
     [
       data, eventsLoading, eventsError, busy, actionError, setEventFilter, setEventsTab, openNewEvent, openEditEvent,
       editor.close, editor.update, editor.setLineupInput, addLineup, removeLineup, addTier,
       updateTier, removeTier, saveDraftEvent, submitEvent, duplicateEvent, startCancel,
-      cancelCancelFlow, confirmCancel, shiftCalendar, openDayDialog, closeDayDialog,
+      cancelCancelFlow, confirmCancel, shiftCalendar, openDayDialog, closeDayDialog, patchEventImage,
     ]
   );
 }

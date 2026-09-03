@@ -8,7 +8,11 @@ describe("parseMenuSection(toMenuSectionFields(section)) round-trip", () => {
   it("preserves name and items", () => {
     const fields = toMenuSectionFields(section);
     const back = parseMenuSection(section.id, fields);
-    expect(back).toEqual(section);
+    // `toMatchObject`, not `toEqual`: T12 added `MenuItem.image`, parsed as
+    // `""` for every item regardless of whether the fixture (mock-data.ts,
+    // predating that field) sets it — an extra `""` key on `back` is
+    // expected here, not a regression.
+    expect(back).toMatchObject(section);
   });
 
   it("defends against a missing/malformed doc", () => {
@@ -22,8 +26,9 @@ describe("parseMenuSection(toMenuSectionFields(section)) round-trip", () => {
 
   it("drops malformed items rather than throwing", () => {
     const back = parseMenuSection("s3", { name: "Drinks", items: [{ id: "ok" }, { noId: true }, null] });
-    expect(back.items).toEqual([
+    expect(back.items).toMatchObject([
       { id: "ok", name: "", price: 0, desc: "", size: "", serves: "", tags: [], nights: [], soldOut: false },
     ]);
+    expect(back.items[0].image).toBe("");
   });
 });

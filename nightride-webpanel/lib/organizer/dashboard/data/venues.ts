@@ -146,6 +146,7 @@ export function parseVenueProfile(
     tableLink: typeof d.tableLink === "string" ? d.tableLink : "",
     verificationSteps: verified ? undefined : parseVerificationSteps(d.verification),
     openVerifyStep: verified ? null : "license",
+    photos: Array.isArray(d.photos) ? d.photos.filter((p): p is string => typeof p === "string") : [],
   };
 }
 
@@ -176,6 +177,7 @@ export function toVenueDocFields(
     hours: ui.hours,
     exceptions: ui.exceptions,
     tableLink: ui.tableLink,
+    photos: ui.photos ?? [],
   };
 }
 
@@ -342,6 +344,7 @@ function parseMenuItem(raw: unknown): MenuItem | null {
     tags: Array.isArray(r.tags) ? r.tags.filter((t): t is string => typeof t === "string") : [],
     nights: Array.isArray(r.nights) ? r.nights.filter((n): n is number => typeof n === "number") : [],
     soldOut: r.soldOut === true,
+    image: typeof r.image === "string" ? r.image : "",
   };
 }
 

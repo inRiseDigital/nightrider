@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo, useSyncExternalStore, type Context, type ReactNode } from "react";
 import { clockStore } from "./browser-stores";
 import { useOrganizerAuth } from "./auth";
-import { DAYS } from "./constants";
+import { DAYS, GALLERY_SLOT_COUNT } from "./constants";
 import { useVenues, type VenuesState } from "./hooks/useVenues";
 import { useEvents, type EventsState } from "./hooks/useEvents";
 import { useReviews, type ReviewsState } from "./hooks/useReviews";
@@ -15,6 +15,8 @@ import { useAiVisibility, type AiVisibilityState } from "./hooks/useAiVisibility
 import { useActivity, type ActivityState } from "./hooks/useActivity";
 import { useAccountSettings, type AccountSettingsState } from "./hooks/useAccountSettings";
 import { useDashboardUi, type DashboardUiState } from "./hooks/useDashboardUi";
+import { eventSlotIds, gallerySlotId, heroSlotId, menuItemSlotId, parseSlotId } from "./data/images";
+import type { VenueProfile } from "./types";
 
 export type { VenueTab } from "./hooks/useVenues";
 export type { EventFilter, EventsTab } from "./hooks/useEvents";
@@ -120,6 +122,140 @@ export function useOrganizerDashboard() {
     const az = analytics.aiVisibility.data;
     const idn = identity.data;
     const u = ui.data;
+
+    // ---- Image slots (T12) ----
+    // Derived from the loaded venue/event documents, not stored — the
+    // localStorage `imageSlotStore` sidecar is gone (browser-stores.ts).
+    // Sourced from `v.profiles` (the SAVED/published venue snapshot, same as
+    // `LiveOperationsSection`'s "missing hero" reminder reads) and `e.eventMedia`
+    // (raw `coverImage`/`posterImage`, refetched after every `patchEventImage`).
+    // A slot mid-upload or sitting in an unsaved draft is NOT reflected here —
+    // `ImageSlot`/the hero-and-gallery preview keep their own local override
+    // for that window, exactly so the tile never has to wait on Save (let
+    // alone admin review) to show what was just picked.
+    const images: Record<string, string> = {};
+    for (const [id, p] of Object.entries(v.profiles as Record<string, VenueProfile>)) {
+      const photos = p.photos ?? [];
+      if (photos[0]) images[heroSlotId(id)] = photos[0];
+      for (let i = 0; i < GALLERY_SLOT_COUNT; i++) {
+        const url = photos[i + 1];
+        if (url) images[gallerySlotId(id, i)] = url;
+      }
+      for (const section of p.menu) {
+        for (const item of section.items) {
+          if (item.image) images[menuItemSlotId(id, item.id)] = item.image;
+        }
+      }
+    }
+    for (const [id, media] of Object.entries(events.data.eventMedia)) {
+      const slots = eventSlotIds(id);
+      if (media.coverImage) images[slots.cover] = media.coverImage;
+      if (media.posterImage) images[slots.poster] = media.posterImage;
+    }
+
+    /**
+     * Writes an uploaded slot's `https` URL onto the document that owns it —
+     * the one place that knows what a slot id resolves to. Venue photos
+     * (hero/gallery) route through `updateVenueListing`'s function form (not
+     * `setVenueField`) specifically so a second slot upload started before
+     * the first has landed still composes against the in-progress draft
+     * rather than a stale outer snapshot. Menu images write immediately
+     * (menu bypasses the draft entirely, same as every other menu edit).
+     * Event images require the event to already exist (T12 brief's ordering
+     * constraint; the `eventMedia` storage rule has nothing else to
+     * authorize against) and go through the raw-remainder merge every event
+     * write uses, via `patchEventImage`.
+     */
+    async function commitSlotImage(slotId: string, url: string): Promise<void> {
+      const slot = parseSlotId(slotId);
+      if (!slot) return;
+      if (slot.kind === "hero") {
+        venues.updateVenueListing(slot.venueId, (p) => {
+          const next = [...(p.photos ?? [])];
+          next[0] = url;
+          return { ...p, photos: next };
+        });
+        return;
+      }
+      if (slot.kind === "gallery") {
+        venues.updateVenueListing(slot.venueId, (p) => {
+          const next = [...(p.photos ?? [])];
+          next[slot.index + 1] = url;
+          return { ...p, photos: next };
+        });
+        return;
+      }
+      if (slot.kind === "menu") {
+        const section = (v.profiles[slot.venueId] as VenueProfile | undefined)?.menu.find((s) =>
+          s.items.some((it) => it.id === slot.itemId)
+        );
+        if (!section) throw new Error("That menu item no longer exists — reload and try again.");
+        venues.setMenuItemField(slot.venueId, section.id, slot.itemId, "image", url);
+        venues.flushMenuWrite(slot.venueId, section.id);
+        return;
+      }
+      // slot.kind === "event"
+      const field = slot.field === "cover" ? "coverImage" : "posterImage";
+      const ok = await events.patchEventImage(slot.eventId, field, url);
+      if (!ok) throw new Error(events.actionError || "Could not save that image.");
+    }
+
+    /**
+     * Clears a slot's Firestore-field reference. Deliberately does NOT
+     * delete the underlying Storage object here: a hero/gallery slot is a
+     * listing field, so "remove" on one only queues a draft change — the
+     * currently PUBLISHED photo (what the live app and this same tile are
+     * showing right now, via `images` above) is still that object until an
+     * admin approves the removal. Deleting it immediately would 404 the
+     * live app's hero shot before the change is even submitted. Orphaned
+     * objects are the named, accepted follow-up (`sweepOrphanImages`) — the
+     * same trade-off the brief makes for uploads, applied symmetrically to
+     * removes.
+     */
+    async function removeSlotImage(slotId: string): Promise<void> {
+      const slot = parseSlotId(slotId);
+      if (!slot) return;
+      if (slot.kind === "hero") {
+        venues.updateVenueListing(slot.venueId, (p) => {
+          const next = [...(p.photos ?? [])];
+          next[0] = "";
+          return { ...p, photos: next };
+        });
+        return;
+      }
+      if (slot.kind === "gallery") {
+        venues.updateVenueListing(slot.venueId, (p) => {
+          const next = [...(p.photos ?? [])];
+          next[slot.index + 1] = "";
+          return { ...p, photos: next };
+        });
+        return;
+      }
+      if (slot.kind === "menu") {
+        const section = (v.profiles[slot.venueId] as VenueProfile | undefined)?.menu.find((s) =>
+          s.items.some((it) => it.id === slot.itemId)
+        );
+        if (!section) return;
+        venues.setMenuItemField(slot.venueId, section.id, slot.itemId, "image", "");
+        venues.flushMenuWrite(slot.venueId, section.id);
+        return;
+      }
+      // slot.kind === "event"
+      const field = slot.field === "cover" ? "coverImage" : "posterImage";
+      await events.patchEventImage(slot.eventId, field, "");
+    }
+
+    const confirmRemoveImage = async () => {
+      const slotId = u.confirmRemoveSlotId;
+      if (!slotId) return;
+      try {
+        await removeSlotImage(slotId);
+      } catch (err) {
+        ui.showSnack(err instanceof Error ? err.message : "Could not remove that image.", "error");
+      } finally {
+        ui.cancelRemoveImage();
+      }
+    };
 
     return {
       organizer: idn.organizer,
@@ -338,12 +474,12 @@ export function useOrganizerDashboard() {
       togglePreference: identity.togglePreference,
 
       // ---- Image slots ----
-      images: u.images,
-      setImage: ui.setImage,
+      images,
+      commitSlotImage,
       confirmRemoveSlotId: u.confirmRemoveSlotId,
       requestRemoveImage: ui.requestRemoveImage,
       cancelRemoveImage: ui.cancelRemoveImage,
-      confirmRemoveImage: ui.confirmRemoveImage,
+      confirmRemoveImage,
     };
   }, [identity, venues, events, engagement, account, analytics, activity, ui]);
 }

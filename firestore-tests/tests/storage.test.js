@@ -320,6 +320,16 @@ describe('storage.rules — venuePhotos/{venueId}/**', () => {
       uploadBytes(ref(ctx.storage(), 'venuePhotos/v87g/hero.jpg'), JPEG_BYTES, { contentType: 'application/pdf' }),
     );
   });
+
+  it('87h. a 7 MB hero.jpg (over the 6 MB cap) -> DENY (T12: client resizes before upload, but the rule is the backstop)', async () => {
+    const owner = uid('owner');
+    await seedVenueDoc('v87h', baseVenue({ ownerUid: owner, editorUids: [owner], editors: { [owner]: 'owner' } }));
+    const ctx = testEnv.authenticatedContext(owner);
+    const big = new Uint8Array(7 * 1024 * 1024);
+    await assertFails(
+      uploadBytes(ref(ctx.storage(), 'venuePhotos/v87h/hero.jpg'), big, { contentType: 'image/jpeg' }),
+    );
+  });
 });
 
 describe('storage.rules — eventMedia/{eventId}/**', () => {

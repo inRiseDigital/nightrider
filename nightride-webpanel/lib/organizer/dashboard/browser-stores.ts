@@ -1,8 +1,14 @@
 /**
- * Two bits of state that genuinely live outside React and differ between the
- * server render and the browser: the dropped-image sidecar (localStorage) and
- * the wall clock. Both are exposed as `useSyncExternalStore` sources so the
- * server snapshot is explicit and hydration stays consistent.
+ * State that genuinely lives outside React and differs between the server
+ * render and the browser: the wall clock, exposed as a `useSyncExternalStore`
+ * source so the server snapshot is explicit and hydration stays consistent.
+ *
+ * `createImageSlotStore` below (the localStorage-backed image sidecar this
+ * module used to also export as `imageSlotStore`) is no longer instantiated
+ * or used anywhere — T12 moved image slots onto Cloud Storage, with the
+ * resulting URL living on the owning Firestore document instead of here.
+ * The function itself is left in place deliberately; T13 is the task that
+ * deletes it.
  */
 
 type Listener = () => void;
@@ -10,7 +16,7 @@ type Listener = () => void;
 const IMAGE_STORAGE_KEY = "nr-organizer-image-slots";
 const EMPTY_IMAGES: Record<string, string> = {};
 
-function createImageSlotStore() {
+export function createImageSlotStore() {
   let snapshot: Record<string, string> = EMPTY_IMAGES;
   let hydrated = false;
   const listeners = new Set<Listener>();
@@ -66,8 +72,6 @@ function createImageSlotStore() {
     },
   };
 }
-
-export const imageSlotStore = createImageSlotStore();
 
 /** Ticks once a minute — enough for "is this event live right now". */
 const CLOCK_INTERVAL_MS = 60_000;

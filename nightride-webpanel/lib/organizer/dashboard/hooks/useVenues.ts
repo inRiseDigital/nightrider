@@ -68,6 +68,7 @@ export function blankVenueProfile(name: string, city: string, days: readonly str
     exceptions: [],
     menu: [],
     tableLink: "",
+    photos: [],
   };
 }
 
@@ -506,7 +507,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
                 ...s,
                 items: [
                   ...s.items,
-                  { id: nextMenuId("item"), name: "", price: 0, desc: "", size: "", serves: "", tags: [], nights: [], soldOut: false },
+                  { id: nextMenuId("item"), name: "", price: 0, desc: "", size: "", serves: "", tags: [], nights: [], soldOut: false, image: "" },
                 ],
               }
         )
@@ -957,6 +958,13 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       saveVenue,
       discardVenue,
       setVenueField,
+      // Exposed alongside `setVenueField` (a fixed-value setter) specifically
+      // for `photos`: two image-slot writes in flight (e.g. hero, then a
+      // gallery slot) must each read the *other's* in-progress draft rather
+      // than a stale outer snapshot, which only the function form gives —
+      // `updateVenueListing`'s reducer bases a new edit on the existing
+      // draft when one is already open. See `store.tsx`'s `commitSlotImage`.
+      updateVenueListing,
       toggleVenueSetValue,
       addSocialLink,
       removeSocialLink,
@@ -990,7 +998,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     [
       data, busy, actionError, setEditingVenue, setVenueTab, openAddVenue, cancelAddVenue,
       setNewVenueName, setNewVenueCity, setNewVenueCountry, createVenue, saveVenue, discardVenue, setVenueField,
-      toggleVenueSetValue, addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
+      updateVenueListing, toggleVenueSetValue, addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
       toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,
       addMenuSection, removeMenuSection, setMenuSectionName, addMenuItem, removeMenuItem,
       setMenuItemField, toggleMenuItemSoldOut, toggleMenuItemTag, toggleMenuItemNight, flushMenuWrite,

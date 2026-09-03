@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ArrowLeft,
   AtSign,
@@ -32,6 +32,7 @@ import {
   useNow,
   useOrganizerDashboard,
 } from "@/lib/organizer/dashboard/store";
+import { uploadSlotImage } from "@/lib/organizer/dashboard/data/images";
 import { DAYS } from "@/lib/organizer/dashboard/constants";
 import { hoursTextFor, isEventLive, isOpenOn, mondayFirstIndex, toISODate } from "@/lib/organizer/dashboard/format";
 import type { SocialLink } from "@/lib/organizer/dashboard/types";
@@ -89,23 +90,76 @@ function networkLabel(link: SocialLink) {
  * Click-to-browse / drag-and-drop upload for one image slot, styled for the
  * cream preview rather than the M3 editor. This is the venue's only image
  * upload surface — the Profile tab just displays what's set here.
+ *
+ * T12: uploads to Cloud Storage (`uploadSlotImage`, resized client-side)
+ * instead of reading a `FileReader.readAsDataURL` blob into `localStorage`,
+ * then writes the resulting `https` URL onto the venue's listing draft via
+ * `commitSlotImage`. `src` is the local objectURL/final URL while an upload
+ * is pending, falling back to `images[slotId]` (the published photo) once
+ * settled — and, on failure, staying exactly where it was: a failed upload
+ * must never clear the tile, only show the error plus a retry.
  */
 function useImageUpload(slotId: string) {
-  const { setImage } = useOrganizerDashboard();
+  const { images, commitSlotImage, showSnack } = useOrganizerDashboard();
   const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
+  const [localSrc, setLocalSrc] = useState<string | null>(null);
+  const pendingFileRef = useRef<File | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const revokeObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }, []);
+  useEffect(() => () => revokeObjectUrl(), [revokeObjectUrl]);
+
+  const startUpload = useCallback(
+    (file: File) => {
+      pendingFileRef.current = file;
+      revokeObjectUrl();
+      const objectUrl = URL.createObjectURL(file);
+      objectUrlRef.current = objectUrl;
+      setLocalSrc(objectUrl);
+      setError("");
+      setUploading(true);
+      setProgress(0);
+
+      uploadSlotImage(slotId, file, setProgress)
+        .then(async (url) => {
+          await commitSlotImage(slotId, url);
+          revokeObjectUrl();
+          setLocalSrc(url);
+          setUploading(false);
+          setProgress(0);
+          pendingFileRef.current = null;
+        })
+        .catch((err) => {
+          setUploading(false);
+          const message = err instanceof Error ? err.message : "Upload failed. Try again.";
+          setError(message);
+          showSnack(message, "error");
+          // `localSrc` deliberately stays set on failure.
+        });
+    },
+    [slotId, commitSlotImage, showSnack, revokeObjectUrl]
+  );
 
   const readFile = useCallback(
     (file: File | undefined) => {
       if (!file || !file.type.startsWith("image/")) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") setImage(slotId, reader.result);
-      };
-      reader.readAsDataURL(file);
+      startUpload(file);
     },
-    [slotId, setImage]
+    [startUpload]
   );
+
+  const retry = useCallback(() => {
+    if (pendingFileRef.current) startUpload(pendingFileRef.current);
+  }, [startUpload]);
 
   const openPicker = useCallback(() => inputRef.current?.click(), []);
 
@@ -131,7 +185,7 @@ function useImageUpload(slotId: string) {
     <input
       ref={inputRef}
       type="file"
-      accept="image/*"
+      accept="image/jpeg,image/png,image/webp"
       className="sr-only"
       onChange={(e) => {
         readFile(e.target.files?.[0]);
@@ -140,7 +194,19 @@ function useImageUpload(slotId: string) {
     />
   );
 
-  return { dragging, openPicker, onDrop, onDragOver, onDragLeave, input };
+  return {
+    src: localSrc ?? images[slotId],
+    dragging,
+    uploading,
+    progress,
+    error,
+    retry,
+    openPicker,
+    onDrop,
+    onDragOver,
+    onDragLeave,
+    input,
+  };
 }
 
 function RemoveButton({ onClick }: { onClick: () => void }) {
@@ -249,7 +315,7 @@ export function VenueAppPreview() {
             onDrop={heroUpload.onDrop}
             onDragOver={heroUpload.onDragOver}
             onDragLeave={heroUpload.onDragLeave}
-            aria-label={images[hero] ? "Replace hero photo" : "Add hero photo"}
+            aria-label={heroUpload.src ? "Replace hero photo" : "Add hero photo"}
             className="group relative h-[220px] cursor-pointer"
             style={{
               background:
@@ -257,9 +323,9 @@ export function VenueAppPreview() {
             }}
           >
             {heroUpload.input}
-            {images[hero] ? (
+            {heroUpload.src ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={images[hero]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={heroUpload.src} alt="" className="absolute inset-0 h-full w-full object-cover" />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white/70">
                 <ImagePlus size={22} />
@@ -273,7 +339,7 @@ export function VenueAppPreview() {
             >
               <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
                 <Camera size={15} />
-                {images[hero] ? "Replace photo" : "Add photo"}
+                {heroUpload.src ? "Replace photo" : "Add photo"}
               </span>
             </div>
             <div
@@ -302,7 +368,32 @@ export function VenueAppPreview() {
             <div className="absolute left-3 top-11 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white backdrop-blur">
               <ArrowLeft size={17} />
             </div>
-            {images[hero] && <RemoveButton onClick={() => requestRemoveImage(hero)} />}
+            {heroUpload.src && <RemoveButton onClick={() => requestRemoveImage(hero)} />}
+
+            {heroUpload.uploading && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-black/40">
+                <div
+                  className="h-full bg-white transition-[width]"
+                  style={{ width: `${Math.round(heroUpload.progress * 100)}%` }}
+                />
+              </div>
+            )}
+            {heroUpload.error && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-black/75 px-3 py-1.5 text-[11px] text-white"
+              >
+                <span className="truncate" title={heroUpload.error}>
+                  {heroUpload.error}
+                </span>
+                <button
+                  onClick={heroUpload.retry}
+                  className="shrink-0 rounded bg-white/20 px-2 py-0.5 font-semibold hover:bg-white/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
             <div
               className="pointer-events-none absolute left-4 bottom-14 rounded-full px-3 py-1 text-[10px] font-bold tracking-widest text-white"
@@ -488,7 +579,7 @@ export function VenueAppPreview() {
             <Section title="GALLERY">
               <div className="nr-phone-scroll flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((slotId) => (
-                  <GalleryTile key={slotId} slotId={slotId} src={images[slotId]} onRemove={requestRemoveImage} />
+                  <GalleryTile key={slotId} slotId={slotId} onRemove={requestRemoveImage} />
                 ))}
               </div>
             </Section>
@@ -782,14 +873,13 @@ function Expect({
 
 function GalleryTile({
   slotId,
-  src,
   onRemove,
 }: {
   slotId: string;
-  src: string | undefined;
   onRemove: (slotId: string) => void;
 }) {
   const upload = useImageUpload(slotId);
+  const src = upload.src;
 
   return (
     <div
@@ -824,6 +914,25 @@ function GalleryTile({
         <Camera size={14} color="#fff" />
       </div>
       {src && <RemoveButton onClick={() => onRemove(slotId)} />}
+      {upload.uploading && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-black/40">
+          <div className="h-full bg-white transition-[width]" style={{ width: `${Math.round(upload.progress * 100)}%` }} />
+        </div>
+      )}
+      {upload.error && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            upload.retry();
+          }}
+          title={upload.error}
+          aria-label="Retry upload"
+          className="absolute inset-x-0 bottom-0 truncate bg-black/75 px-1 py-0.5 text-center text-[8px] font-semibold text-white"
+        >
+          Retry
+        </button>
+      )}
     </div>
   );
 }

@@ -32,7 +32,26 @@ const MOCK_VENUE: VenueProfile = {
     { day: "Sun", closed: false, open: "22:00", close: "04:00" },
   ],
   exceptions: [],
-  menu: [],
+  menu: [
+    {
+      id: "ms1",
+      name: "Bottle service & tables",
+      items: [
+        {
+          id: "mi1",
+          name: "Skyline table — Grey Goose",
+          price: 3200,
+          desc: "Reserved terrace table with skyline view, two mixers per bottle.",
+          size: "1.5L magnum",
+          serves: "6",
+          tags: ["Signature"],
+          nights: [4, 5],
+          soldOut: false,
+          image: "",
+        },
+      ],
+    },
+  ],
   tableLink: "",
   photos: [],
 };
@@ -113,7 +132,11 @@ describe("withLiveFields", () => {
     expect(merged.about).toBe("Draft about");
     expect(merged.verified).toBe(false);
     expect(merged.openVerifyStep).toBe("gps");
+    // `saved.menu` (non-empty, from MOCK_VENUE) and `draft.menu` ([]) are
+    // deliberately different here, so this proves `menu` is overlaid from
+    // `saved` rather than leaking through from the draft.
     expect(merged.menu).toEqual(saved.menu);
+    expect(merged.menu).not.toEqual(draft.menu);
   });
 });
 

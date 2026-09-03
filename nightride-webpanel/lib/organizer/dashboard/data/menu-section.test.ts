@@ -30,6 +30,18 @@ const section: MenuSection = {
       soldOut: false,
       image: "",
     },
+    {
+      id: "mi3",
+      name: "Booth minimum — main deck",
+      price: 1500,
+      desc: "Minimum spend, redeemable against anything on the menu.",
+      size: "",
+      serves: "8",
+      tags: [],
+      nights: [3, 4, 5],
+      soldOut: true,
+      image: "",
+    },
   ],
 };
 
@@ -38,11 +50,10 @@ describe("parseMenuSection(toMenuSectionFields(section)) round-trip", () => {
   it("preserves name and items", () => {
     const fields = toMenuSectionFields(section);
     const back = parseMenuSection(section.id, fields);
-    // `toMatchObject`, not `toEqual`: T12 added `MenuItem.image`, parsed as
-    // `""` for every item regardless of whether the fixture (mock-data.ts,
-    // predating that field) sets it — an extra `""` key on `back` is
-    // expected here, not a regression.
-    expect(back).toMatchObject(section);
+    // Every item in the fixture already sets `image` explicitly, so
+    // `parseMenuItem`'s round trip produces objects structurally identical
+    // to `section` — `toEqual`, not `toMatchObject`.
+    expect(back).toEqual(section);
   });
 
   it("defends against a missing/malformed doc", () => {

@@ -66,9 +66,49 @@ export function parseBoostSlot(id: string, data: Record<string, unknown> | undef
   };
 }
 
-/** Fields for a brand-new boost request — `create`-only per rules, so there is no update counterpart. */
-export function toBoostCreateFields(night: string, price: number): Record<string, unknown> {
-  return { status: "pending", night, price };
+/**
+ * Fields for a brand-new boost request — `create`-only per rules, so there
+ * is no update counterpart. `createdAt` (pass `serverTimestamp()`) is what
+ * `pickCurrentBoost` below sorts on; the caller reloads from Firestore after
+ * the write resolves, so the sentinel has already settled to a real
+ * timestamp by the time it's read back.
+ */
+export function toBoostCreateFields(night: string, price: number, createdAt: unknown): Record<string, unknown> {
+  return { status: "pending", night, price, createdAt };
+}
+
+/**
+ * `boosts` is append-only — `firestore.rules:670-675` allows `create` only,
+ * `update`/`delete` are `if false` unconditionally, so nothing ever prunes an
+ * old or expired boost out of the collection. Fix round 1: `docs[0]` picked
+ * whatever order Firestore happened to return, not "the current boost".
+ *
+ * There is no reliable `status` value to filter on here: every real create
+ * writes `status: 'pending'` and nothing in this collection's rules ever
+ * changes it, so filtering to `'pending'` can't distinguish "just bought" from
+ * "bought months ago and never expired" without a backend job this task
+ * doesn't own. The best available discriminator is recency — `createdAt`
+ * descending, most-recently-bought wins — with the document id (descending)
+ * as a fully deterministic tiebreak for documents that predate `createdAt`
+ * (the current seed fixture: no `status`, no `createdAt` at all, confirmed
+ * against `scripts/seed-emulator/seed-organizer-analytics.mjs`). With today's
+ * seed (exactly one boost doc, no `createdAt`), the tiebreak alone decides —
+ * deterministic, but only because there is nothing else to sort by. The seed
+ * fixture should carry `createdAt` for full parity with real writes; that
+ * script isn't owned by this task.
+ */
+export function pickCurrentBoost(
+  docs: { id: string; data: Record<string, unknown> }[]
+): { id: string; data: Record<string, unknown> } | null {
+  if (docs.length === 0) return null;
+  const createdAtMs = (data: Record<string, unknown>): number => {
+    const v = data.createdAt as { toMillis?: () => number } | undefined;
+    return typeof v?.toMillis === "function" ? v.toMillis() : -1;
+  };
+  return [...docs].sort((a, b) => {
+    const diff = createdAtMs(b.data) - createdAtMs(a.data);
+    return diff !== 0 ? diff : b.id.localeCompare(a.id);
+  })[0];
 }
 
 export function parseRankPerk(tier: string, perk: unknown): RankPerk {

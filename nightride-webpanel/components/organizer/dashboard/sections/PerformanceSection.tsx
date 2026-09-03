@@ -21,9 +21,7 @@ export function PerformanceSection() {
 
   // Only events an audience can actually see have a funnel.
   const perfEvents = events.filter(
-    (e) =>
-      (isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review") &&
-      (perfVenueFilter === "all" || e.venue === perfVenueFilter)
+    (e) => (isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review") && e.venue === perfVenueFilter
   );
 
   const attendance = perfMetrics?.attendance ?? [];
@@ -36,13 +34,7 @@ export function PerformanceSection() {
 
   return (
     <>
-      <VenueSwitcher
-        venueOrder={venueOrder}
-        venues={venues}
-        selected={perfVenueFilter}
-        onSelect={setPerfVenueFilter}
-        includeAll
-      />
+      <VenueSwitcher venueOrder={venueOrder} venues={venues} selected={perfVenueFilter} onSelect={setPerfVenueFilter} />
 
       <div className="mb-[18px] flex flex-wrap gap-2">
         {perfEvents.length === 0 ? (

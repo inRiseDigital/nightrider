@@ -13,18 +13,32 @@ import type { OrganizerEvent } from "../types";
  * Audience destination, plus the Live Operations KPI strip's "profile
  * views" number. Two point reads per venue (`last30` and the current ISO
  * week), not a query — see `data/analytics.ts`'s module doc for why the
- * period splits that way. The venue read is whichever one the switcher has
- * selected, or the organizer's first venue while it's on "All venues" —
- * there is one metrics document per venue, not a combined one.
+ * period splits that way.
+ *
+ * There is no "All venues" option here (fix round 1): metrics documents are
+ * per-venue, and there is no way to sum derived funnel widths or percentage
+ * strings into a meaningful combined figure. A switcher that offered "All
+ * venues" while silently rendering one venue's numbers is the same honesty
+ * failure the brief names for empty states — a number that looks like one
+ * thing and is another. `perfVenueFilter` always holds a real venue id
+ * (repaired to the organizer's first venue whenever it isn't one, e.g. on
+ * first load or after a venue is removed) and nothing outside this hook
+ * reads it, so this is contained.
  */
 export function usePerformance(events: OrganizerEvent[], venueOrder: string[], now: Date | null) {
-  const [perfVenueFilter, setPerfVenueFilterState] = useState("all");
+  const [perfVenueFilter, setPerfVenueFilterState] = useState("");
   const [perfEventId, setPerfEventId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<VenueMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const effectiveVenueId = perfVenueFilter !== "all" ? perfVenueFilter : (venueOrder[0] ?? null);
+  useEffect(() => {
+    if (venueOrder.length > 0 && !venueOrder.includes(perfVenueFilter)) {
+      setPerfVenueFilterState(venueOrder[0]);
+    }
+  }, [venueOrder, perfVenueFilter]);
+
+  const effectiveVenueId = venueOrder.includes(perfVenueFilter) ? perfVenueFilter : null;
   const weekId = now ? isoWeekId(now) : null;
 
   const fetchMetrics = useCallback(async () => {
@@ -63,7 +77,7 @@ export function usePerformance(events: OrganizerEvent[], venueOrder: string[], n
     (id: string) => {
       setPerfVenueFilterState(id);
       const eligible = events.filter(
-        (e) => (isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review") && (id === "all" || e.venue === id)
+        (e) => (isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review") && e.venue === id
       );
       setPerfEventId((prev) => (eligible.some((e) => e.id === prev) ? prev : (eligible[0]?.id ?? null)));
     },

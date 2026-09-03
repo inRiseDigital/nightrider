@@ -8,6 +8,7 @@ import {
   parsePromoCode,
   parsePromoState,
   parseRankPerks,
+  pickCurrentBoost,
   toBoostCreateFields,
   toPromoCodeFields,
   type PromoState,
@@ -25,8 +26,10 @@ const BLANK_BOOST: BoostSlot = { active: false, night: "", price: 40 };
  * Real writes: promo codes (create/update/delete) and a boost request
  * (create only — `firestore.rules` forbids `update`/`delete` on `boosts`
  * once bought). `rankPerks/current` reads `write: if false` in
- * `firestore.rules` despite what an earlier pass of this task assumed —
- * `updatePerk` is an honest no-op, not a write that would only ever fail.
+ * `firestore.rules` unconditionally, despite what an earlier pass of this
+ * task's brief assumed — there is no `updatePerk` here at all; perks are
+ * read-only (`PromotionSection.tsx` renders them as disabled inputs, not a
+ * write that would only ever fail with `permission-denied`).
  * `promoState/current` is display state the organizer cannot write at all;
  * its `{used, max}` is shown as information, not a client-verified
  * guarantee — the real weekly cap is enforced by the FCM fanout function.
@@ -62,8 +65,10 @@ export function usePromotion(venueId: string | null, showSnack: (text: string, t
       setPromoState(parsePromoState(promoStateSnap.exists() ? (promoStateSnap.data() as Record<string, unknown>) : undefined));
       setPerks(parseRankPerks(perksSnap.exists() ? (perksSnap.data() as Record<string, unknown>).perks : undefined));
       setPromos(promosSnap.docs.map((d) => parsePromoCode(d.id, d.data() as Record<string, unknown>)));
-      const boostDoc = boostsSnap.docs[0];
-      setBoost(boostDoc ? parseBoostSlot(boostDoc.id, boostDoc.data() as Record<string, unknown>) : null);
+      const boostDoc = pickCurrentBoost(
+        boostsSnap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> }))
+      );
+      setBoost(boostDoc ? parseBoostSlot(boostDoc.id, boostDoc.data) : null);
       setError("");
     } catch (err) {
       setError(describeFirestoreError(err));
@@ -136,16 +141,6 @@ export function usePromotion(venueId: string | null, showSnack: (text: string, t
     [venueId, promos, run, showSnack]
   );
 
-  /** `rankPerks/current` is `write: if false` in `firestore.rules` — this is honest, not a real save. */
-  const updatePerk = useCallback(
-    (_idx: number, _value: string) => {
-      void _idx;
-      void _value;
-      showSnack("Rank perks aren't editable from here yet.", "error");
-    },
-    [showSnack]
-  );
-
   const [boostNightDraft, setBoostNightDraft] = useState("2026-08-15");
   const setBoostNight = useCallback((v: string) => setBoostNightDraft(v), []);
 
@@ -156,7 +151,7 @@ export function usePromotion(venueId: string | null, showSnack: (text: string, t
       return;
     }
     const ok = await run(async () => {
-      await addDoc(venueBoostsCol(venueId), toBoostCreateFields(boostNightDraft, BLANK_BOOST.price));
+      await addDoc(venueBoostsCol(venueId), toBoostCreateFields(boostNightDraft, BLANK_BOOST.price, serverTimestamp()));
     });
     if (!ok) showSnack("Couldn't buy that boost.", "error");
   }, [venueId, boost, boostNightDraft, run, showSnack]);
@@ -189,11 +184,10 @@ export function usePromotion(venueId: string | null, showSnack: (text: string, t
       addPromo,
       updatePromo,
       removePromo,
-      updatePerk,
       setBoostNight,
       toggleBoost,
     }),
-    [data, loading, error, busy, actionError, sendPush, addPromo, updatePromo, removePromo, updatePerk, setBoostNight, toggleBoost]
+    [data, loading, error, busy, actionError, sendPush, addPromo, updatePromo, removePromo, setBoostNight, toggleBoost]
   );
 }
 

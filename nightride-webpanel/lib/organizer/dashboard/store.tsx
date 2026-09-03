@@ -267,7 +267,6 @@ export function useOrganizerDashboard() {
       updatePromo: account.promotion.updatePromo,
       removePromo: account.promotion.removePromo,
       perks: pr.perks,
-      updatePerk: account.promotion.updatePerk,
       boost: pr.boost,
       setBoostNight: account.promotion.setBoostNight,
       toggleBoost: account.promotion.toggleBoost,

@@ -69,11 +69,21 @@ export function useReviews(
     setDraftReplies((p) => ({ ...p, [id]: value }));
   }, []);
 
+  // Both failure channels, per the brief: `run()` already sets the hook's
+  // `actionError` (threaded through the facade as `reviewsActionError` and
+  // rendered inline in ReviewsSection) on a thrown error, but it swallows
+  // the error itself — the transient snack has to fire from inside the
+  // callback passed to `run`, then rethrow so `run`'s own catch still runs.
   const toggleReviewFlag = useCallback(
     async (id: string) => {
       const next = !(rawDocsRef.current[id]?.flaggedByOwner === true);
       const ok = await run(async () => {
-        await updateDoc(doc(venueReportsCol(), id), { flaggedByOwner: next });
+        try {
+          await updateDoc(doc(venueReportsCol(), id), { flaggedByOwner: next });
+        } catch (err) {
+          showSnack(describeFirestoreError(err), "error");
+          throw err;
+        }
       });
       if (ok) showSnack(next ? "Review reported to Trust & Safety." : "Report withdrawn.");
     },
@@ -90,9 +100,14 @@ export function useReviews(
       const reply = rawDocsRef.current[id]?.reply as { text?: unknown } | null | undefined;
       const hadPosted = typeof reply?.text === "string" && reply.text.length > 0;
       const ok = await run(async () => {
-        await updateDoc(doc(venueReportsCol(), id), {
-          reply: { text, byUid: uid, byName: organizer.name || "Venue", at: serverTimestamp() },
-        });
+        try {
+          await updateDoc(doc(venueReportsCol(), id), {
+            reply: { text, byUid: uid, byName: organizer.name || "Venue", at: serverTimestamp() },
+          });
+        } catch (err) {
+          showSnack(describeFirestoreError(err), "error");
+          throw err;
+        }
       });
       if (ok) {
         setDraftReplies((p) => ({ ...p, [id]: "" }));
@@ -119,7 +134,12 @@ export function useReviews(
   const deletePostedReply = useCallback(
     async (id: string) => {
       const ok = await run(async () => {
-        await updateDoc(doc(venueReportsCol(), id), { reply: null });
+        try {
+          await updateDoc(doc(venueReportsCol(), id), { reply: null });
+        } catch (err) {
+          showSnack(describeFirestoreError(err), "error");
+          throw err;
+        }
       });
       if (ok) {
         setDraftReplies((p) => ({ ...p, [id]: "" }));

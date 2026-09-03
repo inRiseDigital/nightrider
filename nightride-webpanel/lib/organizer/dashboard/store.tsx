@@ -292,6 +292,7 @@ export function useOrganizerDashboard() {
       reviews: r.reviews,
       reviewsLoading: engagement.reviews.loading,
       reviewsError: engagement.reviews.error,
+      reviewsActionError: engagement.reviews.actionError,
       setReviewReply: engagement.reviews.setReviewReply,
       toggleReviewFlag: engagement.reviews.toggleReviewFlag,
       sendReviewReply: engagement.reviews.sendReviewReply,

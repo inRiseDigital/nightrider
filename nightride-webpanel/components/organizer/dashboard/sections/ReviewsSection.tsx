@@ -17,6 +17,7 @@ export function ReviewsSection() {
     reviews,
     reviewsLoading,
     reviewsError,
+    reviewsActionError,
     profile,
     setReviewReply,
     toggleReviewFlag,
@@ -51,6 +52,14 @@ export function ReviewsSection() {
 
   return (
     <div className="flex max-w-[820px] flex-col gap-4">
+      {reviewsActionError && (
+        <p
+          className="rounded-xl bg-[var(--m3-surf1)] px-4 py-3 text-[13px]"
+          style={{ color: "var(--m3-err)" }}
+        >
+          {reviewsActionError}
+        </p>
+      )}
       {reviews.map((r) => {
         const canSend = r.reply.trim().length > 0;
         return (

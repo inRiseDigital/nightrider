@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, useSyncExternalStore, type Context, type ReactNode } from "react";
 import { clockStore } from "./browser-stores";
+import { useOrganizerAuth } from "./auth";
 import { DAYS } from "./constants";
 import { useVenues, type VenuesState } from "./hooks/useVenues";
 import { useEvents, type EventsState } from "./hooks/useEvents";
@@ -40,9 +41,12 @@ const ActivityContext = createContext<ActivityState | null>(null);
 const UiContext = createContext<DashboardUiState | null>(null);
 
 export function OrganizerDashboardProvider({ children }: { children: ReactNode }) {
+  const { uid } = useOrganizerAuth();
   const ui = useDashboardUi();
   const identity = useAccountSettings();
-  const venues = useVenues(ui.showSnack);
+  // `uid` is guaranteed non-null here: `OrganizerDashboardProvider` only ever
+  // mounts inside `OrganizerGate` once auth status is "approved".
+  const venues = useVenues(uid as string, ui.showSnack);
   const events = useEvents(venues.data.venues, venues.data.venueOrder, ui.showSnack);
   const reviews = useReviews(ui.showSnack);
   const inbox = useInbox();
@@ -122,10 +126,16 @@ export function useOrganizerDashboard() {
       // ---- Venues ----
       venueOrder: v.venueOrder,
       venues: v.venues,
+      venuesLoading: v.venuesLoading,
+      venuesError: v.venuesError,
       editingVenue: v.editingVenue,
       profile: v.profile,
       savedProfile: v.savedProfile,
       venueDirty: v.venueDirty,
+      venueBusy: venues.busy,
+      venueActionError: venues.actionError,
+      liveBusy: v.liveBusy,
+      menuLoading: v.menuLoading,
       saveVenue: venues.saveVenue,
       discardVenue: venues.discardVenue,
       venueTab: v.venueTab,
@@ -216,6 +226,9 @@ export function useOrganizerDashboard() {
       setFlashUntil: venues.setFlashUntil,
       toggleFlash: venues.toggleFlash,
       toggleEmergency: venues.toggleEmergency,
+      flushQueueMinutesNow: venues.flushQueueMinutesNow,
+      flushFlashNow: venues.flushFlashNow,
+      flushMenuWrite: venues.flushMenuWrite,
 
       // ---- Performance ----
       perfVenueFilter: perf.perfVenueFilter,

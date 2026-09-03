@@ -27,6 +27,13 @@ export function venueTeamCol(venueId: string): CollectionReference {
 export function venueMenuSectionsCol(venueId: string): CollectionReference {
   return collection(getDb(), "venues", venueId, "menuSections");
 }
+/** Doc id IS the venue id — one pending listing draft per venue, ever. */
+export function venueEditsDocRef(venueId: string): DocumentReference {
+  return doc(getDb(), "venueEdits", venueId);
+}
+export function venueMenuSectionDocRef(venueId: string, sectionId: string): DocumentReference {
+  return doc(getDb(), "venues", venueId, "menuSections", sectionId);
+}
 export function venueMetricsDocRef(venueId: string, periodId: string): DocumentReference {
   return doc(getDb(), "venues", venueId, "metrics", periodId);
 }

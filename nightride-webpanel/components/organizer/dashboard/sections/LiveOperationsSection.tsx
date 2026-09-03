@@ -60,10 +60,12 @@ export function LiveOperationsSection() {
     profile,
     editingVenue,
     venues,
+    venueOrder,
     events,
     reviews,
     images,
     tonight,
+    liveBusy,
     setDoorStatus,
     setQueueMinutes,
     toggleFlash,
@@ -72,6 +74,7 @@ export function LiveOperationsSection() {
     setAudienceTab,
     setAccountTab,
     setVenueTab,
+    openAddVenue,
   } = useOrganizerDashboard();
   const now = useNow();
 
@@ -164,6 +167,26 @@ export function LiveOperationsSection() {
     return rows;
   }
 
+  if (venueOrder.length === 0) {
+    return (
+      <div className="rounded-2xl bg-[var(--m3-surf2)] p-8 text-center">
+        <p className="text-sm text-[var(--m3-on)]">Add a venue to get started.</p>
+        <p className="mt-1.5 text-[13px] text-[var(--m3-onv)]">
+          Tonight&apos;s door status, KPIs, and activity all live here once you have a venue.
+        </p>
+        <Link
+          href="/organizer/venues"
+          onClick={openAddVenue}
+          className="mx-auto mt-4 flex h-10 w-fit items-center gap-2 rounded-full px-6 text-sm font-medium transition-opacity hover:opacity-90"
+          style={{ background: "var(--m3-pri)", color: "var(--m3-onpri)" }}
+        >
+          <Plus size={18} />
+          Add venue
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Live operations control */}
@@ -210,7 +233,8 @@ export function LiveOperationsSection() {
             </Link>
             <button
               onClick={toggleEmergency}
-              className="flex h-10 items-center gap-2 rounded-full border px-5 text-sm font-medium transition-colors"
+              disabled={liveBusy.emergency}
+              className="flex h-10 items-center gap-2 rounded-full border px-5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               style={{
                 borderColor: "var(--m3-err)",
                 color: tonight.emergencyActive ? "var(--m3-onerrc)" : "var(--m3-err)",
@@ -237,9 +261,10 @@ export function LiveOperationsSection() {
                   <button
                     key={s.id}
                     onClick={() => setDoorStatus(s.id)}
+                    disabled={liveBusy.door}
                     aria-pressed={active}
                     title={s.label}
-                    className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1 px-1.5 text-[11px] font-medium transition-colors"
+                    className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1 px-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     style={{
                       borderLeft: `1px solid ${i === 0 ? "transparent" : "var(--m3-outline)"}`,
                       background: active ? "var(--m3-pric)" : "transparent",
@@ -310,7 +335,12 @@ export function LiveOperationsSection() {
                   {tonight.flashText || "No offer set"}
                 </p>
               </div>
-              <Toggle checked={tonight.flashActive} onChange={toggleFlash} label="Flash offer" />
+              <Toggle
+                checked={tonight.flashActive}
+                onChange={toggleFlash}
+                label="Flash offer"
+                disabled={liveBusy.flash}
+              />
             </div>
           </div>
         </div>

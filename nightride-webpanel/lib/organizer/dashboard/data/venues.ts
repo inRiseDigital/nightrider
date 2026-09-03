@@ -22,11 +22,13 @@ import {
 import type {
   DoorStatus,
   HoursException,
+  MenuItem,
   MenuSection,
   OpeningHours,
   SocialLink,
   TonightState,
   VenueMeta,
+  VenueProfile,
   VerifyStepId,
   VerifyStepStatus,
 } from "../types";
@@ -217,4 +219,117 @@ export function toLiveFields(
     emergencyActive: t.emergencyActive,
     flash: { active: t.flashActive, text: t.flashText.slice(0, 200), until: t.flashUntil },
   };
+}
+
+/**
+ * A brand-new venue has no `live` map at all — `organizerCreateOk()` denies
+ * writing one on create, and no admin flow writes one either. This is the
+ * map `ensureLive()` backfills the first time an organizer touches door
+ * status for a venue that has never had one, before any real value is known.
+ */
+export const DEFAULT_TONIGHT_STATE: TonightState = {
+  status: "closed",
+  inVenue: 0,
+  queueMinutes: 0,
+  emergencyActive: false,
+  flashActive: false,
+  flashText: "",
+  flashUntil: "",
+};
+
+// ---------------------------------------------------------------------------
+// The draft/published listing seam — pure and unit-testable on its own, so
+// "a remote snapshot must never clobber an in-progress local edit" is a
+// property of these functions rather than something only observable by
+// rendering the hook.
+// ---------------------------------------------------------------------------
+
+/**
+ * Fields that bypass the draft entirely. `verified`/`verificationSteps` are
+ * admin-only verdicts; `openVerifyStep` is pure client accordion state. All
+ * three must keep flowing from the latest snapshot even while a listing draft
+ * is open, so a draft never goes stale on the one thing an admin can change
+ * out from under the organizer mid-edit.
+ */
+const LIVE_VENUE_FIELDS = ["verified", "verificationSteps", "openVerifyStep"] as const;
+
+/** Overlays `saved`'s live fields onto `draft`'s listing fields. */
+export function withLiveFields(draft: VenueProfile, saved: VenueProfile): VenueProfile {
+  return {
+    ...draft,
+    verified: saved.verified,
+    verificationSteps: saved.verificationSteps,
+    openVerifyStep: saved.openVerifyStep,
+  };
+}
+
+/** `p` with the live fields stripped — the subset that is ever reviewable/dirty. */
+export function listingFieldsOf(p: VenueProfile): Partial<VenueProfile> {
+  const listing: Partial<VenueProfile> = { ...p };
+  for (const field of LIVE_VENUE_FIELDS) delete listing[field];
+  return listing;
+}
+
+/**
+ * What the editor renders: the in-progress draft with the latest snapshot's
+ * live fields overlaid, or the plain snapshot when there is no draft. A new
+ * `onSnapshot` delivery only ever changes `saved` — it can update `verified`
+ * out from under an open draft, but never the listing fields the organizer is
+ * mid-edit on.
+ */
+export function computeVenueProfile(draft: VenueProfile | undefined, saved: VenueProfile): VenueProfile {
+  return draft ? withLiveFields(draft, saved) : saved;
+}
+
+/** True once the draft's listing fields differ from the saved listing fields. */
+export function isVenueDirty(draft: VenueProfile | undefined, saved: VenueProfile): boolean {
+  return !!draft && JSON.stringify(listingFieldsOf(draft)) !== JSON.stringify(listingFieldsOf(saved));
+}
+
+/**
+ * The reviewable listing fields only, shaped for `venueEdits/{venueId}.listing`
+ * — the same fields `listingFieldsOf` strips down to, just spread into a plain
+ * object rather than `Partial<VenueProfile>` so it writes cleanly.
+ */
+export function toVenueEditListing(p: VenueProfile): Record<string, unknown> {
+  return listingFieldsOf(p);
+}
+
+// ---------------------------------------------------------------------------
+// `venues/{id}/menuSections/{sectionId}` <-> `MenuSection`. A subcollection,
+// not the venue draft: menu edits publish immediately (see rules' `menuSections`
+// match block), so there is no listing/live split here — one document, one
+// read, one write.
+// ---------------------------------------------------------------------------
+
+function parseMenuItem(raw: unknown): MenuItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== "string") return null;
+  return {
+    id: r.id,
+    name: typeof r.name === "string" ? r.name : "",
+    price: typeof r.price === "number" ? r.price : 0,
+    desc: typeof r.desc === "string" ? r.desc : "",
+    size: typeof r.size === "string" ? r.size : "",
+    serves: typeof r.serves === "string" ? r.serves : "",
+    tags: Array.isArray(r.tags) ? r.tags.filter((t): t is string => typeof t === "string") : [],
+    nights: Array.isArray(r.nights) ? r.nights.filter((n): n is number => typeof n === "number") : [],
+    soldOut: r.soldOut === true,
+  };
+}
+
+export function parseMenuSection(id: string, data: Record<string, unknown> | undefined): MenuSection {
+  const d = data ?? {};
+  const items = Array.isArray(d.items) ? d.items : [];
+  return {
+    id,
+    name: typeof d.name === "string" ? d.name : "",
+    items: items.map(parseMenuItem).filter((i): i is MenuItem => i !== null),
+  };
+}
+
+/** `MenuSection` -> the fields written to its own `menuSections/{id}` doc. */
+export function toMenuSectionFields(s: MenuSection): Record<string, unknown> {
+  return { name: s.name, items: s.items };
 }

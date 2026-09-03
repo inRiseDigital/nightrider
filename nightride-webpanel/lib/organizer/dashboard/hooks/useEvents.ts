@@ -171,6 +171,17 @@ export function useEvents(
    * `saveDraftEvent`/`submitEvent` only close the dialog when this resolves
    * true, so the organizer's draft survives a permission error instead of
    * being discarded.
+   *
+   * The non-empty-`endTime` requirement applies only to a document that is
+   * (or is about to become) `source: 'organizer'` — a brand-new draft
+   * (always organizer-sourced), or an existing document whose stored
+   * `source` already is `'organizer'`. An organizer can also load an
+   * admin- or scraper-sourced document assigned to them via `organizerUid`
+   * (rules permit that update; `source` stays unchanged) with `endTime`
+   * correctly parsed as `""` — that document must remain saveable with no
+   * end time, which is exactly what `eventWindowToTimestamps` now does
+   * (`endAt: null`) once this guard doesn't stand in the way. Fixed in
+   * `data/time.ts`, not with a second guard here — see the fix-round report.
    */
   const commitEvent = useCallback(
     async (status: OrganizerEvent["status"], extra: Partial<OrganizerEvent> = {}) => {
@@ -183,14 +194,13 @@ export function useEvents(
         if (!meta) throw new Error("Select a venue before saving.");
         if (!finalDraft.name.trim()) throw new Error("Give the event a name before saving.");
         if (!finalDraft.date || !finalDraft.startTime) throw new Error("Set a date and start time before saving.");
-        // Every organizer-authored write needs a non-null `endAt` — the rules
-        // require it (`shapeOk()`: `source != 'organizer' || endAt is
-        // timestamp`) and derived `live` cannot guess an end time. The editor
-        // must not assume `endTime` is populated; it must require it.
-        if (!finalDraft.endTime) throw new Error("Set a close time before saving.");
+        const raw = editingId ? rawDocsRef.current[editingId] ?? {} : {};
+        const isOrganizerSourced = editingId ? raw.source === "organizer" : true;
+        if (isOrganizerSourced && !finalDraft.endTime) {
+          throw new Error("Set a close time before saving.");
+        }
         const venueNameValue = venues[finalDraft.venue]?.name ?? "";
         if (editingId) {
-          const raw = rawDocsRef.current[editingId] ?? {};
           const fields = toEventDocFields(finalDraft, { meta, venueName: venueNameValue, raw });
           await setDoc(eventDocRef(editingId), fields);
         } else {
@@ -222,7 +232,12 @@ export function useEvents(
    * A fresh `draft` with a new id — never carries `moderation`/`sales`
    * forward (the source event's producer-owned fields are never read here;
    * the new document's `raw` starts empty, so `toEventDocFields` writes
-   * neither).
+   * neither). Always writes `source: 'organizer'` on the new document (it's
+   * the organizer's own copy now, regardless of what the original's
+   * `source` was), so it needs a non-empty `endTime` even when duplicating
+   * an admin/scraped event that had none — required by `shapeOk()`, and
+   * checked here with a clear message rather than left to a `permission-denied`
+   * from the rules.
    */
   const duplicateEvent = useCallback(
     async (id: string) => {
@@ -231,6 +246,9 @@ export function useEvents(
       const ok = await run(async () => {
         const meta = venueMeta[src.venue];
         if (!meta) throw new Error("That event's venue no longer exists.");
+        if (!src.endTime) {
+          throw new Error("That event has no close time on record — set one before duplicating it.");
+        }
         const venueNameValue = venues[src.venue]?.name ?? "";
         const draftUi: OrganizerEvent = {
           ...src,

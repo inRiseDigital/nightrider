@@ -107,4 +107,71 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
     expect(back.endTime).toBe("");
     expect(back.date).toBe("2026-08-09"); // Asia/Dubai is UTC+4
   });
+
+  // Fix round 1: an organizer can load and re-save an admin/scraped document
+  // assigned to them (organizerUid set, source left as-is) that has no
+  // stored endAt — parseOrganizerEvent correctly yields endTime: "". The
+  // write must round-trip endAt as null, not fabricate a midnight close via
+  // eventWindowToTimestamps' old minutesOf("") === 0 behaviour, and not have
+  // `window?.endAt ?? toTimestampOrNull(ctx.raw.endAt)` silently reinstate
+  // whatever stale endAt happened to be on the stored document.
+  it("edit-save of a null-endAt (scraped/admin) document round-trips endAt as null, never fabricating one", () => {
+    const raw = {
+      name: "Scraped Night",
+      startAt: Timestamp.fromDate(new Date("2026-08-08T22:00:00Z")),
+      endAt: null,
+      source: "scraped",
+    };
+    const parsed = parseOrganizerEvent("e10", raw, meta.timeZone);
+    expect(parsed.endTime).toBe("");
+
+    const edited: OrganizerEvent = { ...parsed, name: "Scraped Night (Retitled)" };
+    const fields = toEventDocFields(edited, { meta, venueName: "Sirens Dubai", raw });
+
+    expect(fields.endAt).toBeNull();
+
+    const back = parseOrganizerEvent("e10", fields, meta.timeZone);
+    expect(back.endTime).toBe("");
+    expect(back.name).toBe("Scraped Night (Retitled)");
+  });
+
+  it("does not silently reinstate a stale stored endAt when the UI's endTime is legitimately empty", () => {
+    // A pathological but rules-permitted stored document: source stays
+    // 'scraped'/'admin' (never touched by the organizer's write), but an
+    // earlier write happened to leave a (now-superseded) endAt on it. The
+    // organizer's own edit, with endTime parsed as "", must still write
+    // endAt: null — not resurrect the old stored value via a `??` that can't
+    // tell "no window" from "window says null".
+    const raw = {
+      name: "Scraped Night",
+      startAt: Timestamp.fromDate(new Date("2026-08-08T22:00:00Z")),
+      endAt: Timestamp.fromDate(new Date("2026-08-09T02:00:00Z")),
+      source: "scraped",
+    };
+    const uiWithNoEndTime: OrganizerEvent = {
+      ...MOCK_EVENTS[0],
+      date: "2026-08-08",
+      startTime: "22:00",
+      endTime: "",
+    };
+    const fields = toEventDocFields(uiWithNoEndTime, { meta, venueName: "Sirens Dubai", raw });
+    expect(fields.endAt).toBeNull();
+  });
+
+  it("duplicating a null-endAt document's mapper output never invents a midnight close", () => {
+    // What useEvents.ts's duplicateEvent() builds: a fresh draft UI sourced
+    // from the parsed original, empty raw (no producer fields carried over).
+    // The hook itself refuses to duplicate an event with no endTime (see
+    // useEvents.ts) — this asserts the mapper-level guarantee that fix round
+    // 1 relies on: even without that guard, the mapper would write `null`,
+    // never a fabricated Timestamp.
+    const src = parseOrganizerEvent(
+      "e11",
+      { name: "Scraped Night", startAt: Timestamp.fromDate(new Date("2026-08-08T22:00:00Z")), endAt: null },
+      meta.timeZone
+    );
+    const duplicateDraft: OrganizerEvent = { ...src, id: "", name: `${src.name} (Copy)`, status: "draft" };
+    const fields = toEventDocFields(duplicateDraft, { meta, venueName: "Sirens Dubai", raw: {} });
+    expect(fields.endAt).toBeNull();
+  });
 });

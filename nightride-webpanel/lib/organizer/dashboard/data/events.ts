@@ -152,8 +152,14 @@ export function toEventDocFields(
     city: ctx.meta.city,
     countryCode: ctx.meta.countryCode,
     geo: ctx.meta.geo ? new GeoPoint(ctx.meta.geo.latitude, ctx.meta.geo.longitude) : toGeoOrNull(ctx.raw.geo),
-    startAt: window?.startAt ?? toTimestampOrNull(ctx.raw.startAt),
-    endAt: window?.endAt ?? toTimestampOrNull(ctx.raw.endAt),
+    // `window` is either absent (no `startTime` at all — falls back to
+    // whatever was already stored) or fully authoritative, `endAt: null`
+    // included. `window?.endAt ?? toTimestampOrNull(ctx.raw.endAt)` would be
+    // wrong here: `??` treats a legitimate `window.endAt === null` (no end
+    // time) the same as "no window computed," silently reinstating the
+    // stale stored `endAt` instead of writing the organizer's actual intent.
+    startAt: window ? window.startAt : toTimestampOrNull(ctx.raw.startAt),
+    endAt: window ? window.endAt : toTimestampOrNull(ctx.raw.endAt),
     performers,
     price: priceFromTiers(ui.tiers, currency),
     tickets: { ...(ctx.raw.tickets as Record<string, unknown> | undefined), currency, tiers: ui.tiers },

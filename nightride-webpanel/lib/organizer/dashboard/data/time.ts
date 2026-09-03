@@ -66,12 +66,25 @@ export function utcToZonedParts(d: Date, timeZone: string): { dateISO: string; t
  * `date`/`startTime`/`endTime` -> `startAt`/`endAt`. Overnight windows (e.g.
  * 22:00 -> 04:00) roll `endAt` onto `date + 1`, matching `format.ts:36`'s
  * `endMins <= startMins` bump and `blankEventDraft`'s 22:00/04:00 default.
+ *
+ * `ui.endTime === ""` means "no end time" (an admin- or scraper-written
+ * document `parseOrganizerEvent` tolerated as `endTime: ""`, being edited or
+ * duplicated by an organizer rather than freshly authored by one) and
+ * returns `endAt: null` — never a fabricated close time. `minutesOf("")` is
+ * `0`, which without this branch reads as "ends at 00:00", makes `overnight`
+ * true unconditionally, and silently produces `endAt` at midnight the next
+ * day: a real close time invented from nothing. Every genuinely
+ * organizer-authored event has a non-empty `endTime` in the UI (`shapeOk()`
+ * requires it whenever the written `source` is `'organizer'`); that
+ * requirement belongs at the call site, which knows whether the document
+ * it's about to write is organizer-sourced, not here.
  */
 export function eventWindowToTimestamps(
   ui: Pick<OrganizerEvent, "date" | "startTime" | "endTime">,
   timeZone: string
-): { startAt: Timestamp; endAt: Timestamp } {
+): { startAt: Timestamp; endAt: Timestamp | null } {
   const start = zonedToUtc(ui.date, ui.startTime, timeZone);
+  if (!ui.endTime) return { startAt: Timestamp.fromDate(start), endAt: null };
   const overnight = minutesOf(ui.endTime) <= minutesOf(ui.startTime);
   const endDateISO = overnight ? addDaysISO(ui.date, 1) : ui.date;
   const end = zonedToUtc(endDateISO, ui.endTime, timeZone);

@@ -74,6 +74,22 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
     ]);
   });
 
+  it("never writes moderation or sales — both are producer-owned and pass through from raw untouched", () => {
+    const ui: OrganizerEvent = { ...MOCK_EVENTS[0], moderationFlag: "clean", moderationEta: "" };
+    const raw = {
+      moderation: { flag: "pending", eta: Timestamp.fromDate(new Date("2026-08-08T22:00:00Z")) },
+      sales: { sold: 120, gross: 9600 },
+    };
+
+    const fields = toEventDocFields(ui, { meta, raw });
+
+    // UI carries a different moderationFlag ("clean") than the stored doc
+    // ("pending") — the write must still leave moderation byte-identical to
+    // what was stored, or producerFieldsPinned() rejects the update.
+    expect(fields.moderation).toEqual(raw.moderation);
+    expect(fields.sales).toEqual(raw.sales);
+  });
+
   it("tolerates endAt === null on read, returning endTime ''", () => {
     const back = parseOrganizerEvent(
       "e9",

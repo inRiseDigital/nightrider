@@ -54,12 +54,6 @@ function etaToText(raw: unknown): string {
   return `~${Math.max(1, Math.round(ms / 3_600_000))}h remaining`;
 }
 
-/** Best-effort inverse of `etaToText` — pulls the hour count back out of "~2h remaining". */
-function textToEta(text: string): Timestamp | null {
-  const m = text.match(/(\d+)\s*h/);
-  return m ? Timestamp.fromMillis(Date.now() + Number(m[1]) * 3_600_000) : null;
-}
-
 function scheduledPublishToLocal(raw: unknown, timeZone: string): string {
   const ts = toTimestampOrNull(raw);
   if (!ts) return "";
@@ -146,7 +140,6 @@ export function toEventDocFields(
   }));
   const existingPrice = (ctx.raw.price ?? {}) as Record<string, unknown>;
   const currency = typeof existingPrice.currency === "string" ? existingPrice.currency : "";
-  const existingModeration = (ctx.raw.moderation ?? {}) as Record<string, unknown>;
 
   return {
     ...ctx.raw,
@@ -166,10 +159,12 @@ export function toEventDocFields(
     scheduledPublish: localToScheduledPublish(ui.scheduledPublish, ctx.meta.timeZone),
     notifyOnChange: ui.notifyOnChange,
     cancelReason: ui.cancelReason,
-    moderation: {
-      ...existingModeration,
-      flag: ui.moderationFlag,
-      eta: ui.moderationFlag === "pending" ? (textToEta(ui.moderationEta) ?? existingModeration.eta) : null,
-    },
+    // `moderation` and `sales` are producer-owned: `producerFieldsPinned()` in
+    // firestore.rules requires an organizer update to leave both byte-identical
+    // to the stored document. Never map either outbound — the raw-remainder
+    // merge above (`...ctx.raw`) already carries the stored values through
+    // untouched, which is exactly right for a field this panel cannot own.
+    // (`moderationFlag`/`moderationEta` are still parsed inbound, above, so
+    // the panel can display review state — just never write it back.)
   };
 }

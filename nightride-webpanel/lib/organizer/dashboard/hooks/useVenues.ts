@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { MOCK_TONIGHT, MOCK_VENUES, MOCK_VENUE_ORDER } from "../mock-data";
+import { MOCK_LIVE, MOCK_VENUES, MOCK_VENUE_ORDER } from "../mock-data";
+import { parseTonight, toLiveFields } from "../data/venues";
 import type { DoorStatus, MenuItem, TonightState, VenueProfile, VerifyStepId } from "../types";
 import { useAsyncAction } from "./useAsyncAction";
 import { useVenueEditor } from "./useVenueEditor";
@@ -74,7 +75,7 @@ export function useVenues(showSnack: (text: string, tone?: "info" | "error") => 
   const [addingVenue, setAddingVenue] = useState(false);
   const [newVenueName, setNewVenueName] = useState("");
   const [newVenueCity, setNewVenueCity] = useState("");
-  const [tonight, setTonight] = useState<TonightState>(MOCK_TONIGHT);
+  const [rawLive, setRawLive] = useState<Record<string, Record<string, unknown>>>(MOCK_LIVE);
 
   const { drafts: venueDrafts, updateListing, discard } = useVenueEditor();
   const { busy, actionError, run } = useAsyncAction();
@@ -327,28 +328,57 @@ export function useVenues(showSnack: (text: string, tone?: "info" | "error") => 
     [newVenueName, newVenueCity]
   );
 
+  /**
+   * `live` is per-venue in Firestore (`venues/{id}.live`), so the raw doc is
+   * keyed by venue id and `tonight` is derived for whichever venue is being
+   * edited — see `parseTonight`/`toLiveFields` in `data/venues.ts`. Every
+   * mutator here reads and writes the *selected* venue's live doc, never a
+   * global slice.
+   */
+  const updateLive = useCallback(
+    (fn: (t: TonightState) => TonightState) => {
+      const id = editingVenue;
+      const capacity = venues[id]?.capacity ?? 0;
+      setRawLive((prev) => {
+        const raw = prev[id] ?? {};
+        const next = fn(parseTonight(raw, capacity));
+        return { ...prev, [id]: toLiveFields(next, { capacity, raw }) };
+      });
+    },
+    [editingVenue, venues]
+  );
+
   const setDoorStatus = useCallback(
     (status: DoorStatus) => {
-      setTonight((p) => ({ ...p, status }));
+      updateLive((p) => ({ ...p, status }));
       showSnack(`Door status set to ${status}.`);
     },
-    [showSnack]
+    [updateLive, showSnack]
   );
-  const setQueueMinutes = useCallback((v: number) => setTonight((p) => ({ ...p, queueMinutes: v })), []);
-  const setFlashText = useCallback((v: string) => setTonight((p) => ({ ...p, flashText: v })), []);
-  const setFlashUntil = useCallback((v: string) => setTonight((p) => ({ ...p, flashUntil: v })), []);
+  const setQueueMinutes = useCallback((v: number) => updateLive((p) => ({ ...p, queueMinutes: v })), [updateLive]);
+  const setFlashText = useCallback((v: string) => updateLive((p) => ({ ...p, flashText: v })), [updateLive]);
+  const setFlashUntil = useCallback((v: string) => updateLive((p) => ({ ...p, flashUntil: v })), [updateLive]);
   const toggleFlash = useCallback(() => {
-    setTonight((p) => {
-      showSnack(p.flashActive ? "Flash offer ended." : "Flash offer is live.");
-      return { ...p, flashActive: !p.flashActive };
-    });
-  }, [showSnack]);
+    const capacity = venues[editingVenue]?.capacity ?? 0;
+    const current = parseTonight(rawLive[editingVenue], capacity);
+    updateLive((p) => ({ ...p, flashActive: !p.flashActive }));
+    showSnack(current.flashActive ? "Flash offer ended." : "Flash offer is live.");
+  }, [venues, editingVenue, rawLive, updateLive, showSnack]);
   const toggleEmergency = useCallback(() => {
-    setTonight((p) => {
-      showSnack(p.emergencyActive ? "Venue reopened — you're back on the map." : "Emergency close requested — platform admin notified.");
-      return { ...p, emergencyActive: !p.emergencyActive };
-    });
-  }, [showSnack]);
+    const capacity = venues[editingVenue]?.capacity ?? 0;
+    const current = parseTonight(rawLive[editingVenue], capacity);
+    updateLive((p) => ({ ...p, emergencyActive: !p.emergencyActive }));
+    showSnack(
+      current.emergencyActive
+        ? "Venue reopened — you're back on the map."
+        : "Emergency close requested — platform admin notified."
+    );
+  }, [venues, editingVenue, rawLive, updateLive, showSnack]);
+
+  const tonight = useMemo(
+    () => parseTonight(rawLive[editingVenue], venues[editingVenue]?.capacity ?? 0),
+    [rawLive, editingVenue, venues]
+  );
 
   const savedProfile = venues[editingVenue];
   const draft = venueDrafts[editingVenue];

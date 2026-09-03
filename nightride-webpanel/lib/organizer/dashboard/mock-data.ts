@@ -9,7 +9,6 @@ import type {
   PushState,
   RankPerk,
   TeamMember,
-  TonightState,
   VenueProfile,
   VenueReview,
 } from "./types";
@@ -327,14 +326,31 @@ export const MOCK_EVENTS: OrganizerEvent[] = [
   },
 ];
 
-export const MOCK_TONIGHT: TonightState = {
-  status: "open",
-  inVenue: 412,
-  queueMinutes: 15,
-  emergencyActive: false,
-  flashActive: false,
-  flashText: "Free entry before midnight",
-  flashUntil: "23:59",
+/**
+ * `venues/{id}.live`, one raw doc per venue — mock-backed stand-in for what
+ * would otherwise be a Firestore read. `parseTonight(MOCK_LIVE[id], capacity)`
+ * derives the `TonightState` for whichever venue is being edited; there is no
+ * global "tonight" slice, matching one `live` map per venue in production.
+ */
+export const MOCK_LIVE: Record<string, Record<string, unknown>> = {
+  sirens: {
+    status: "open",
+    doorStatus: "open",
+    inVenue: 412,
+    queueMinutes: 15,
+    emergencyActive: false,
+    tablesAvailable: true,
+    flash: { active: false, text: "Free entry before midnight", until: "23:59" },
+  },
+  warehouse9: {
+    status: "open",
+    doorStatus: "open",
+    inVenue: 90,
+    queueMinutes: 0,
+    emergencyActive: false,
+    tablesAvailable: true,
+    flash: { active: false, text: "", until: "" },
+  },
 };
 
 export const MOCK_PUSH: PushState = { message: "", rateUsed: 2, rateMax: 4 };

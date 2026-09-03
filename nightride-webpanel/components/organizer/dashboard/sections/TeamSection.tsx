@@ -20,6 +20,8 @@ function initialsFor(name: string) {
 export function TeamSection() {
   const {
     team,
+    teamLoading,
+    teamError,
     inviteEmail,
     setInviteEmail,
     sendInvite,
@@ -28,8 +30,28 @@ export function TeamSection() {
     activity,
   } = useOrganizerDashboard();
 
+  if (teamLoading) {
+    return (
+      <div className="flex h-40 items-center justify-center text-[13px] text-[var(--m3-onv)]">
+        Loading your team…
+      </div>
+    );
+  }
+
+  if (teamError) {
+    return (
+      <div className="max-w-[480px] rounded-xl bg-[var(--m3-surf1)] p-5 text-[13px]" style={{ color: "var(--m3-err)" }}>
+        {teamError}
+      </div>
+    );
+  }
+
   return (
     <>
+      <p className="mb-3 max-w-[820px] text-xs text-[var(--m3-onv)]">
+        Invites and role changes need the team management API, which hasn&apos;t shipped yet — the
+        controls below are disabled until it does.
+      </p>
       <div className="mb-6 max-w-[820px] overflow-hidden rounded-xl bg-[var(--m3-surf1)] py-2">
         {team.map((tm) => (
           <div
@@ -48,6 +70,8 @@ export function TeamSection() {
             </div>
             <Select
               dense
+              disabled
+              title="Role changes need the team management API, which hasn't shipped yet."
               aria-label={`Role for ${tm.name}`}
               value={tm.role}
               onChange={(e) => setTeamRole(tm.id, e.target.value as TeamRole)}
@@ -67,14 +91,21 @@ export function TeamSection() {
         <div className="flex flex-wrap items-center gap-3 px-5 py-4">
           <TextField
             type="email"
+            disabled
+            title="Team invites need the team management API, which hasn't shipped yet."
             aria-label="Invite by email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendInvite()}
-            placeholder="Invite by email"
+            placeholder="Invite by email — coming soon"
             wrapperClassName="min-w-[220px] flex-1"
           />
-          <FilledButton icon={<UserPlus size={17} />} onClick={sendInvite}>
+          <FilledButton
+            icon={<UserPlus size={17} />}
+            onClick={sendInvite}
+            disabled
+            title="Team invites need the team management API, which hasn't shipped yet."
+          >
             Send invite
           </FilledButton>
         </div>

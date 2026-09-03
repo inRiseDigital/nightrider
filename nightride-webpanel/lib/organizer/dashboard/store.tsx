@@ -41,16 +41,16 @@ const ActivityContext = createContext<ActivityState | null>(null);
 const UiContext = createContext<DashboardUiState | null>(null);
 
 export function OrganizerDashboardProvider({ children }: { children: ReactNode }) {
-  const { uid } = useOrganizerAuth();
+  const { uid, user, organizer, refreshOrganizer } = useOrganizerAuth();
   const ui = useDashboardUi();
-  const identity = useAccountSettings();
   // `uid` is guaranteed non-null here: `OrganizerDashboardProvider` only ever
   // mounts inside `OrganizerGate` once auth status is "approved".
+  const identity = useAccountSettings(uid as string, user, organizer, refreshOrganizer, ui.showSnack);
   const venues = useVenues(uid as string, ui.showSnack);
   const events = useEvents(uid as string, venues.data.profiles, venues.data.order, venues.data.meta, ui.showSnack);
-  const reviews = useReviews(ui.showSnack);
-  const inbox = useInbox();
-  const team = useTeam(ui.showSnack);
+  const reviews = useReviews(venues.data.order, identity.data.organizer, uid as string, ui.showSnack);
+  const inbox = useInbox(uid as string);
+  const team = useTeam(venues.data.order, user, ui.showSnack);
   const promotion = usePromotion(ui.showSnack);
   const now = useNow();
   const performance = usePerformance(events.data.events, now);
@@ -265,6 +265,9 @@ export function useOrganizerDashboard() {
 
       // ---- Team ----
       team: t.team,
+      teamLoading: account.team.loading,
+      teamError: account.team.error,
+      teamBusy: account.team.busy,
       activity: activity.data.activity,
       inviteEmail: t.inviteEmail,
       setInviteEmail: account.team.setInviteEmail,
@@ -287,12 +290,16 @@ export function useOrganizerDashboard() {
 
       // ---- Reviews & inbox ----
       reviews: r.reviews,
+      reviewsLoading: engagement.reviews.loading,
+      reviewsError: engagement.reviews.error,
       setReviewReply: engagement.reviews.setReviewReply,
       toggleReviewFlag: engagement.reviews.toggleReviewFlag,
       sendReviewReply: engagement.reviews.sendReviewReply,
       editPostedReply: engagement.reviews.editPostedReply,
       deletePostedReply: engagement.reviews.deletePostedReply,
       inbox: ib.inbox,
+      inboxLoading: engagement.inbox.loading,
+      inboxError: engagement.inbox.error,
       toggleInboxItem: engagement.inbox.toggleInboxItem,
       hasUnreadInbox: ib.hasUnreadInbox,
 
@@ -310,6 +317,10 @@ export function useOrganizerDashboard() {
       setChangeOtp: identity.setChangeOtp,
       submitNewValue: identity.submitNewValue,
       submitOtp: identity.submitOtp,
+      preferences: idn.preferences,
+      prefsLoading: idn.prefsLoading,
+      prefsError: idn.prefsError,
+      togglePreference: identity.togglePreference,
 
       // ---- Image slots ----
       images: u.images,

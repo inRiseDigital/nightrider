@@ -1,25 +1,24 @@
-/** `venues/{venueId}/team/{memberId}` <-> `TeamMember`. Function-owned in
- * production (`/api/organizer/team`); this task only builds the mapper. */
+/**
+ * `venues/{venueId}/team/{memberId}` <-> `TeamMember`. Read-only from the
+ * client — `firestore.rules` denies every client write to this collection
+ * outright; `/api/organizer/team` owns invites, role changes and removals
+ * and does not exist yet (see `docs/FIRESTORE_SCHEMA.md`).
+ */
 import type { TeamMember, TeamRole } from "../types";
 
 const TEAM_ROLES: readonly TeamRole[] = ["Owner", "Manager", "Door staff"];
 
-function parseTeamRole(raw: unknown): TeamRole {
-  return typeof raw === "string" && (TEAM_ROLES as readonly string[]).includes(raw)
-    ? (raw as TeamRole)
-    : "Door staff";
+function isTeamRole(v: unknown): v is TeamRole {
+  return typeof v === "string" && (TEAM_ROLES as readonly string[]).includes(v);
 }
 
-export function parseTeamMember(id: string, data: Record<string, unknown> | undefined): TeamMember {
-  const d = data ?? {};
+/** `venues/{venueId}/team/{id}` -> `TeamMember`. An unrecognised `role` degrades to "Door staff" rather than throwing. */
+export function parseTeamMember(id: string, raw: Record<string, unknown> | undefined): TeamMember {
+  const d = raw ?? {};
   return {
     id,
     name: typeof d.name === "string" ? d.name : "",
     email: typeof d.email === "string" ? d.email : "",
-    role: parseTeamRole(d.role),
+    role: isTeamRole(d.role) ? d.role : "Door staff",
   };
-}
-
-export function toTeamMemberFields(ui: TeamMember, ctx: { raw: Record<string, unknown> }): Record<string, unknown> {
-  return { ...ctx.raw, name: ui.name, email: ui.email, role: ui.role };
 }

@@ -31,8 +31,7 @@ export function OrganizerGate({ children }: { children: React.ReactNode }) {
       <Shell>
         <Card className="max-w-md text-center">
           <p className="text-sm" style={{ color: "var(--m3-on)" }}>
-            Firebase is not configured. Copy .env.example to .env.local and fill in the
-            NEXT_PUBLIC_FIREBASE_* values.
+            Firebase is not configured. Copy .env.example to .env.local and restart the dev server.
           </p>
         </Card>
       </Shell>

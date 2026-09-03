@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { getAdminReviewDoc } from "@/lib/admin/firestore";
 import { getDb, getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
 import { initialsOf } from "./format";
 import type { OrganizerProfile } from "./types";
@@ -68,9 +69,8 @@ export function OrganizerAuthProvider({ children }: { children: ReactNode }) {
 
     if (nextStatus === "rejected") {
       try {
-        const reviewSnap = await getDoc(doc(getDb(), "users", nextUser.uid, "private", "organizerReview"));
-        const reviewData = reviewSnap.exists() ? (reviewSnap.data() as Record<string, unknown>) : undefined;
-        setRejectionReason(typeof reviewData?.rejectionReason === "string" ? reviewData.rejectionReason : "");
+        const review = await getAdminReviewDoc(nextUser.uid);
+        setRejectionReason(review?.rejectionReason ?? "");
       } catch {
         setRejectionReason("");
       }

@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
+import { useOrganizerAuth } from "@/lib/organizer/dashboard/auth";
 import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { findNavItem } from "./nav-items";
 
@@ -10,6 +11,7 @@ export function Topbar({ onMenuClick: _onMenuClick }: { onMenuClick: () => void 
   const router = useRouter();
   const { organizer, inbox, hasUnreadInbox, venueOrder, openNewEvent, profile, setAccountTab } =
     useOrganizerDashboard();
+  const { signOut } = useOrganizerAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -186,7 +188,10 @@ export function Topbar({ onMenuClick: _onMenuClick }: { onMenuClick: () => void 
                 Settings
               </button>
               <button
-                onClick={closeMenus}
+                onClick={() => {
+                  closeMenus();
+                  void signOut().then(() => router.replace("/organizer/login"));
+                }}
                 className="block w-full border-t px-3.5 py-2.5 text-left text-xs hover:opacity-80"
                 style={{ borderColor: "var(--m3-outlinev)", color: "var(--m3-err)" }}
               >

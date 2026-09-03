@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Roboto, Roboto_Mono } from "next/font/google";
 import { DashboardShell } from "@/components/organizer/dashboard/DashboardShell";
+import { OrganizerGate } from "@/components/organizer/dashboard/OrganizerGate";
+import { OrganizerAuthProvider } from "@/lib/organizer/dashboard/auth";
 import { OrganizerDashboardProvider } from "@/lib/organizer/dashboard/store";
 import "./organizer-material.css";
 
@@ -35,7 +37,7 @@ const robotoMono = Roboto_Mono({
 
 export default function OrganizerDashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <OrganizerDashboardProvider>
+    <OrganizerAuthProvider>
       <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
         rel="stylesheet"
@@ -44,8 +46,19 @@ export default function OrganizerDashboardLayout({ children }: { children: React
         className={`organizer-m3 ${roboto.variable} ${robotoMono.variable} flex min-h-0 flex-1`}
         style={{ fontFamily: "var(--font-m3-sans), sans-serif" }}
       >
-        <DashboardShell>{children}</DashboardShell>
+        {/*
+         * OrganizerGate renders every non-"approved" auth state (loading,
+         * unconfigured, signed-out, pending, rejected) inside this themed
+         * wrapper so a gate card never loses the dashboard's M3 look. Only
+         * once it reports "approved" does OrganizerDashboardProvider — and
+         * therefore any real Firestore read — mount at all.
+         */}
+        <OrganizerGate>
+          <OrganizerDashboardProvider>
+            <DashboardShell>{children}</DashboardShell>
+          </OrganizerDashboardProvider>
+        </OrganizerGate>
       </div>
-    </OrganizerDashboardProvider>
+    </OrganizerAuthProvider>
   );
 }

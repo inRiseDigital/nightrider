@@ -4,12 +4,27 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { AccentButton } from "@/components/organizer/ui/AccentButton";
 import { AuthCard, BrandMark, ErrorNote } from "@/components/organizer/ui/AuthCard";
 import { TextField } from "@/components/organizer/ui/TextField";
-import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
+import { getDb, getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
 import { describeAuthError } from "@/lib/organizer/errors";
 import { validateEmail } from "@/lib/organizer/validation";
+
+/**
+ * Only used once we already know the sign-in landed on an approved organizer
+ * — an unapproved one always goes to /organizer/apply regardless of `next`.
+ * `useSearchParams` would need a Suspense boundary under `output: "export"`,
+ * and there is exactly one query param to read here, so `window.location.search`
+ * avoids that for a one-line lookup. An open redirect elsewhere would be a
+ * real vulnerability, hence the prefix check rather than trusting the param.
+ */
+function approvedDestination(): string {
+  if (typeof window === "undefined") return "/organizer/dashboard";
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/organizer/") ? next : "/organizer/dashboard";
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -38,10 +53,22 @@ export function LoginForm() {
     setBusy(true);
     setError("");
     try {
-      await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
-      // The application store reads the signed-in user and resumes the flow at
-      // whichever stage they left off — phone linking or review.
-      router.replace("/organizer/apply");
+      const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password);
+      try {
+        const snap = await getDoc(doc(getDb(), "users", credential.user.uid));
+        const organizerStatus = snap.exists() ? (snap.data().organizerStatus as string | undefined) : undefined;
+        if (organizerStatus === "approved") {
+          router.replace(approvedDestination());
+        } else {
+          // The application store reads the signed-in user and resumes the
+          // flow at whichever stage they left off — phone linking or review.
+          router.replace("/organizer/apply");
+        }
+      } catch {
+        // A read failure shouldn't strand a signed-in user — the apply flow
+        // is the current and safe default.
+        router.replace("/organizer/apply");
+      }
     } catch (err) {
       setError(describeAuthError(err));
       setBusy(false);

@@ -134,9 +134,17 @@ export function useOrganizerDashboard() {
     // `ImageSlot`/the hero-and-gallery preview keep their own local override
     // for that window, exactly so the tile never has to wait on Save (let
     // alone admin review) to show what was just picked.
+    //
+    // Exception: the currently-editing venue while its listing submission is
+    // pending review. `v.profile` already overlays `pendingEdit.listing`
+    // (including `photos`) onto the saved snapshot for exactly this venue —
+    // reusing it here, instead of `p.photos` from the raw saved doc, is what
+    // keeps a submitted-but-not-yet-approved hero/gallery photo visible after
+    // a refresh (`localSrc`'s in-memory override doesn't survive one, and the
+    // photo itself isn't on the venue doc until an admin approves it).
     const images: Record<string, string> = {};
     for (const [id, p] of Object.entries(v.profiles as Record<string, VenueProfile>)) {
-      const photos = p.photos ?? [];
+      const photos = (id === v.editingVenue && v.venuePendingReview ? v.profile.photos : p.photos) ?? [];
       if (photos[0]) images[heroSlotId(id)] = photos[0];
       for (let i = 0; i < GALLERY_SLOT_COUNT; i++) {
         const url = photos[i + 1];

@@ -1,21 +1,63 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import {
-  ATTENDANCE_CEILING,
-  MOCK_ATTENDANCE,
-  MOCK_ATTENDANCE_AVG,
-  MOCK_ATTENDANCE_PEAK,
-  MOCK_DISCOVERY_FUNNEL,
-  MOCK_TOP_NIGHTS,
-} from "../mock-analytics";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getDoc } from "firebase/firestore";
+import { venueMetricsDocRef } from "../data/refs";
+import { isoWeekId, parseVenueMetrics, type VenueMetrics } from "../data/analytics";
+import { describeFirestoreError } from "../data/errors";
 import { isEventLive } from "../format";
 import type { OrganizerEvent } from "../types";
 
-/** `venues/{venueId}/metrics/{periodId}` — read-only analytics for the Audience destination. */
-export function usePerformance(events: OrganizerEvent[], now: Date | null) {
+/**
+ * `venues/{venueId}/metrics/{periodId}` — read-only analytics for the
+ * Audience destination, plus the Live Operations KPI strip's "profile
+ * views" number. Two point reads per venue (`last30` and the current ISO
+ * week), not a query — see `data/analytics.ts`'s module doc for why the
+ * period splits that way. The venue read is whichever one the switcher has
+ * selected, or the organizer's first venue while it's on "All venues" —
+ * there is one metrics document per venue, not a combined one.
+ */
+export function usePerformance(events: OrganizerEvent[], venueOrder: string[], now: Date | null) {
   const [perfVenueFilter, setPerfVenueFilterState] = useState("all");
   const [perfEventId, setPerfEventId] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<VenueMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const effectiveVenueId = perfVenueFilter !== "all" ? perfVenueFilter : (venueOrder[0] ?? null);
+  const weekId = now ? isoWeekId(now) : null;
+
+  const fetchMetrics = useCallback(async () => {
+    if (!effectiveVenueId) {
+      setMetrics(null);
+      setLoading(false);
+      setError("");
+      return;
+    }
+    setLoading(true);
+    try {
+      const [last30Snap, weekSnap] = await Promise.all([
+        getDoc(venueMetricsDocRef(effectiveVenueId, "last30")),
+        weekId ? getDoc(venueMetricsDocRef(effectiveVenueId, weekId)) : Promise.resolve(null),
+      ]);
+      setMetrics(
+        parseVenueMetrics(
+          last30Snap.exists() ? (last30Snap.data() as Record<string, unknown>) : undefined,
+          weekSnap?.exists() ? (weekSnap.data() as Record<string, unknown>) : undefined
+        )
+      );
+      setError("");
+    } catch (err) {
+      setMetrics(null);
+      setError(describeFirestoreError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [effectiveVenueId, weekId]);
+
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
 
   const setPerfVenueFilter = useCallback(
     (id: string) => {
@@ -29,22 +71,13 @@ export function usePerformance(events: OrganizerEvent[], now: Date | null) {
   );
 
   const data = useMemo(
-    () => ({
-      perfVenueFilter,
-      perfEventId,
-      attendance: MOCK_ATTENDANCE,
-      attendanceCeiling: ATTENDANCE_CEILING,
-      attendanceAvg: MOCK_ATTENDANCE_AVG,
-      attendancePeak: MOCK_ATTENDANCE_PEAK,
-      funnel: MOCK_DISCOVERY_FUNNEL,
-      topNights: MOCK_TOP_NIGHTS,
-    }),
-    [perfVenueFilter, perfEventId]
+    () => ({ perfVenueFilter, perfEventId, metrics }),
+    [perfVenueFilter, perfEventId, metrics]
   );
 
   return useMemo(
-    () => ({ data, loading: false, error: null, busy: false, actionError: "", setPerfVenueFilter, setPerfEventId }),
-    [data, setPerfVenueFilter]
+    () => ({ data, loading, error, busy: false, actionError: "", setPerfVenueFilter, setPerfEventId }),
+    [data, loading, error, setPerfVenueFilter]
   );
 }
 

@@ -23,7 +23,6 @@ import {
   useOrganizerDashboard,
 } from "@/lib/organizer/dashboard/store";
 import { DOOR_STATUSES } from "@/lib/organizer/dashboard/constants";
-import { MOCK_KPIS } from "@/lib/organizer/dashboard/mock-data";
 import { deriveEventChip, toISODate, venueName } from "@/lib/organizer/dashboard/format";
 import { Toggle } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
@@ -48,6 +47,26 @@ const KPI_ICONS: Record<string, LucideIcon> = {
   views: Eye,
   ai: Sparkles,
 };
+
+/**
+ * Trend deltas have no backing document in this task's four shapes (metrics,
+ * aiVisibility, promotion, activity) — nothing here stores a week-over-week
+ * comparison to derive them from, so they stay illustrative placeholders
+ * rather than a number invented to look real. `value` is filled in for real
+ * below, from `tonightEvent`, the performance funnel, and the AI score.
+ */
+const KPI_META: {
+  icon: "rsvp" | "revenue" | "views" | "ai";
+  label: string;
+  delta: string;
+  tone: "primary" | "tertiary";
+  deltaTone: "up" | "down";
+}[] = [
+  { icon: "rsvp", label: "RSVPs tonight", delta: "+18%", tone: "primary", deltaTone: "up" },
+  { icon: "revenue", label: "Ticket revenue (AED)", delta: "+7%", tone: "tertiary", deltaTone: "up" },
+  { icon: "views", label: "Profile views, 7d", delta: "−4%", tone: "primary", deltaTone: "down" },
+  { icon: "ai", label: "AI recommendation score", delta: "+6", tone: "tertiary", deltaTone: "up" },
+];
 
 /**
  * Home → Live operations: the mockup's single combined control screen — one
@@ -75,6 +94,8 @@ export function LiveOperationsSection() {
     setAccountTab,
     setVenueTab,
     openAddVenue,
+    perfMetrics,
+    aiVisibility,
   } = useOrganizerDashboard();
   const now = useNow();
 
@@ -90,6 +111,17 @@ export function LiveOperationsSection() {
     .sort((a, b) => a.date.localeCompare(b.date));
   const todayISO = now ? toISODate(now) : "";
   const tonightEvent = venueEvents.find((e) => e.date === todayISO) ?? venueEvents[0];
+
+  // "Profile views" reuses the discovery funnel's "Profile opened" count —
+  // the same absolute number the Performance tab derives its bar chart from,
+  // not a second, independently-maintained figure.
+  const profileViews = perfMetrics?.funnel.find((f) => f.label === "Profile opened")?.value ?? "—";
+  const kpiValues: Record<string, string> = {
+    rsvp: tonightEvent ? String(tonightEvent.sold) : "—",
+    revenue: tonightEvent ? `${(tonightEvent.revenue / 1000).toFixed(1)}k` : "—",
+    views: profileViews,
+    ai: aiVisibility ? String(aiVisibility.score) : "—",
+  };
 
   const attention = buildAttention();
 
@@ -348,7 +380,7 @@ export function LiveOperationsSection() {
 
       {/* KPI row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {MOCK_KPIS.map((kpi) => {
+        {KPI_META.map((kpi) => {
           const Icon = KPI_ICONS[kpi.icon] ?? Sparkles;
           return (
             <div key={kpi.label} className="rounded-xl bg-[var(--m3-surf1)] p-5">
@@ -370,7 +402,7 @@ export function LiveOperationsSection() {
                 </span>
               </div>
               <p className="mt-4 font-mono text-[30px] font-medium leading-none text-[var(--m3-on)]">
-                {kpi.value}
+                {kpiValues[kpi.icon]}
               </p>
               <p className="mt-1.5 text-[13px] text-[var(--m3-onv)]">{kpi.label}</p>
             </div>

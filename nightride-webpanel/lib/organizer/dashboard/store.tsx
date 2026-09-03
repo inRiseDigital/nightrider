@@ -51,11 +51,11 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const reviews = useReviews(venues.data.order, identity.data.organizer, uid as string, ui.showSnack);
   const inbox = useInbox(uid as string);
   const team = useTeam(venues.data.order, user, ui.showSnack);
-  const promotion = usePromotion(ui.showSnack);
+  const promotion = usePromotion(venues.data.editingVenue || null, ui.showSnack);
   const now = useNow();
-  const performance = usePerformance(events.data.events, now);
-  const aiVisibility = useAiVisibility();
-  const activity = useActivity();
+  const performance = usePerformance(events.data.events, venues.data.order, now);
+  const aiVisibility = useAiVisibility(venues.data.editingVenue || null);
+  const activity = useActivity(venues.data.order);
 
   const engagementValue = useMemo(() => ({ reviews, inbox }), [reviews, inbox]);
   const accountValue = useMemo(() => ({ team, promotion }), [team, promotion]);
@@ -117,6 +117,7 @@ export function useOrganizerDashboard() {
     const t = account.team.data;
     const pr = account.promotion.data;
     const perf = analytics.performance.data;
+    const az = analytics.aiVisibility.data;
     const idn = identity.data;
     const u = ui.data;
 
@@ -248,6 +249,14 @@ export function useOrganizerDashboard() {
       perfEventId: perf.perfEventId,
       setPerfVenueFilter: analytics.performance.setPerfVenueFilter,
       setPerfEventId: analytics.performance.setPerfEventId,
+      perfMetrics: perf.metrics,
+      perfLoading: analytics.performance.loading,
+      perfError: analytics.performance.error,
+
+      // ---- AI visibility ----
+      aiVisibility: az.visibility,
+      aiLoading: analytics.aiVisibility.loading,
+      aiError: analytics.aiVisibility.error,
 
       // ---- Promotion ----
       push: pr.push,
@@ -262,6 +271,10 @@ export function useOrganizerDashboard() {
       boost: pr.boost,
       setBoostNight: account.promotion.setBoostNight,
       toggleBoost: account.promotion.toggleBoost,
+      promotionLoading: account.promotion.loading,
+      promotionError: account.promotion.error,
+      promotionBusy: account.promotion.busy,
+      promotionActionError: account.promotion.actionError,
 
       // ---- Team ----
       team: t.team,
@@ -269,6 +282,8 @@ export function useOrganizerDashboard() {
       teamError: account.team.error,
       teamBusy: account.team.busy,
       activity: activity.data.activity,
+      activityLoading: activity.loading,
+      activityError: activity.error,
       inviteEmail: t.inviteEmail,
       setInviteEmail: account.team.setInviteEmail,
       sendInvite: account.team.sendInvite,

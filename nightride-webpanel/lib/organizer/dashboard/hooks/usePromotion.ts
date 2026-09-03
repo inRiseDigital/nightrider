@@ -1,48 +1,199 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { MOCK_BOOST, MOCK_PERKS, MOCK_PROMOS, MOCK_PUSH } from "../mock-data";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { addDoc, deleteDoc, doc, getDoc, getDocs, serverTimestamp, updateDoc } from "firebase/firestore";
+import { venueBoostsCol, venuePromoStateDocRef, venuePromotionsCol, venuePushCampaignsCol, venueRankPerksDocRef } from "../data/refs";
+import {
+  parseBoostSlot,
+  parsePromoCode,
+  parsePromoState,
+  parseRankPerks,
+  toBoostCreateFields,
+  toPromoCodeFields,
+  type PromoState,
+} from "../data/promotion";
+import { useAsyncAction } from "./useAsyncAction";
+import { describeFirestoreError } from "../data/errors";
 import type { BoostSlot, PromoCode, PushState, RankPerk } from "../types";
 
-/** `venues/{venueId}/{promotions,pushCampaigns,promoState,boosts,rankPerks}`. */
-export function usePromotion(showSnack: (text: string, tone?: "info" | "error") => void) {
-  const [push, setPush] = useState<PushState>(MOCK_PUSH);
-  const [promos, setPromos] = useState<PromoCode[]>(MOCK_PROMOS);
-  const [perks, setPerks] = useState<RankPerk[]>(MOCK_PERKS);
-  const [boost, setBoost] = useState<BoostSlot>(MOCK_BOOST);
+const BLANK_PROMO_STATE: PromoState = { used: 0, max: 0 };
+const BLANK_BOOST: BoostSlot = { active: false, night: "", price: 40 };
 
-  const setPushMessage = useCallback((v: string) => setPush((p) => ({ ...p, message: v })), []);
-  const sendPush = useCallback(() => {
-    if (push.rateUsed >= push.rateMax) {
-      showSnack("No pushes left this week.");
+/**
+ * `venues/{venueId}/{promotions,pushCampaigns,promoState,boosts,rankPerks}`.
+ *
+ * Real writes: promo codes (create/update/delete) and a boost request
+ * (create only — `firestore.rules` forbids `update`/`delete` on `boosts`
+ * once bought). `rankPerks/current` reads `write: if false` in
+ * `firestore.rules` despite what an earlier pass of this task assumed —
+ * `updatePerk` is an honest no-op, not a write that would only ever fail.
+ * `promoState/current` is display state the organizer cannot write at all;
+ * its `{used, max}` is shown as information, not a client-verified
+ * guarantee — the real weekly cap is enforced by the FCM fanout function.
+ * `sendPush` writes only `pushCampaigns/{id}` with `status: 'queued'`.
+ */
+export function usePromotion(venueId: string | null, showSnack: (text: string, tone?: "info" | "error") => void) {
+  const [pushMessage, setPushMessage] = useState("");
+  const [promoState, setPromoState] = useState<PromoState>(BLANK_PROMO_STATE);
+  const [promos, setPromos] = useState<(PromoCode & { id: string })[]>([]);
+  const [perks, setPerks] = useState<RankPerk[]>([]);
+  const [boost, setBoost] = useState<(BoostSlot & { id: string }) | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchAll = useCallback(async () => {
+    if (!venueId) {
+      setPromoState(BLANK_PROMO_STATE);
+      setPromos([]);
+      setPerks([]);
+      setBoost(null);
+      setLoading(false);
+      setError("");
       return;
     }
-    if (!push.message.trim()) {
-      showSnack("Write a message first.");
+    setLoading(true);
+    try {
+      const [promoStateSnap, perksSnap, promosSnap, boostsSnap] = await Promise.all([
+        getDoc(venuePromoStateDocRef(venueId)),
+        getDoc(venueRankPerksDocRef(venueId)),
+        getDocs(venuePromotionsCol(venueId)),
+        getDocs(venueBoostsCol(venueId)),
+      ]);
+      setPromoState(parsePromoState(promoStateSnap.exists() ? (promoStateSnap.data() as Record<string, unknown>) : undefined));
+      setPerks(parseRankPerks(perksSnap.exists() ? (perksSnap.data() as Record<string, unknown>).perks : undefined));
+      setPromos(promosSnap.docs.map((d) => parsePromoCode(d.id, d.data() as Record<string, unknown>)));
+      const boostDoc = boostsSnap.docs[0];
+      setBoost(boostDoc ? parseBoostSlot(boostDoc.id, boostDoc.data() as Record<string, unknown>) : null);
+      setError("");
+    } catch (err) {
+      setError(describeFirestoreError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [venueId]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const { busy, actionError, run } = useAsyncAction(fetchAll);
+
+  const sendPush = useCallback(async () => {
+    if (!venueId) return;
+    if (!pushMessage.trim()) {
+      showSnack("Write a message first.", "error");
       return;
     }
-    setPush((p) => ({ ...p, rateUsed: p.rateUsed + 1, message: "" }));
-    showSnack("Push queued for 240 followers.");
-  }, [push.rateUsed, push.rateMax, push.message, showSnack]);
+    const ok = await run(async () => {
+      await addDoc(venuePushCampaignsCol(venueId), {
+        message: pushMessage.trim(),
+        status: "queued",
+        createdAt: serverTimestamp(),
+      });
+    });
+    if (ok) {
+      setPushMessage("");
+      showSnack("Push queued — the weekly limit is enforced when it sends, not here.", "info");
+    } else {
+      showSnack("Couldn't queue that push.", "error");
+    }
+  }, [venueId, pushMessage, run, showSnack]);
 
-  const addPromo = useCallback(() => setPromos((p) => [...p, { code: "NEWCODE", desc: "", maxUses: 100, used: 0 }]), []);
-  const updatePromo = useCallback((idx: number, field: "code" | "desc", value: string) => {
-    setPromos((p) => p.map((x, i) => (i === idx ? { ...x, [field]: value } : x)));
-  }, []);
-  const removePromo = useCallback((idx: number) => setPromos((p) => p.filter((_, i) => i !== idx)), []);
+  const addPromo = useCallback(async () => {
+    if (!venueId) return;
+    const ok = await run(async () => {
+      await addDoc(venuePromotionsCol(venueId), { code: "NEWCODE", desc: "", maxUses: 100, used: 0, createdAt: serverTimestamp() });
+    });
+    if (!ok) showSnack("Couldn't add that code.", "error");
+  }, [venueId, run, showSnack]);
 
-  const updatePerk = useCallback((idx: number, value: string) => {
-    setPerks((p) => p.map((x, i) => (i === idx ? { ...x, perk: value } : x)));
-  }, []);
+  const updatePromo = useCallback(
+    async (idx: number, field: "code" | "desc", value: string) => {
+      const target = promos[idx];
+      if (!venueId || !target) return;
+      const { id, ...ui } = target;
+      const next = { ...ui, [field]: value };
+      setPromos((p) => p.map((x, i) => (i === idx ? { ...x, [field]: value } : x)));
+      // `updateDoc` merges, so there is no need to spread an existing raw doc
+      // here — `used` is simply omitted from the patch and stays untouched.
+      const ok = await run(async () => {
+        await updateDoc(doc(venuePromotionsCol(venueId), id), toPromoCodeFields(next, { raw: {} }));
+      });
+      if (!ok) showSnack("Couldn't save that code.", "error");
+    },
+    [venueId, promos, run, showSnack]
+  );
 
-  const setBoostNight = useCallback((v: string) => setBoost((b) => ({ ...b, night: v })), []);
-  const toggleBoost = useCallback(() => setBoost((b) => ({ ...b, active: !b.active })), []);
+  const removePromo = useCallback(
+    async (idx: number) => {
+      const target = promos[idx];
+      if (!venueId || !target) return;
+      const ok = await run(async () => {
+        await deleteDoc(doc(venuePromotionsCol(venueId), target.id));
+      });
+      if (!ok) showSnack("Couldn't remove that code.", "error");
+    },
+    [venueId, promos, run, showSnack]
+  );
 
-  const data = useMemo(() => ({ push, promos, perks, boost }), [push, promos, perks, boost]);
+  /** `rankPerks/current` is `write: if false` in `firestore.rules` — this is honest, not a real save. */
+  const updatePerk = useCallback(
+    (_idx: number, _value: string) => {
+      void _idx;
+      void _value;
+      showSnack("Rank perks aren't editable from here yet.", "error");
+    },
+    [showSnack]
+  );
+
+  const [boostNightDraft, setBoostNightDraft] = useState("2026-08-15");
+  const setBoostNight = useCallback((v: string) => setBoostNightDraft(v), []);
+
+  const toggleBoost = useCallback(async () => {
+    if (!venueId) return;
+    if (boost) {
+      showSnack("Boosts can't be cancelled or edited from here once bought.", "error");
+      return;
+    }
+    const ok = await run(async () => {
+      await addDoc(venueBoostsCol(venueId), toBoostCreateFields(boostNightDraft, BLANK_BOOST.price));
+    });
+    if (!ok) showSnack("Couldn't buy that boost.", "error");
+  }, [venueId, boost, boostNightDraft, run, showSnack]);
+
+  const push: PushState = useMemo(
+    () => ({ message: pushMessage, rateUsed: promoState.used, rateMax: promoState.max }),
+    [pushMessage, promoState]
+  );
+  const boostUi: BoostSlot = useMemo(
+    () => (boost ? { active: boost.active, night: boost.night, price: boost.price } : { ...BLANK_BOOST, night: boostNightDraft }),
+    [boost, boostNightDraft]
+  );
+
+  const promosUi: PromoCode[] = useMemo(
+    () => promos.map((p) => ({ code: p.code, desc: p.desc, maxUses: p.maxUses, used: p.used })),
+    [promos]
+  );
+
+  const data = useMemo(() => ({ push, promos: promosUi, perks, boost: boostUi }), [push, promosUi, perks, boostUi]);
 
   return useMemo(
-    () => ({ data, loading: false, error: null, busy: false, actionError: "", setPushMessage, sendPush, addPromo, updatePromo, removePromo, updatePerk, setBoostNight, toggleBoost }),
-    [data, setPushMessage, sendPush, addPromo, updatePromo, removePromo, updatePerk, setBoostNight, toggleBoost]
+    () => ({
+      data,
+      loading,
+      error,
+      busy,
+      actionError,
+      setPushMessage,
+      sendPush,
+      addPromo,
+      updatePromo,
+      removePromo,
+      updatePerk,
+      setBoostNight,
+      toggleBoost,
+    }),
+    [data, loading, error, busy, actionError, sendPush, addPromo, updatePromo, removePromo, updatePerk, setBoostNight, toggleBoost]
   );
 }
 

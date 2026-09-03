@@ -3,6 +3,12 @@ import type { Timestamp } from "firebase/firestore";
 import { toTimestampOrNull } from "./venues";
 import type { ActivityEntry } from "../types";
 
+/**
+ * Formatted in UTC, not the browser's local zone — activity spans every
+ * venue an organizer edits, which may sit in different timezones, and there
+ * is no single "the" zone to convert to at this call site. UTC keeps the
+ * label deterministic regardless of the organizer's or a test runner's zone.
+ */
 function whenText(ts: Timestamp | null): string {
   if (!ts) return "";
   return ts.toDate().toLocaleString("en-US", {
@@ -11,6 +17,7 @@ function whenText(ts: Timestamp | null): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone: "UTC",
   });
 }
 

@@ -2,6 +2,7 @@
 
 import { Pencil, Plus, X } from "lucide-react";
 import { useOrganizerDashboard, type VenueTab } from "@/lib/organizer/dashboard/store";
+import { LAUNCH_MARKETS } from "@/lib/organizer/dashboard/data/venues";
 import {
   AGE_POLICIES,
   AMENITIES,
@@ -61,6 +62,9 @@ export function VenuesSection() {
     setNewVenueName,
     newVenueCity,
     setNewVenueCity,
+    newVenueCountry,
+    setNewVenueCountry,
+    approximateLocationVenues,
     createVenue,
   } = useOrganizerDashboard();
 
@@ -116,6 +120,17 @@ export function VenuesSection() {
         }
       />
 
+      {approximateLocationVenues.has(editingVenue) && (
+        <Card
+          className="mb-6 max-w-[640px] text-[13px]"
+          style={{ borderColor: "var(--m3-warn)", color: "var(--m3-on)" }}
+        >
+          This venue&apos;s map location is approximate — device location wasn&apos;t
+          available when it was created, so it was placed at the centre of its market
+          instead. Contact support to get its precise location fixed.
+        </Card>
+      )}
+
       {addingVenue && (
         <Card className="mb-6 flex max-w-[480px] flex-col gap-6">
           <SectionLabel>Add a new venue</SectionLabel>
@@ -125,15 +140,32 @@ export function VenuesSection() {
             onChange={(e) => setNewVenueName(e.target.value)}
           />
           <TextField
-            label="City, country"
+            label="City"
             value={newVenueCity}
             onChange={(e) => setNewVenueCity(e.target.value)}
           />
+          <Select
+            label="Market"
+            value={newVenueCountry}
+            onChange={(e) => setNewVenueCountry(e.target.value)}
+            options={[
+              { value: "", label: "Select a launch market…" },
+              ...LAUNCH_MARKETS.map((m) => ({ value: m.countryCode, label: m.label })),
+            ]}
+          />
+          <p className="-mt-3 text-xs text-[var(--m3-outline)]">
+            Night Ride currently launches in these four markets — this sets the venue&apos;s
+            country and its map location.
+          </p>
           <div className="flex justify-end gap-2">
             <TextButton onClick={cancelAddVenue} disabled={venueBusy}>
               Cancel
             </TextButton>
-            <FilledButton onClick={createVenue} loading={venueBusy} disabled={!newVenueName.trim()}>
+            <FilledButton
+              onClick={createVenue}
+              loading={venueBusy}
+              disabled={!newVenueName.trim() || !newVenueCountry}
+            >
               Create &amp; verify
             </FilledButton>
           </div>

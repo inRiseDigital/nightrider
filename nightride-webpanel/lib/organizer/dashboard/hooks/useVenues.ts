@@ -661,9 +661,12 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
           });
         } catch {
           // Non-fatal: the venue itself was created successfully. Not
-          // batched with the venue create — verified against the emulator
-          // that `canEditVenue()`'s `get()` cannot see a sibling document
-          // created earlier in the same `writeBatch` (see task-8-report.md).
+          // batched with the venue create — `canEditVenue()`'s `get()` on
+          // the brand-new venue document cannot see a sibling document
+          // created earlier in the same `writeBatch` (confirmed against the
+          // emulator; see "Fix round" in task-8-report.md), so a batched
+          // activity entry here would make every organizer venue creation
+          // fail outright.
         }
         if (approximate) {
           setApproximateLocationVenues((prev) => new Set(prev).add(ref.id));

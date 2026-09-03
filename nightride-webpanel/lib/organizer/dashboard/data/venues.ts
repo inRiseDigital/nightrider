@@ -84,6 +84,25 @@ function parseVerificationSteps(raw: unknown): Record<VerifyStepId, VerifyStepSt
   return { license: stepStatus("license"), gps: stepStatus("gps"), video: stepStatus("video") };
 }
 
+/**
+ * The four launch markets (see root CLAUDE.md). `createVenue`'s "Add venue"
+ * dialog has no address step and no geocoding service — this is the
+ * required country selector's option list, and `cityCenter` is the fallback
+ * `geo` when device geolocation is denied or unavailable. A launch-city
+ * centre is an honest approximation flagged to the organizer; `(0, 0)` is a
+ * silent lie only an admin could ever notice.
+ */
+export const LAUNCH_MARKETS: readonly {
+  countryCode: string;
+  label: string;
+  cityCenter: { latitude: number; longitude: number };
+}[] = [
+  { countryCode: "AE", label: "Dubai, UAE", cityCenter: { latitude: 25.2048, longitude: 55.2708 } },
+  { countryCode: "JP", label: "Tokyo, Japan", cityCenter: { latitude: 35.6762, longitude: 139.6503 } },
+  { countryCode: "GB", label: "London, UK", cityCenter: { latitude: 51.5072, longitude: -0.1276 } },
+  { countryCode: "AU", label: "Melbourne, Australia", cityCenter: { latitude: -37.8136, longitude: 144.9631 } },
+];
+
 export function parseVenueMeta(id: string, data: Record<string, unknown> | undefined): VenueMeta {
   const d = data ?? {};
   return {
@@ -245,28 +264,35 @@ export const DEFAULT_TONIGHT_STATE: TonightState = {
 // ---------------------------------------------------------------------------
 
 /**
- * Fields that bypass the draft entirely. `verified`/`verificationSteps` are
- * admin-only verdicts; `openVerifyStep` is pure client accordion state. All
- * three must keep flowing from the latest snapshot even while a listing draft
- * is open, so a draft never goes stale on the one thing an admin can change
- * out from under the organizer mid-edit.
+ * Fields that bypass the draft entirely and must keep flowing from the
+ * latest snapshot even while a listing draft is open — none of them are
+ * part of what the organizer is reviewing before Save.
+ * `verified`/`verificationSteps` are admin-only verdicts; `openVerifyStep` is
+ * pure client accordion state. `menu` is its own subcollection with its own
+ * immediate-write, no-review path (see `parseMenuSection`/
+ * `toMenuSectionFields` above) — a draft seeds `menu` once, from whatever the
+ * snapshot held at draft-creation time, and never sees it again, so without
+ * this overlay a menu edit made while a listing draft is open would write to
+ * Firestore correctly but render as if it hadn't happened until the draft is
+ * saved or discarded.
  */
-const LIVE_VENUE_FIELDS = ["verified", "verificationSteps", "openVerifyStep"] as const;
+const SNAPSHOT_ONLY_FIELDS = ["verified", "verificationSteps", "openVerifyStep", "menu"] as const;
 
-/** Overlays `saved`'s live fields onto `draft`'s listing fields. */
+/** Overlays `saved`'s snapshot-only fields onto `draft`'s listing fields. */
 export function withLiveFields(draft: VenueProfile, saved: VenueProfile): VenueProfile {
   return {
     ...draft,
     verified: saved.verified,
     verificationSteps: saved.verificationSteps,
     openVerifyStep: saved.openVerifyStep,
+    menu: saved.menu,
   };
 }
 
-/** `p` with the live fields stripped — the subset that is ever reviewable/dirty. */
+/** `p` with the snapshot-only fields stripped — the subset that is ever reviewable/dirty. */
 export function listingFieldsOf(p: VenueProfile): Partial<VenueProfile> {
   const listing: Partial<VenueProfile> = { ...p };
-  for (const field of LIVE_VENUE_FIELDS) delete listing[field];
+  for (const field of SNAPSHOT_ONLY_FIELDS) delete listing[field];
   return listing;
 }
 

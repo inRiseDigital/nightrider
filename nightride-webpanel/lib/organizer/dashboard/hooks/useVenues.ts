@@ -20,8 +20,10 @@ import {
   computeVenueProfile,
   DEFAULT_TONIGHT_STATE,
   isVenueDirty,
+  LAUNCH_MARKETS,
   parseMenuSection,
   parseTonight,
+  parseVenueMeta,
   parseVenueProfile,
   toLiveFields,
   toMenuSectionFields,
@@ -37,7 +39,7 @@ import {
 } from "../data/refs";
 import { describeFirestoreError } from "../data/errors";
 import { crowdLevelForDoorStatus, liveStatusFor, offerFor, queueStatusForDoorStatus, ticketsAvailableFor } from "../data/enums";
-import type { DoorStatus, MenuItem, TonightState, VenueProfile, VerifyStepId } from "../types";
+import type { DoorStatus, MenuItem, TonightState, VenueMeta, VenueProfile, VerifyStepId } from "../types";
 import { useAsyncAction } from "./useAsyncAction";
 import { useVenueEditor } from "./useVenueEditor";
 import { useLatest } from "./useLatest";
@@ -85,35 +87,44 @@ function nextMenuId(prefix: string) {
  * solved properly here (no geocoding service is wired in, and the brief is
  * silent on where one would come from).
  */
-function bestEffortGeo(): Promise<{ latitude: number; longitude: number }> {
-  const fallback = { latitude: 0, longitude: 0 };
+/**
+ * Best-effort device geolocation for a brand-new venue, falling back to the
+ * selected launch market's city centre — never `(0, 0)` — when geolocation is
+ * denied, unavailable, or times out (the common default: most browsers deny
+ * the permission prompt by default or the organizer dismisses it). The
+ * `approximate` flag lets the caller show a persistent "location is
+ * approximate" notice rather than silently shipping a guess.
+ */
+function bestEffortGeo(
+  fallback: { latitude: number; longitude: number }
+): Promise<{ latitude: number; longitude: number; approximate: boolean }> {
   return new Promise((resolve) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       console.warn(
-        "[useVenues] createVenue: geolocation unavailable in this environment — falling back to (0, 0). This venue's real location must be corrected (e.g. by an admin) before it belongs on the map."
+        "[useVenues] createVenue: geolocation unavailable in this environment — falling back to the selected market's city centre."
       );
-      resolve(fallback);
+      resolve({ ...fallback, approximate: true });
       return;
     }
     let settled = false;
-    const finish = (value: { latitude: number; longitude: number }, warning?: string) => {
+    const finish = (value: { latitude: number; longitude: number; approximate: boolean }, warning?: string) => {
       if (settled) return;
       settled = true;
       if (warning) console.warn(`[useVenues] createVenue: ${warning}`);
       resolve(value);
     };
     const timer = setTimeout(
-      () => finish(fallback, "geolocation timed out — falling back to (0, 0)."),
+      () => finish({ ...fallback, approximate: true }, "geolocation timed out — falling back to the selected market's city centre."),
       4000
     );
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         clearTimeout(timer);
-        finish({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        finish({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, approximate: false });
       },
       () => {
         clearTimeout(timer);
-        finish(fallback, "geolocation denied or failed — falling back to (0, 0).");
+        finish({ ...fallback, approximate: true }, "geolocation denied or failed — falling back to the selected market's city centre.");
       },
       { timeout: 4000 }
     );
@@ -203,6 +214,16 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
   const [addingVenue, setAddingVenue] = useState(false);
   const [newVenueName, setNewVenueName] = useState("");
   const [newVenueCity, setNewVenueCity] = useState("");
+  // Required country selector, limited to the four launch markets — see
+  // `LAUNCH_MARKETS`. Written verbatim to `countryCode`: the Flutter app's
+  // `live_hub_service.dart` queries `venues where countryCode == X`, so an
+  // organizer-created venue with `countryCode: ""` is invisible in the app.
+  const [newVenueCountry, setNewVenueCountry] = useState("");
+  // Venues created with a geolocation-denied/unavailable fallback location —
+  // a session-local flag (not persisted: `types.ts`/`VenueMeta` don't model
+  // it and are not in this task's file ownership) that drives a persistent
+  // inline notice rather than a silent, unflagged approximation.
+  const [approximateLocationVenues, setApproximateLocationVenues] = useState<Set<string>>(new Set());
 
   const venueOrder = useMemo(
     () =>
@@ -243,6 +264,15 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     return out;
   }, [venueOrder, rawDocs, menuByVenue, openVerifyStepByVenue]);
   const venuesRef = useLatest(venues);
+
+  // `VenueMeta` (ownerUid/city/countryCode/timeZone/geo/status/verified) —
+  // the shape T9 (events) needs `meta[venueId].timeZone` from to map local
+  // date/time strings to Firestore Timestamps per venue.
+  const meta = useMemo(() => {
+    const out: Record<string, VenueMeta> = {};
+    for (const id of venueOrder) out[id] = parseVenueMeta(id, rawDocs[id]);
+    return out;
+  }, [venueOrder, rawDocs]);
 
   const toggleVerifyStep = useCallback(
     (id: string, step: VerifyStepId) => {
@@ -593,23 +623,25 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     setAddingVenue(true);
     setNewVenueName("");
     setNewVenueCity("");
+    setNewVenueCountry("");
   }, []);
   const cancelAddVenue = useCallback(() => setAddingVenue(false), []);
 
   const createVenue = useCallback(
     async (days: readonly string[]) => {
       const name = newVenueName.trim();
-      if (!name) return;
-      const city = newVenueCity.trim() || "City, Country";
+      const market = LAUNCH_MARKETS.find((m) => m.countryCode === newVenueCountry);
+      if (!name || !market) return;
+      const city = newVenueCity.trim() || market.label;
       const ok = await run(async () => {
-        const { latitude, longitude } = await bestEffortGeo();
+        const { latitude, longitude, approximate } = await bestEffortGeo(market.cityCenter);
         const timeZone = resolvedTimeZoneWithFallback();
         const blank = blankVenueProfile(name, city, days);
         const ref = doc(venuesCol());
         await setDoc(ref, {
           name,
           city,
-          countryCode: "",
+          countryCode: market.countryCode,
           timeZone,
           geo: new GeoPoint(latitude, longitude),
           geohash: encodeGeohash(latitude, longitude),
@@ -628,16 +660,27 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
             what: `Created venue "${name}"`,
           });
         } catch {
-          // Non-fatal: the venue itself was created successfully.
+          // Non-fatal: the venue itself was created successfully. Not
+          // batched with the venue create — verified against the emulator
+          // that `canEditVenue()`'s `get()` cannot see a sibling document
+          // created earlier in the same `writeBatch` (see task-8-report.md).
+        }
+        if (approximate) {
+          setApproximateLocationVenues((prev) => new Set(prev).add(ref.id));
         }
         setEditingVenue(ref.id);
         setAddingVenue(false);
         setNewVenueName("");
         setNewVenueCity("");
+        setNewVenueCountry("");
       });
-      if (ok) showSnack("Venue created — complete verification from the mobile app.");
+      if (ok) {
+        showSnack(
+          "Venue created — complete verification from the mobile app."
+        );
+      }
     },
-    [newVenueName, newVenueCity, run, uid, setEditingVenue, showSnack]
+    [newVenueName, newVenueCity, newVenueCountry, run, uid, setEditingVenue, showSnack]
   );
 
   // ---- Live door status ----
@@ -652,8 +695,14 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
         ensuredLive.current.add(id);
         return;
       }
+      // `updatedAt` has no `.get()` default in `liveOk()` — every other new
+      // field does — so it must be present in this very first write, not
+      // just in the dotted-path patches that follow it.
       await updateDoc(venueDocRef(id), {
-        live: toLiveFields(DEFAULT_TONIGHT_STATE, { capacity: capacityFor(id), raw: {} }),
+        live: {
+          ...toLiveFields(DEFAULT_TONIGHT_STATE, { capacity: capacityFor(id), raw: {} }),
+          updatedAt: serverTimestamp(),
+        },
       });
       ensuredLive.current.add(id);
     },
@@ -857,8 +906,13 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
 
   const data = useMemo(
     () => ({
-      venueOrder,
-      venues,
+      // Renamed per fix round: `order`/`profiles`/`meta` — `store.tsx`'s
+      // facade re-maps these back to the `venueOrder`/`venues` names the 34
+      // existing call sites use, so this rename is internal to this hook and
+      // the one file that consumes its `data` directly.
+      order: venueOrder,
+      profiles: venues,
+      meta,
       venuesLoading,
       venuesError,
       editingVenue,
@@ -869,13 +923,16 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       addingVenue,
       newVenueName,
       newVenueCity,
+      newVenueCountry,
+      approximateLocationVenues,
       tonight,
       liveBusy,
       menuLoading,
     }),
     [
-      venueOrder, venues, venuesLoading, venuesError, editingVenue, profile, savedProfile, venueDirty,
-      venueTab, addingVenue, newVenueName, newVenueCity, tonight, liveBusy, menuLoading,
+      venueOrder, venues, meta, venuesLoading, venuesError, editingVenue, profile, savedProfile, venueDirty,
+      venueTab, addingVenue, newVenueName, newVenueCity, newVenueCountry, approximateLocationVenues,
+      tonight, liveBusy, menuLoading,
     ]
   );
 
@@ -892,6 +949,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       cancelAddVenue,
       setNewVenueName,
       setNewVenueCity,
+      setNewVenueCountry,
       createVenue,
       saveVenue,
       discardVenue,
@@ -928,7 +986,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     }),
     [
       data, busy, actionError, setEditingVenue, setVenueTab, openAddVenue, cancelAddVenue,
-      setNewVenueName, setNewVenueCity, createVenue, saveVenue, discardVenue, setVenueField,
+      setNewVenueName, setNewVenueCity, setNewVenueCountry, createVenue, saveVenue, discardVenue, setVenueField,
       toggleVenueSetValue, addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
       toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,
       addMenuSection, removeMenuSection, setMenuSectionName, addMenuItem, removeMenuItem,

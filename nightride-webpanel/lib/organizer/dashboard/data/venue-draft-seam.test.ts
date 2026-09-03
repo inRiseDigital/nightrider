@@ -45,12 +45,32 @@ describe("computeVenueProfile — snapshot must never clobber an in-progress dra
     expect(profile.verified).toBe(false);
     expect(profile.openVerifyStep).toBe("license");
   });
+
+  it("shows a menu edit made while a listing draft is open (menu bypasses the draft entirely)", () => {
+    // The draft was seeded from `saved` at draft-creation time, so its
+    // `menu` is frozen at whatever the snapshot held then.
+    const draft = { ...saved, name: "Sirens Dubai (editing)" };
+    // The organizer then edits the Menu tab, which writes straight to
+    // Firestore — the next snapshot reflects it in `saved.menu`.
+    const nextSaved = { ...saved, menu: [...saved.menu, { id: "new-section", name: "New section", items: [] }] };
+
+    const profile = computeVenueProfile(draft, nextSaved);
+
+    expect(profile.name).toBe("Sirens Dubai (editing)");
+    expect(profile.menu).toEqual(nextSaved.menu);
+    expect(profile.menu).not.toEqual(draft.menu);
+  });
 });
 
 describe("withLiveFields", () => {
-  it("overlays only verified/verificationSteps/openVerifyStep onto the draft", () => {
-    const draft = { ...MOCK_VENUES.sirens, name: "Draft name", about: "Draft about" };
-    const saved = { ...MOCK_VENUES.sirens, verified: false, openVerifyStep: "gps" as const };
+  it("overlays verified/verificationSteps/openVerifyStep/menu onto the draft, nothing else", () => {
+    const draft = { ...MOCK_VENUES.sirens, name: "Draft name", about: "Draft about", menu: [] };
+    const saved = {
+      ...MOCK_VENUES.sirens,
+      verified: false,
+      openVerifyStep: "gps" as const,
+      menu: MOCK_VENUES.sirens.menu,
+    };
 
     const merged = withLiveFields(draft, saved);
 
@@ -58,6 +78,7 @@ describe("withLiveFields", () => {
     expect(merged.about).toBe("Draft about");
     expect(merged.verified).toBe(false);
     expect(merged.openVerifyStep).toBe("gps");
+    expect(merged.menu).toEqual(saved.menu);
   });
 });
 
@@ -87,15 +108,24 @@ describe("isVenueDirty", () => {
     const nextSaved = { ...saved, verified: true, openVerifyStep: null };
     expect(isVenueDirty(draft, nextSaved)).toBe(false);
   });
+
+  it("ignores a menu-only difference between the frozen draft and a fresher snapshot", () => {
+    // The draft's `menu` is frozen at draft-creation time; a menu edit made
+    // meanwhile writes straight to Firestore and shows up in `saved.menu`
+    // without ever being a "listing" edit the organizer is reviewing.
+    const draft = { ...saved };
+    const nextSaved = { ...saved, menu: [...saved.menu, { id: "new", name: "New", items: [] }] };
+    expect(isVenueDirty(draft, nextSaved)).toBe(false);
+  });
 });
 
 describe("listingFieldsOf", () => {
-  it("strips verified/verificationSteps/openVerifyStep and nothing else", () => {
+  it("strips verified/verificationSteps/openVerifyStep/menu and nothing else", () => {
     const stripped = listingFieldsOf(MOCK_VENUES.sirens);
     expect(stripped).not.toHaveProperty("verified");
     expect(stripped).not.toHaveProperty("verificationSteps");
     expect(stripped).not.toHaveProperty("openVerifyStep");
+    expect(stripped).not.toHaveProperty("menu");
     expect(stripped.name).toBe(MOCK_VENUES.sirens.name);
-    expect(stripped.menu).toEqual(MOCK_VENUES.sirens.menu);
   });
 });

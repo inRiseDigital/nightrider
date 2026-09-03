@@ -47,7 +47,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   // `uid` is guaranteed non-null here: `OrganizerDashboardProvider` only ever
   // mounts inside `OrganizerGate` once auth status is "approved".
   const venues = useVenues(uid as string, ui.showSnack);
-  const events = useEvents(venues.data.venues, venues.data.venueOrder, ui.showSnack);
+  const events = useEvents(venues.data.profiles, venues.data.order, ui.showSnack);
   const reviews = useReviews(ui.showSnack);
   const inbox = useInbox();
   const team = useTeam(ui.showSnack);
@@ -124,8 +124,14 @@ export function useOrganizerDashboard() {
       organizer: idn.organizer,
 
       // ---- Venues ----
-      venueOrder: v.venueOrder,
-      venues: v.venues,
+      // `v.order`/`v.profiles` are the hook's internal names (fix round:
+      // renamed from `venueOrder`/`venues` so the hook's own `data` shape is
+      // `{ order, profiles, meta }` per the brief); re-mapped back to the
+      // `venueOrder`/`venues` keys every existing call site already uses, so
+      // no consumer outside this file needs to change.
+      venueOrder: v.order,
+      venues: v.profiles,
+      venueMeta: v.meta,
       venuesLoading: v.venuesLoading,
       venuesError: v.venuesError,
       editingVenue: v.editingVenue,
@@ -142,12 +148,15 @@ export function useOrganizerDashboard() {
       addingVenue: v.addingVenue,
       newVenueName: v.newVenueName,
       newVenueCity: v.newVenueCity,
+      newVenueCountry: v.newVenueCountry,
+      approximateLocationVenues: v.approximateLocationVenues,
       setEditingVenue: venues.setEditingVenue,
       setVenueTab: venues.setVenueTab,
       openAddVenue: venues.openAddVenue,
       cancelAddVenue: venues.cancelAddVenue,
       setNewVenueName: venues.setNewVenueName,
       setNewVenueCity: venues.setNewVenueCity,
+      setNewVenueCountry: venues.setNewVenueCountry,
       createVenue: () => venues.createVenue(DAYS),
       setVenueField: venues.setVenueField,
       toggleVenueSetValue: venues.toggleVenueSetValue,

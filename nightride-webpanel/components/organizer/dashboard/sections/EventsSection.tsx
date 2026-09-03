@@ -2,7 +2,7 @@
 
 import { Pencil } from "lucide-react";
 import { useNow, useOrganizerDashboard, type EventFilter } from "@/lib/organizer/dashboard/store";
-import { deriveEventChip, isEventLive, venueName } from "@/lib/organizer/dashboard/format";
+import { deriveEventChip, isEventLive, matchesFilter, venueName } from "@/lib/organizer/dashboard/format";
 import { Chip, IconButton, SlimTextarea } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
 
@@ -30,10 +30,14 @@ export function EventsSection() {
     setCancelReasonInput,
     confirmCancel,
     cancelCancelFlow,
+    eventBusy,
+    eventActionError,
   } = useOrganizerDashboard();
   const now = useNow();
 
-  const rows = events.filter((e) => eventFilter === "all" || e.status === eventFilter);
+  // `matchesFilter`, never raw `e.status === eventFilter` — the "live" filter
+  // id is a legitimate filter on derived state, not a stored status.
+  const rows = events.filter((e) => matchesFilter(e, eventFilter, now));
 
   return (
     <>
@@ -141,16 +145,23 @@ export function EventsSection() {
                   />
                   <button
                     onClick={confirmCancel}
-                    className="whitespace-nowrap rounded-full bg-[#dc2626] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#b91c1c]"
+                    disabled={eventBusy || !cancelReasonInput.trim()}
+                    className="whitespace-nowrap rounded-full bg-[#dc2626] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#b91c1c] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Confirm cancel
                   </button>
                   <button
                     onClick={cancelCancelFlow}
+                    disabled={eventBusy}
                     className="whitespace-nowrap px-3.5 py-2.5 text-xs text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
                   >
                     Never mind
                   </button>
+                  {eventActionError && (
+                    <p className="w-full text-xs" style={{ color: "var(--m3-err)" }}>
+                      {eventActionError}
+                    </p>
+                  )}
                 </div>
               )}
 

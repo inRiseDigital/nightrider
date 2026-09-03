@@ -127,7 +127,7 @@ export function parseOrganizerEvent(
  */
 export function toEventDocFields(
   ui: OrganizerEvent,
-  ctx: { meta: VenueMeta; raw: Record<string, unknown> }
+  ctx: { meta: VenueMeta; venueName: string; raw: Record<string, unknown> }
 ): Record<string, unknown> {
   const window = ui.startTime ? eventWindowToTimestamps(ui, ctx.meta.timeZone) : null;
   const existingPerformers = Array.isArray(ctx.raw.performers)
@@ -145,6 +145,10 @@ export function toEventDocFields(
     ...ctx.raw,
     name: ui.name,
     venueId: ui.venue,
+    // Re-derived on every write from the venue's current profile — never
+    // carried forward from `ctx.raw.venueName`, which goes stale the moment
+    // an event's venue changes (or the venue itself is renamed).
+    venueName: ctx.venueName,
     city: ctx.meta.city,
     countryCode: ctx.meta.countryCode,
     geo: ctx.meta.geo ? new GeoPoint(ctx.meta.geo.latitude, ctx.meta.geo.longitude) : toGeoOrNull(ctx.raw.geo),

@@ -56,6 +56,17 @@ describe("isEventLive", () => {
     expect(isEventLive(ev, now)).toBe(true);
   });
 
+  it("is true indefinitely once started when endTime is '' (null stored endAt)", () => {
+    const ev = makeEvent({ date: "2026-09-02", startTime: "22:00", endTime: "" });
+    expect(isEventLive(ev, new Date(2026, 8, 2, 22, 0))).toBe(true);
+    expect(isEventLive(ev, new Date(2026, 8, 5, 12, 0))).toBe(true);
+  });
+
+  it("is false before the window starts when endTime is ''", () => {
+    const ev = makeEvent({ date: "2026-09-02", startTime: "22:00", endTime: "" });
+    expect(isEventLive(ev, new Date(2026, 8, 2, 20, 0))).toBe(false);
+  });
+
   it("is false for a non-published event even inside the window", () => {
     const ev = makeEvent({
       status: "scheduled",

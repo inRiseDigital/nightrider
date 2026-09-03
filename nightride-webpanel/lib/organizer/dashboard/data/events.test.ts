@@ -30,7 +30,7 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
       popularityScore: 7,
     };
 
-    const fields = toEventDocFields(ui, { meta, raw });
+    const fields = toEventDocFields(ui, { meta, venueName: "Sirens Dubai", raw });
 
     // Raw-remainder merge: fields only the Flutter app reads survive untouched.
     expect(fields.description).toBe(raw.description);
@@ -60,13 +60,13 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
         { name: "General", price: 120, qty: 300 },
       ],
     };
-    const fields = toEventDocFields(ui, { meta, raw: {} });
+    const fields = toEventDocFields(ui, { meta, venueName: "Sirens Dubai", raw: {} });
     expect(fields.price).toEqual({ min: 80, max: 120, currency: "", isFree: false });
   });
 
   it("writes no lineup field — maps to performers[i].name with type DJ", () => {
     const ui: OrganizerEvent = { ...MOCK_EVENTS[0], lineup: ["DJ Kalima", "Nyx"] };
-    const fields = toEventDocFields(ui, { meta, raw: {} });
+    const fields = toEventDocFields(ui, { meta, venueName: "Sirens Dubai", raw: {} });
     expect(fields.lineup).toBeUndefined();
     expect(fields.performers).toEqual([
       { name: "DJ Kalima", type: "DJ", bio: "" },
@@ -81,13 +81,21 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
       sales: { sold: 120, gross: 9600 },
     };
 
-    const fields = toEventDocFields(ui, { meta, raw });
+    const fields = toEventDocFields(ui, { meta, venueName: "Sirens Dubai", raw });
 
     // UI carries a different moderationFlag ("clean") than the stored doc
     // ("pending") — the write must still leave moderation byte-identical to
     // what was stored, or producerFieldsPinned() rejects the update.
     expect(fields.moderation).toEqual(raw.moderation);
     expect(fields.sales).toEqual(raw.sales);
+  });
+
+  it("re-derives venueName from ctx on every write, never carrying forward the stored value", () => {
+    const ui: OrganizerEvent = { ...MOCK_EVENTS[0], venue: "sirens" };
+    const raw = { venueName: "Old Stale Name (venue since renamed)" };
+    const fields = toEventDocFields(ui, { meta, venueName: "Sirens Dubai", raw });
+    expect(fields.venueName).toBe("Sirens Dubai");
+    expect(fields.venueName).not.toBe(raw.venueName);
   });
 
   it("tolerates endAt === null on read, returning endTime ''", () => {

@@ -37,18 +37,28 @@ function dateTimeOf(dateISO: string, time: string): Date {
  * midnight. `now` is null until the client has mounted (the server has no
  * meaningful clock for the organizer's timezone) — in that case the event is
  * never live.
+ *
+ * `ev.endTime === ""` means the stored `endAt` is null — only possible for an
+ * admin- or scraper-written event, since every organizer-authored event has
+ * a required, non-null `endAt`. Per the stored formula
+ * (`endAt == null || now <= endAt`), that is open-ended, not "ends at
+ * midnight" — treating an empty `endTime` as `00:00` would make the event
+ * live for at most an instant instead of indefinitely once started.
  */
 export function isEventLive(ev: OrganizerEvent, now: Date | null): boolean {
   if (!now) return false;
   if (ev.status !== "published") return false;
 
   const start = dateTimeOf(ev.date, ev.startTime);
+  if (now.getTime() < start.getTime()) return false;
+  if (!ev.endTime) return true;
+
   let end = dateTimeOf(ev.date, ev.endTime);
   if (end.getTime() <= start.getTime()) {
     end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // closing time is after midnight
   }
 
-  return now.getTime() >= start.getTime() && now.getTime() <= end.getTime();
+  return now.getTime() <= end.getTime();
 }
 
 /**

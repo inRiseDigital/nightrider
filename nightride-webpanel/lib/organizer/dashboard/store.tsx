@@ -47,7 +47,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   // `uid` is guaranteed non-null here: `OrganizerDashboardProvider` only ever
   // mounts inside `OrganizerGate` once auth status is "approved".
   const venues = useVenues(uid as string, ui.showSnack);
-  const events = useEvents(venues.data.profiles, venues.data.order, ui.showSnack);
+  const events = useEvents(uid as string, venues.data.profiles, venues.data.order, venues.data.meta, ui.showSnack);
   const reviews = useReviews(ui.showSnack);
   const inbox = useInbox();
   const team = useTeam(ui.showSnack);
@@ -192,6 +192,10 @@ export function useOrganizerDashboard() {
 
       // ---- Events ----
       events: e.events,
+      eventsLoading: e.eventsLoading,
+      eventsError: e.eventsError,
+      eventBusy: events.busy,
+      eventActionError: events.actionError,
       eventFilter: e.eventFilter,
       setEventFilter: events.setEventFilter,
       eventEditorOpen: e.eventEditorOpen,

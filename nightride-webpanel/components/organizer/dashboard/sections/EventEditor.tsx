@@ -52,6 +52,8 @@ export function EventEditor() {
     removeTier,
     saveDraftEvent,
     submitEvent,
+    eventBusy,
+    eventActionError,
   } = useOrganizerDashboard();
 
   if (!eventEditorOpen || !eventDraft) return null;
@@ -300,12 +302,20 @@ export function EventEditor() {
           )}
         </div>
 
+        {eventActionError && (
+          <p className="mt-4 text-[13px]" style={{ color: "var(--m3-err)" }}>
+            {eventActionError}
+          </p>
+        )}
+
         <div className="mt-7 flex flex-wrap items-center justify-end gap-2">
-          <TextButton onClick={closeEditor}>Cancel</TextButton>
-          <FilledButton onClick={saveDraftEvent} tonal>
+          <TextButton onClick={closeEditor} disabled={eventBusy}>
+            Cancel
+          </TextButton>
+          <FilledButton onClick={saveDraftEvent} tonal loading={eventBusy} disabled={eventBusy}>
             Save draft
           </FilledButton>
-          <FilledButton onClick={submitEvent}>
+          <FilledButton onClick={submitEvent} loading={eventBusy} disabled={eventBusy}>
             {eventDraft.scheduledPublish ? "Schedule publish" : "Submit for review"}
           </FilledButton>
         </div>

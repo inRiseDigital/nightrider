@@ -152,10 +152,12 @@ export function parseVenueProfile(
 
 /**
  * The reviewable listing fields only — `verified`, `verificationSteps` and
- * `menu` are live fields that bypass the draft and are never written from
- * here, matching `store.tsx`'s `LIVE_VENUE_FIELDS`. Spreads `ctx.raw` first
- * so `editorUids`/`editors`/`live`/`verification`/anything else the panel
- * doesn't model survives the write.
+ * `menu` are never written from here. `verified` and `verificationSteps` are
+ * admin-written and pinned by the rules against every organizer write, so
+ * they are excluded from the dirty check and preserved when a draft commits.
+ * `menu` lives in the `menuSections` subcollection and bypasses the draft
+ * entirely. Spreads `ctx.raw` first so `editorUids`/`editors`/`live`/
+ * `verification`/anything else the panel doesn't model survives the write.
  */
 export function toVenueDocFields(
   ui: import("../types").VenueProfile,

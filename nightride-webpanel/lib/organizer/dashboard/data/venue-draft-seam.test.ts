@@ -1,6 +1,41 @@
 import { describe, expect, it } from "vitest";
 import { computeVenueProfile, isVenueDirty, listingFieldsOf, withLiveFields } from "./venues";
-import { MOCK_VENUES } from "../mock-data";
+import type { VenueProfile } from "../types";
+
+const MOCK_VENUE: VenueProfile = {
+  verified: true,
+  verificationSteps: { license: "done", gps: "done", video: "done" },
+  openVerifyStep: null,
+  name: "Sirens Dubai",
+  city: "Dubai, UAE",
+  address: "Marina Walk, Dubai Marina, Dubai, UAE",
+  about: "Rooftop techno and house on the Marina skyline.",
+  socialLinks: [
+    { network: "instagram", value: "@sirensdubai" },
+    { network: "tiktok", value: "@sirensdubai" },
+  ],
+  genres: ["Techno", "House"],
+  dressCode: "Smart Casual",
+  agePolicy: "21+",
+  coverMin: 50,
+  coverMax: 150,
+  currency: "AED",
+  capacity: 450,
+  amenities: ["Rooftop", "Cloakroom"],
+  hours: [
+    { day: "Mon", closed: true, open: "22:00", close: "04:00" },
+    { day: "Tue", closed: true, open: "22:00", close: "04:00" },
+    { day: "Wed", closed: false, open: "22:00", close: "04:00" },
+    { day: "Thu", closed: false, open: "22:00", close: "04:00" },
+    { day: "Fri", closed: false, open: "22:00", close: "04:00" },
+    { day: "Sat", closed: false, open: "22:00", close: "04:00" },
+    { day: "Sun", closed: false, open: "22:00", close: "04:00" },
+  ],
+  exceptions: [],
+  menu: [],
+  tableLink: "",
+  photos: [],
+};
 
 /**
  * The draft/published seam is what makes `useVenues`'s `onSnapshot` listener
@@ -11,7 +46,7 @@ import { MOCK_VENUES } from "../mock-data";
  * React Testing Library set up for hooks).
  */
 describe("computeVenueProfile — snapshot must never clobber an in-progress draft", () => {
-  const saved = MOCK_VENUES.sirens;
+  const saved = MOCK_VENUE;
 
   it("returns the saved profile untouched when there is no draft", () => {
     expect(computeVenueProfile(undefined, saved)).toEqual(saved);
@@ -64,12 +99,12 @@ describe("computeVenueProfile — snapshot must never clobber an in-progress dra
 
 describe("withLiveFields", () => {
   it("overlays verified/verificationSteps/openVerifyStep/menu onto the draft, nothing else", () => {
-    const draft = { ...MOCK_VENUES.sirens, name: "Draft name", about: "Draft about", menu: [] };
+    const draft = { ...MOCK_VENUE, name: "Draft name", about: "Draft about", menu: [] };
     const saved = {
-      ...MOCK_VENUES.sirens,
+      ...MOCK_VENUE,
       verified: false,
       openVerifyStep: "gps" as const,
-      menu: MOCK_VENUES.sirens.menu,
+      menu: MOCK_VENUE.menu,
     };
 
     const merged = withLiveFields(draft, saved);
@@ -83,7 +118,7 @@ describe("withLiveFields", () => {
 });
 
 describe("isVenueDirty", () => {
-  const saved = MOCK_VENUES.sirens;
+  const saved = MOCK_VENUE;
 
   it("is false with no draft", () => {
     expect(isVenueDirty(undefined, saved)).toBe(false);
@@ -121,11 +156,11 @@ describe("isVenueDirty", () => {
 
 describe("listingFieldsOf", () => {
   it("strips verified/verificationSteps/openVerifyStep/menu and nothing else", () => {
-    const stripped = listingFieldsOf(MOCK_VENUES.sirens);
+    const stripped = listingFieldsOf(MOCK_VENUE);
     expect(stripped).not.toHaveProperty("verified");
     expect(stripped).not.toHaveProperty("verificationSteps");
     expect(stripped).not.toHaveProperty("openVerifyStep");
     expect(stripped).not.toHaveProperty("menu");
-    expect(stripped.name).toBe(MOCK_VENUES.sirens.name);
+    expect(stripped.name).toBe(MOCK_VENUE.name);
   });
 });

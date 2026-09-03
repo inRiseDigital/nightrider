@@ -3,10 +3,16 @@
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { useNow, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
-import { MOCK_AI_INTENTS, MOCK_AI_RECOMMEND_COUNT } from "@/lib/organizer/dashboard/mock-data";
 import type { AiPrompt } from "@/lib/organizer/dashboard/mock-analytics";
 import { isEventLive } from "@/lib/organizer/dashboard/format";
 import { Card, FieldLabel, SectionLabel, VenueSwitcher } from "../ui/Primitives";
+
+const MOCK_AI_RECOMMEND_COUNT = "1,240";
+const MOCK_AI_INTENTS = [
+  { label: "techno tonight", count: 410 },
+  { label: "rooftop, cheap", count: 260 },
+  { label: "open late near me", count: 180 },
+];
 
 /** Chip tone per ranking band — top spots read as success, absence as neutral. */
 const RANK_CHIP: Record<AiPrompt["band"], { background: string; color: string }> = {

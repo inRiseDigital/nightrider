@@ -1,9 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { parseMenuSection, toMenuSectionFields } from "./venues";
-import { MOCK_VENUES } from "../mock-data";
+import type { MenuSection } from "../types";
+
+const section: MenuSection = {
+  id: "ms1",
+  name: "Bottle service & tables",
+  items: [
+    {
+      id: "mi1",
+      name: "Skyline table — Grey Goose",
+      price: 3200,
+      desc: "Reserved terrace table with skyline view, two mixers per bottle.",
+      size: "1.5L magnum",
+      serves: "6",
+      tags: ["Signature"],
+      nights: [4, 5],
+      soldOut: false,
+      image: "",
+    },
+    {
+      id: "mi2",
+      name: "Dom Pérignon 2013",
+      price: 2900,
+      desc: "Served with sparklers on request.",
+      size: "75cl",
+      serves: "4",
+      tags: [],
+      nights: [],
+      soldOut: false,
+      image: "",
+    },
+  ],
+};
 
 describe("parseMenuSection(toMenuSectionFields(section)) round-trip", () => {
-  const section = MOCK_VENUES.sirens.menu[0];
 
   it("preserves name and items", () => {
     const fields = toMenuSectionFields(section);

@@ -1,11 +1,45 @@
 import { describe, expect, it } from "vitest";
 import { parseTonight, parseVenueProfile, toLiveFields, toVenueDocFields } from "./venues";
-import type { DoorStatus, TonightState } from "../types";
-import { MOCK_VENUES } from "../mock-data";
+import type { DoorStatus, TonightState, VenueProfile } from "../types";
+
+const MOCK_VENUE: VenueProfile = {
+  verified: true,
+  verificationSteps: { license: "done", gps: "done", video: "done" },
+  openVerifyStep: null,
+  name: "Sirens Dubai",
+  city: "Dubai, UAE",
+  address: "Marina Walk, Dubai Marina, Dubai, UAE",
+  about: "Rooftop techno and house on the Marina skyline.",
+  socialLinks: [
+    { network: "instagram", value: "@sirensdubai" },
+    { network: "tiktok", value: "@sirensdubai" },
+  ],
+  genres: ["Techno", "House"],
+  dressCode: "Smart Casual",
+  agePolicy: "21+",
+  coverMin: 50,
+  coverMax: 150,
+  currency: "AED",
+  capacity: 450,
+  amenities: ["Rooftop", "Cloakroom"],
+  hours: [
+    { day: "Mon", closed: true, open: "22:00", close: "04:00" },
+    { day: "Tue", closed: true, open: "22:00", close: "04:00" },
+    { day: "Wed", closed: false, open: "22:00", close: "04:00" },
+    { day: "Thu", closed: false, open: "22:00", close: "04:00" },
+    { day: "Fri", closed: false, open: "22:00", close: "04:00" },
+    { day: "Sat", closed: false, open: "22:00", close: "04:00" },
+    { day: "Sun", closed: false, open: "22:00", close: "04:00" },
+  ],
+  exceptions: [],
+  menu: [],
+  tableLink: "",
+  photos: [],
+};
 
 describe("parseVenueProfile(toVenueDocFields(ui)) round-trip", () => {
   it("preserves the reviewable listing fields", () => {
-    const ui = MOCK_VENUES.sirens;
+    const ui = MOCK_VENUE;
     const fields = toVenueDocFields(ui, { raw: {} });
     const back = parseVenueProfile("sirens", fields, ui.menu);
     // Listing fields only — verified/verificationSteps/openVerifyStep are
@@ -30,7 +64,7 @@ describe("parseVenueProfile(toVenueDocFields(ui)) round-trip", () => {
 
   it("preserves unmapped raw keys (editorUids, live, verification)", () => {
     const raw = { editorUids: ["u1"], live: { status: "open" }, verification: { license: { status: "done" } } };
-    const fields = toVenueDocFields(MOCK_VENUES.sirens, { raw });
+    const fields = toVenueDocFields(MOCK_VENUE, { raw });
     expect(fields.editorUids).toEqual(["u1"]);
     expect(fields.live).toEqual({ status: "open" });
   });

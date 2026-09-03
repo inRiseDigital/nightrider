@@ -2,7 +2,30 @@ import { Timestamp } from "firebase/firestore";
 import { describe, expect, it } from "vitest";
 import { parseOrganizerEvent, toEventDocFields } from "./events";
 import type { OrganizerEvent, VenueMeta } from "../types";
-import { MOCK_EVENTS } from "../mock-data";
+
+const MOCK_EVENT: OrganizerEvent = {
+  id: "e1",
+  name: "Full Moon Rooftop",
+  venue: "sirens",
+  date: "2026-08-08",
+  startTime: "22:00",
+  endTime: "04:00",
+  lineup: ["DJ Kalima", "Nyx"],
+  tiers: [
+    { name: "Early Bird", price: 80, qty: 100 },
+    { name: "General", price: 120, qty: 300 },
+  ],
+  status: "published",
+  recurring: false,
+  recurrenceLabel: "",
+  scheduledPublish: "",
+  notifyOnChange: true,
+  moderationFlag: "clean",
+  moderationEta: "",
+  cancelReason: "",
+  sold: 268,
+  revenue: 21440,
+};
 
 const meta: VenueMeta = {
   id: "sirens",
@@ -17,7 +40,7 @@ const meta: VenueMeta = {
 
 describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
   it("round-trips a published event, including unmapped raw keys", () => {
-    const ui: OrganizerEvent = { ...MOCK_EVENTS[0], status: "published" };
+    const ui: OrganizerEvent = { ...MOCK_EVENT, status: "published" };
     const raw = {
       description: "Rooftop techno with a skyline view.",
       policies: { ageRestriction: 21, refundPolicy: "none", reEntryAllowed: true, wheelchairAccessible: true, allowPets: false },
@@ -54,7 +77,7 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
 
   it("derives price.min/max/isFree from tiers on every write", () => {
     const ui: OrganizerEvent = {
-      ...MOCK_EVENTS[0],
+      ...MOCK_EVENT,
       tiers: [
         { name: "Early Bird", price: 80, qty: 100 },
         { name: "General", price: 120, qty: 300 },
@@ -65,7 +88,7 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
   });
 
   it("writes no lineup field — maps to performers[i].name with type DJ", () => {
-    const ui: OrganizerEvent = { ...MOCK_EVENTS[0], lineup: ["DJ Kalima", "Nyx"] };
+    const ui: OrganizerEvent = { ...MOCK_EVENT, lineup: ["DJ Kalima", "Nyx"] };
     const fields = toEventDocFields(ui, { meta, venueName: "Sirens Dubai", raw: {} });
     expect(fields.lineup).toBeUndefined();
     expect(fields.performers).toEqual([
@@ -75,7 +98,7 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
   });
 
   it("never writes moderation or sales — both are producer-owned and pass through from raw untouched", () => {
-    const ui: OrganizerEvent = { ...MOCK_EVENTS[0], moderationFlag: "clean", moderationEta: "" };
+    const ui: OrganizerEvent = { ...MOCK_EVENT, moderationFlag: "clean", moderationEta: "" };
     const raw = {
       moderation: { flag: "pending", eta: Timestamp.fromDate(new Date("2026-08-08T22:00:00Z")) },
       sales: { sold: 120, gross: 9600 },
@@ -91,7 +114,7 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
   });
 
   it("re-derives venueName from ctx on every write, never carrying forward the stored value", () => {
-    const ui: OrganizerEvent = { ...MOCK_EVENTS[0], venue: "sirens" };
+    const ui: OrganizerEvent = { ...MOCK_EVENT, venue: "sirens" };
     const raw = { venueName: "Old Stale Name (venue since renamed)" };
     const fields = toEventDocFields(ui, { meta, venueName: "Sirens Dubai", raw });
     expect(fields.venueName).toBe("Sirens Dubai");
@@ -149,7 +172,7 @@ describe("parseOrganizerEvent(toEventDocFields(ui, ctx)) round-trip", () => {
       source: "scraped",
     };
     const uiWithNoEndTime: OrganizerEvent = {
-      ...MOCK_EVENTS[0],
+      ...MOCK_EVENT,
       date: "2026-08-08",
       startTime: "22:00",
       endTime: "",

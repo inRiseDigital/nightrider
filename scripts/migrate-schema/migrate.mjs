@@ -541,6 +541,24 @@ function buildEventDoc(d, { forcedSource, forcedStatus } = {}) {
     allowPets: (rawPolicies.allowPets ?? rawPolicies.allow_pets) === true,
   };
 
+  const resolvedStatus = forcedStatus ?? resolveStatus(d);
+  // Finding 5: `firestore.rules` (`shapeOk()`) requires a non-empty
+  // `cancelReason` whenever `status == 'cancelled'`. The Admin SDK bypasses
+  // rules on this write, and the admin update branch bypasses `shapeOk()`
+  // too, but the organizer branch does not — so a migrated `cancelled`
+  // event with no `cancelReason` was a document only an organizer could
+  // never edit again (bare `permission-denied` on any later save). Preserve
+  // whatever reason the legacy document already carried; fabricate a
+  // generic one only when it had none.
+  const cancelReason =
+    resolvedStatus === "cancelled"
+      ? typeof d.cancelReason === "string" && d.cancelReason.trim()
+        ? d.cancelReason
+        : "Cancelled before migration"
+      : typeof d.cancelReason === "string"
+        ? d.cancelReason
+        : "";
+
   return {
     failed: false,
     doc: {
@@ -568,7 +586,8 @@ function buildEventDoc(d, { forcedSource, forcedStatus } = {}) {
           ? d.interested_count
           : 0,
       popularityScore: typeof d.popularityScore === "number" ? d.popularityScore : 0,
-      status: forcedStatus ?? resolveStatus(d),
+      status: resolvedStatus,
+      cancelReason,
       source: resolveSource(d, { forcedSource }),
       organizerUid: typeof d.organizerUid === "string" ? d.organizerUid : null,
       createdAt:

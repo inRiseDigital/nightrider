@@ -5,14 +5,8 @@ import { CheckCircle2 } from "lucide-react";
 import { useNow, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import type { AiPrompt } from "@/lib/organizer/dashboard/mock-analytics";
 import { isEventLive } from "@/lib/organizer/dashboard/format";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { Card, FieldLabel, SectionLabel, VenueSwitcher } from "../ui/Primitives";
-
-const MOCK_AI_RECOMMEND_COUNT = "1,240";
-const MOCK_AI_INTENTS = [
-  { label: "techno tonight", count: 410 },
-  { label: "rooftop, cheap", count: 260 },
-  { label: "open late near me", count: 180 },
-];
 
 /** Chip tone per ranking band — top spots read as success, absence as neutral. */
 const RANK_CHIP: Record<AiPrompt["band"], { background: string; color: string }> = {
@@ -36,6 +30,7 @@ export function AiVisibilitySection() {
   const {
     venueOrder,
     venues,
+    venueMeta,
     editingVenue,
     setEditingVenue,
     profile,
@@ -47,6 +42,7 @@ export function AiVisibilitySection() {
     aiError,
   } = useOrganizerDashboard();
   const now = useNow();
+  const timeZone = resolveTimeZone(venueMeta[editingVenue]?.timeZone);
   const score = aiVisibility?.score ?? 0;
   const prompts = aiVisibility?.prompts ?? [];
   const tips = aiVisibility?.tips ?? [];
@@ -63,7 +59,7 @@ export function AiVisibilitySection() {
   const upcomingSoon = now
     ? events.some((e) => {
         if (e.venue !== editingVenue) return false;
-        if (!(isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review")) return false;
+        if (!(isEventLive(e, now, timeZone) || e.status === "scheduled" || e.status === "in_review")) return false;
         const days = (new Date(e.date).getTime() - now.getTime()) / 86_400_000;
         return days < 14 && days >= -1;
       })
@@ -196,33 +192,33 @@ export function AiVisibilitySection() {
           )}
           <div className="px-5 py-4">
             <SectionLabel className="mb-2.5">Raise your score</SectionLabel>
-            {tips.map((tip) => (
-              <div key={tip} className="mb-3 flex items-start gap-3 last:mb-0">
-                <CheckCircle2 size={18} className="mt-px shrink-0" color="var(--m3-ter)" />
-                <p className="text-[13px] leading-[19px] text-[var(--m3-onv)]">{tip}</p>
-              </div>
-            ))}
+            {tips.length === 0 ? (
+              <p className="text-[13px] text-[var(--m3-outline)]">
+                {aiLoading ? "Loading…" : "No tips yet for this venue."}
+              </p>
+            ) : (
+              tips.map((tip) => (
+                <div key={tip} className="mb-3 flex items-start gap-3 last:mb-0">
+                  <CheckCircle2 size={18} className="mt-px shrink-0" color="var(--m3-ter)" />
+                  <p className="text-[13px] leading-[19px] text-[var(--m3-onv)]">{tip}</p>
+                </div>
+              ))
+            )}
           </div>
         </Card>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-          <FieldLabel>Recommended by the AI companion this week</FieldLabel>
-          <p className="mt-2 font-display text-[32px] leading-none text-[var(--m3-on)]">
-            {MOCK_AI_RECOMMEND_COUNT}
-          </p>
-        </div>
-        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-          <FieldLabel className="mb-2.5">By intent</FieldLabel>
-          {MOCK_AI_INTENTS.map((i) => (
-            <div key={i.label} className="flex justify-between py-0.5 text-xs">
-              <span className="text-[var(--m3-on)]">&ldquo;{i.label}&rdquo;</span>
-              <span className="font-mono text-[var(--m3-onv)]">{i.count}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/*
+       * Finding 9: this used to also render two tiles of local MOCK_AI_*
+       * constants (a weekly-recommendation count and an intent breakdown)
+       * unconditionally, with no loading/error state, beside the
+       * Firestore-sourced score/prompts/tips above which have both. No
+       * producer populates those numbers — `aiVisibility/current`'s shape
+       * (plan A3) has neither a weekly-recommendation count nor an intent
+       * breakdown, and PartyAgent AI-visibility scoring is a named
+       * not-built follow-up. Deleted rather than extended: that would be
+       * speculative shape design for a producer that doesn't exist.
+       */}
 
       <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
         <FieldLabel className="mb-3.5">Why am I not being recommended more?</FieldLabel>

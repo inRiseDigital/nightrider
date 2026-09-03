@@ -17,6 +17,7 @@ import {
 import { getDb } from "@/lib/firebase";
 import { encodeGeohash } from "@/lib/admin/geo";
 import {
+  applyPendingListing,
   computeVenueProfile,
   DEFAULT_TONIGHT_STATE,
   isVenueDirty,
@@ -27,6 +28,7 @@ import {
   parseVenueProfile,
   toLiveFields,
   toMenuSectionFields,
+  toVenueDocFields,
   toVenueEditListing,
 } from "../data/venues";
 import {
@@ -247,6 +249,29 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
   useEffect(() => {
     if (editingVenue) fetchMenu(editingVenue);
   }, [editingVenue, fetchMenu]);
+
+  // ---- Finding 4: read `venueEdits/{editingVenue}` back ----
+  // A one-doc listener on the currently-open venue only — mirrors the menu
+  // fetch above rather than subscribing to all venues at once, since only
+  // the open editor needs this. `editOk()` guarantees the shape below for
+  // any document this client (or an admin) can have written.
+  const [pendingEditByVenue, setPendingEditByVenue] = useState<
+    Record<string, { status: string; listing: Record<string, unknown> } | null>
+  >({});
+  useEffect(() => {
+    if (!editingVenue) return;
+    const unsub = onSnapshot(venueEditsDocRef(editingVenue), (snap) => {
+      setPendingEditByVenue((prev) => ({
+        ...prev,
+        [editingVenue]: snap.exists()
+          ? (snap.data() as { status: string; listing: Record<string, unknown> })
+          : null,
+      }));
+    });
+    return unsub;
+  }, [editingVenue]);
+  const pendingEdit = pendingEditByVenue[editingVenue] ?? null;
+  const venuePendingReview = pendingEdit?.status === "pending";
 
   const { drafts: venueDrafts, updateListing, discard } = useVenueEditor();
   const { busy, actionError, run } = useAsyncAction();
@@ -594,7 +619,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
         batch.set(venueEditsDocRef(id), {
           venueId: id,
           status: "pending",
-          listing: toVenueEditListing(draft),
+          listing: toVenueEditListing(draft, { timeZone: meta[id]?.timeZone ?? "" }),
           submittedBy: uid,
           submittedAt: serverTimestamp(),
           reviewedBy: null,
@@ -607,16 +632,27 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       });
       if (ok) showSnack("Changes submitted for review.");
     },
-    [venueDrafts, run, discard, showSnack, uid]
+    [venueDrafts, run, discard, showSnack, uid, meta]
   );
 
   const discardVenue = useCallback(
-    (id: string) => {
-      if (!venueDrafts[id]) return;
-      discard(id);
-      showSnack("Changes discarded.");
+    async (id: string) => {
+      if (venueDrafts[id]) {
+        discard(id);
+        showSnack("Changes discarded.");
+        return;
+      }
+      // Withdraw a submitted-but-unreviewed draft — `firestore.rules`'
+      // `venueEdits` `allow delete` permits this exactly while
+      // `reviewedBy == null`, i.e. `status: 'pending'`.
+      if (pendingEditByVenue[id]?.status === "pending") {
+        const ok = await run(async () => {
+          await deleteDoc(venueEditsDocRef(id));
+        });
+        if (ok) showSnack("Submission withdrawn.");
+      }
     },
-    [venueDrafts, discard, showSnack]
+    [venueDrafts, discard, showSnack, pendingEditByVenue, run]
   );
 
   // ---- Add venue ----
@@ -639,9 +675,13 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
         const timeZone = resolvedTimeZoneWithFallback();
         const blank = blankVenueProfile(name, city, days);
         const ref = doc(venuesCol());
+        // `toVenueDocFields` is the document-shaped mapper (`cover` as a
+        // map, `name`/`address` included) — the same one `venues.test.ts`
+        // round-trips against. `toVenueEditListing` is for `venueEdits`
+        // only; using it here previously stored `coverMin`/`coverMax`/
+        // `currency` on the venue doc instead of a `cover` map (findings 1+2).
         await setDoc(ref, {
-          name,
-          city,
+          ...toVenueDocFields(blank, { raw: {} }),
           countryCode: market.countryCode,
           timeZone,
           geo: new GeoPoint(latitude, longitude),
@@ -652,7 +692,6 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
           ownerUid: uid,
           editors: { [uid]: "owner" },
           editorUids: [uid],
-          ...toVenueEditListing(blank),
         });
         try {
           await setDoc(doc(venueActivityCol(ref.id)), {
@@ -904,8 +943,15 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
   // ---- Derived profile: draft/published seam ----
   const savedProfile = venues[editingVenue] ?? blankVenueProfile("", "", []);
   const draft = venueDrafts[editingVenue];
-  const profile = computeVenueProfile(draft, savedProfile);
-  const venueDirty = isVenueDirty(draft, savedProfile);
+  // A pending `venueEdits` submission takes precedence over both the saved
+  // snapshot and any (post-submit, unlikely) local draft: the organizer's
+  // most recent action was Save, so what they should see is what they
+  // submitted, read-only, until an admin resolves it — not silently reverted
+  // to the pre-edit snapshot (finding 4).
+  const profile = venuePendingReview
+    ? applyPendingListing(savedProfile, pendingEdit?.listing)
+    : computeVenueProfile(draft, savedProfile);
+  const venueDirty = !venuePendingReview && isVenueDirty(draft, savedProfile);
   const menuLoading = menuLoadingIds.has(editingVenue);
 
   const data = useMemo(
@@ -923,6 +969,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       profile,
       savedProfile,
       venueDirty,
+      venuePendingReview,
       venueTab,
       addingVenue,
       newVenueName,
@@ -935,7 +982,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     }),
     [
       venueOrder, venues, meta, venuesLoading, venuesError, editingVenue, profile, savedProfile, venueDirty,
-      venueTab, addingVenue, newVenueName, newVenueCity, newVenueCountry, approximateLocationVenues,
+      venuePendingReview, venueTab, addingVenue, newVenueName, newVenueCity, newVenueCountry, approximateLocationVenues,
       tonight, liveBusy, menuLoading,
     ]
   );

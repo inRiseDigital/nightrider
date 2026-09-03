@@ -526,10 +526,10 @@ const RAW_VENUES = [
     website: "",
     photos: [
       emulatorDownloadUrl("venuePhotos/sirens/hero.jpg"),
+      emulatorDownloadUrl("venuePhotos/sirens/gallery/0.jpg"),
       emulatorDownloadUrl("venuePhotos/sirens/gallery/1.jpg"),
       emulatorDownloadUrl("venuePhotos/sirens/gallery/2.jpg"),
       emulatorDownloadUrl("venuePhotos/sirens/gallery/3.jpg"),
-      emulatorDownloadUrl("venuePhotos/sirens/gallery/4.jpg"),
     ],
     source: "organizer",
     osmId: null,
@@ -588,10 +588,10 @@ const RAW_VENUES = [
     website: "",
     photos: [
       emulatorDownloadUrl("venuePhotos/warehouse9/hero.jpg"),
+      emulatorDownloadUrl("venuePhotos/warehouse9/gallery/0.jpg"),
       emulatorDownloadUrl("venuePhotos/warehouse9/gallery/1.jpg"),
       emulatorDownloadUrl("venuePhotos/warehouse9/gallery/2.jpg"),
       emulatorDownloadUrl("venuePhotos/warehouse9/gallery/3.jpg"),
-      emulatorDownloadUrl("venuePhotos/warehouse9/gallery/4.jpg"),
     ],
     source: "organizer",
     osmId: null,
@@ -1737,10 +1737,10 @@ const VENUE_EDITS = [
       exceptions: [{ label: "Eid Al Adha — Private Hire", date: "2026-08-19", closed: true }],
       photos: [
         emulatorDownloadUrl("venuePhotos/sirens/hero.jpg"),
+        emulatorDownloadUrl("venuePhotos/sirens/gallery/0.jpg"),
         emulatorDownloadUrl("venuePhotos/sirens/gallery/1.jpg"),
         emulatorDownloadUrl("venuePhotos/sirens/gallery/2.jpg"),
         emulatorDownloadUrl("venuePhotos/sirens/gallery/3.jpg"),
-        emulatorDownloadUrl("venuePhotos/sirens/gallery/4.jpg"),
       ],
       timeZone: "Asia/Dubai",
     },
@@ -2241,10 +2241,10 @@ async function seedStorage() {
   for (const venueId of [VENUE_ID.sirens, VENUE_ID.warehouse9]) {
     const paths = [
       `venuePhotos/${venueId}/hero.jpg`,
+      `venuePhotos/${venueId}/gallery/0.jpg`,
       `venuePhotos/${venueId}/gallery/1.jpg`,
       `venuePhotos/${venueId}/gallery/2.jpg`,
       `venuePhotos/${venueId}/gallery/3.jpg`,
-      `venuePhotos/${venueId}/gallery/4.jpg`,
       `venuePhotos/${venueId}/menu/0.jpg`,
     ];
     for (const p of paths) {

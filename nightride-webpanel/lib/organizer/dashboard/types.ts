@@ -135,7 +135,7 @@ export type EventStatus =
 export type EventDisplayStatus = EventStatus | "live" | "upcoming";
 
 /** Result of the platform's automated content scan. "" means not yet scanned. */
-export type ModerationFlag = "" | "pending" | "clean";
+export type ModerationFlag = "" | "pending" | "clean" | "rejected";
 
 export interface TicketTier {
   name: string;

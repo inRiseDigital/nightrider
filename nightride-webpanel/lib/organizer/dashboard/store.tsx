@@ -56,7 +56,7 @@ export function OrganizerDashboardProvider({ children }: { children: ReactNode }
   const team = useTeam(venues.data.order, user, ui.showSnack);
   const promotion = usePromotion(venues.data.editingVenue || null, ui.showSnack);
   const now = useNow();
-  const performance = usePerformance(events.data.events, venues.data.order, now);
+  const performance = usePerformance(events.data.events, venues.data.order, now, venues.data.meta);
   const aiVisibility = useAiVisibility(venues.data.editingVenue || null);
   const activity = useActivity(venues.data.order);
 
@@ -266,6 +266,7 @@ export function useOrganizerDashboard() {
       profile: v.profile,
       savedProfile: v.savedProfile,
       venueDirty: v.venueDirty,
+      venuePendingReview: v.venuePendingReview,
       venueBusy: venues.busy,
       venueActionError: venues.actionError,
       liveBusy: v.liveBusy,

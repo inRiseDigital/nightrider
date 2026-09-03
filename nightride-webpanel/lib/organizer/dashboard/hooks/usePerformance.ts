@@ -6,7 +6,8 @@ import { venueMetricsDocRef } from "../data/refs";
 import { isoWeekId, parseVenueMetrics, type VenueMetrics } from "../data/analytics";
 import { describeFirestoreError } from "../data/errors";
 import { isEventLive } from "../format";
-import type { OrganizerEvent } from "../types";
+import { resolveTimeZone } from "../data/time";
+import type { OrganizerEvent, VenueMeta } from "../types";
 
 /**
  * `venues/{venueId}/metrics/{periodId}` — read-only analytics for the
@@ -25,7 +26,12 @@ import type { OrganizerEvent } from "../types";
  * first load or after a venue is removed) and nothing outside this hook
  * reads it, so this is contained.
  */
-export function usePerformance(events: OrganizerEvent[], venueOrder: string[], now: Date | null) {
+export function usePerformance(
+  events: OrganizerEvent[],
+  venueOrder: string[],
+  now: Date | null,
+  venueMeta: Record<string, VenueMeta>
+) {
   const [perfVenueFilter, setPerfVenueFilterState] = useState("");
   const [perfEventId, setPerfEventId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<VenueMetrics | null>(null);
@@ -76,12 +82,13 @@ export function usePerformance(events: OrganizerEvent[], venueOrder: string[], n
   const setPerfVenueFilter = useCallback(
     (id: string) => {
       setPerfVenueFilterState(id);
+      const tz = resolveTimeZone(venueMeta[id]?.timeZone);
       const eligible = events.filter(
-        (e) => (isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review") && e.venue === id
+        (e) => (isEventLive(e, now, tz) || e.status === "scheduled" || e.status === "in_review") && e.venue === id
       );
       setPerfEventId((prev) => (eligible.some((e) => e.id === prev) ? prev : (eligible[0]?.id ?? null)));
     },
-    [events, now]
+    [events, now, venueMeta]
   );
 
   const data = useMemo(

@@ -31,7 +31,7 @@ function parseEventStatus(raw: unknown): EventStatus {
 }
 
 function parseModerationFlag(raw: unknown): ModerationFlag {
-  return raw === "pending" || raw === "clean" ? raw : "";
+  return raw === "pending" || raw === "clean" || raw === "rejected" ? raw : "";
 }
 
 function parseTiers(raw: unknown): TicketTier[] {

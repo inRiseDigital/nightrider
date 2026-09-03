@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useNow, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { deriveEventChip, venueAccent, venueName } from "@/lib/organizer/dashboard/format";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { FilledButton, IconButton } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
 
@@ -16,6 +17,7 @@ export function EventDayDialog() {
     closeDayDialog,
     events,
     venues,
+    venueMeta,
     venueOrder,
     openEditEvent,
     openNewEvent,
@@ -52,7 +54,7 @@ export function EventDayDialog() {
             </p>
           )}
           {rows.map((ev) => {
-            const chip = deriveEventChip(ev, now);
+            const chip = deriveEventChip(ev, now, resolveTimeZone(venueMeta[ev.venue]?.timeZone));
             return (
               <button
                 key={ev.id}

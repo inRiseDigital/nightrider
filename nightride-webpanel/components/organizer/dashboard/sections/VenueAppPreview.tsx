@@ -33,6 +33,7 @@ import {
   useOrganizerDashboard,
 } from "@/lib/organizer/dashboard/store";
 import { uploadSlotImage } from "@/lib/organizer/dashboard/data/images";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { DAYS } from "@/lib/organizer/dashboard/constants";
 import { hoursTextFor, isEventLive, isOpenOn, mondayFirstIndex, toISODate } from "@/lib/organizer/dashboard/format";
 import type { SocialLink } from "@/lib/organizer/dashboard/types";
@@ -235,10 +236,11 @@ export function VenueAppPreview() {
   // The phone shows the *published* listing — drafted edits only appear here
   // once the save bar commits them. Menu and images are live either way,
   // since neither goes through the draft.
-  const { savedProfile, editingVenue, events, images, requestRemoveImage } =
+  const { savedProfile, editingVenue, events, images, requestRemoveImage, venueMeta } =
     useOrganizerDashboard();
   const profile = savedProfile;
   const now = useNow();
+  const timeZone = resolveTimeZone(venueMeta[editingVenue]?.timeZone);
   const [liked, setLiked] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -275,7 +277,7 @@ export function VenueAppPreview() {
 
   const highlights = useMemo(() => {
     const upcoming = events
-      .filter((e) => e.venue === editingVenue && (e.status === "scheduled" || isEventLive(e, now)))
+      .filter((e) => e.venue === editingVenue && (e.status === "scheduled" || isEventLive(e, now, timeZone)))
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 4)
       .map((e) => {
@@ -294,7 +296,7 @@ export function VenueAppPreview() {
       { key: "h2", title: "Ladies Night", day: "FRI", meta: "Free entry before 12AM" },
       { key: "h3", title: "Cocktail Hour", day: "SAT", meta: "2-for-1 cocktails" },
     ];
-  }, [events, editingVenue, now]);
+  }, [events, editingVenue, now, timeZone]);
 
   return (
     <div className="flex flex-col gap-3.5 lg:sticky lg:top-0">

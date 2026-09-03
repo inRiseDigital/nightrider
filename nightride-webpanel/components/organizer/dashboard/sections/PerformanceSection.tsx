@@ -2,12 +2,14 @@
 
 import { useNow, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { isEventLive } from "@/lib/organizer/dashboard/format";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { Card, Chip, FieldLabel, VenueSwitcher } from "../ui/Primitives";
 
 export function PerformanceSection() {
   const {
     venueOrder,
     venues,
+    venueMeta,
     events,
     perfVenueFilter,
     setPerfVenueFilter,
@@ -18,10 +20,13 @@ export function PerformanceSection() {
     perfError,
   } = useOrganizerDashboard();
   const now = useNow();
+  const perfTimeZone = resolveTimeZone(venueMeta[perfVenueFilter]?.timeZone);
 
   // Only events an audience can actually see have a funnel.
   const perfEvents = events.filter(
-    (e) => (isEventLive(e, now) || e.status === "scheduled" || e.status === "in_review") && e.venue === perfVenueFilter
+    (e) =>
+      (isEventLive(e, now, perfTimeZone) || e.status === "scheduled" || e.status === "in_review") &&
+      e.venue === perfVenueFilter
   );
 
   const attendance = perfMetrics?.attendance ?? [];

@@ -3,6 +3,7 @@
 import { Pencil } from "lucide-react";
 import { useNow, useOrganizerDashboard, type EventFilter } from "@/lib/organizer/dashboard/store";
 import { deriveEventChip, isEventLive, matchesFilter, venueName } from "@/lib/organizer/dashboard/format";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { Chip, IconButton, SlimTextarea } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
 
@@ -23,6 +24,7 @@ export function EventsSection() {
     eventFilter,
     setEventFilter,
     venues,
+    venueMeta,
     openEditEvent,
     startCancel,
     cancelingEventId,
@@ -37,7 +39,9 @@ export function EventsSection() {
 
   // `matchesFilter`, never raw `e.status === eventFilter` — the "live" filter
   // id is a legitimate filter on derived state, not a stored status.
-  const rows = events.filter((e) => matchesFilter(e, eventFilter, now));
+  const rows = events.filter((e) =>
+    matchesFilter(e, eventFilter, now, resolveTimeZone(venueMeta[e.venue]?.timeZone))
+  );
 
   return (
     <>
@@ -72,8 +76,9 @@ export function EventsSection() {
         )}
 
         {rows.map((ev) => {
-          const chip = deriveEventChip(ev, now);
-          const cancelable = isEventLive(ev, now) || ev.status === "scheduled";
+          const evTimeZone = resolveTimeZone(venueMeta[ev.venue]?.timeZone);
+          const chip = deriveEventChip(ev, now, evTimeZone);
+          const cancelable = isEventLive(ev, now, evTimeZone) || ev.status === "scheduled";
           const currency = venues[ev.venue]?.currency ?? "";
 
           return (

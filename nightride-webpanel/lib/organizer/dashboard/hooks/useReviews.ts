@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { venueReportsCol } from "../data/refs";
 import { describeFirestoreError } from "../data/errors";
 import { orderReviews, parseVenueReview } from "../data/engagement";
@@ -38,7 +38,16 @@ export function useReviews(
       const chunks =
         venueIds.length === 0
           ? []
-          : await Promise.all(venueIds.map((id) => getDocs(query(venueReportsCol(), where("venueId", "==", id)))));
+          : await Promise.all(
+              // `limit(50)` — finding 7: `venueReports` grows unbounded (the
+              // plan's own word), same as `venues/{id}/activity`.
+              // `orderBy("createdAt", "desc")` first, so the 50 kept are the
+              // most recent — `orderReviews` re-sorts by the same field, so
+              // this doesn't change what the organizer sees, just how many.
+              venueIds.map((id) =>
+                getDocs(query(venueReportsCol(), where("venueId", "==", id), orderBy("createdAt", "desc"), limit(50)))
+              )
+            );
       const next: Record<string, Record<string, unknown>> = {};
       for (const snap of chunks) {
         snap.forEach((d) => {

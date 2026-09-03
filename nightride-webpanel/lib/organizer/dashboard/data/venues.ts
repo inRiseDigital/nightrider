@@ -317,12 +317,75 @@ export function isVenueDirty(draft: VenueProfile | undefined, saved: VenueProfil
 }
 
 /**
- * The reviewable listing fields only, shaped for `venueEdits/{venueId}.listing`
- * — the same fields `listingFieldsOf` strips down to, just spread into a plain
- * object rather than `Partial<VenueProfile>` so it writes cleanly.
+ * Finding 4: nothing read `venueEdits/{venueId}` back, so Save appeared to
+ * discard the organizer's work. This overlays a pending `venueEdits.listing`
+ * onto the last-saved profile the same way `withLiveFields` overlays a local
+ * draft — `name`/`address`/`menu`/verification stay from `saved` (they were
+ * never part of the submission), the thirteen listing fields come from the
+ * submitted draft. Reuses the same defensive per-field parsing as
+ * `parseVenueProfile` so a malformed or partial `listing` map degrades to
+ * `saved`'s values rather than throwing.
  */
-export function toVenueEditListing(p: VenueProfile): Record<string, unknown> {
-  return listingFieldsOf(p);
+export function applyPendingListing(saved: VenueProfile, listing: Record<string, unknown> | undefined): VenueProfile {
+  const l = listing ?? {};
+  const cover = (l.cover ?? {}) as Record<string, unknown>;
+  return {
+    ...saved,
+    about: typeof l.about === "string" ? l.about : saved.about,
+    socialLinks: Array.isArray(l.socialLinks) ? parseSocialLinks(l.socialLinks) : saved.socialLinks,
+    genres: Array.isArray(l.genres) ? l.genres.filter((g): g is string => typeof g === "string") : saved.genres,
+    dressCode: typeof l.dressCode === "string" ? l.dressCode : saved.dressCode,
+    agePolicy: typeof l.agePolicy === "string" ? l.agePolicy : saved.agePolicy,
+    tableLink: typeof l.tableLink === "string" ? l.tableLink : saved.tableLink,
+    coverMin: typeof cover.min === "number" ? cover.min : saved.coverMin,
+    coverMax: typeof cover.max === "number" ? cover.max : saved.coverMax,
+    currency: typeof cover.currency === "string" ? cover.currency : saved.currency,
+    capacity: typeof l.capacity === "number" ? l.capacity : saved.capacity,
+    amenities: Array.isArray(l.amenities) ? l.amenities.filter((a): a is string => typeof a === "string") : saved.amenities,
+    hours: Array.isArray(l.hours) ? parseHours(l.hours) : saved.hours,
+    exceptions: Array.isArray(l.exceptions) ? parseExceptions(l.exceptions) : saved.exceptions,
+    photos: Array.isArray(l.photos) ? l.photos.filter((p): p is string => typeof p === "string") : saved.photos,
+  };
+}
+
+/**
+ * The reviewable listing fields only, shaped for `venueEdits/{venueId}.listing`
+ * — exactly `venueListingFields()` (`firestore.rules`), in document shape
+ * (`cover: { min, max, currency }`, never `coverMin`/`coverMax`/`currency`).
+ *
+ * This is deliberately NOT `listingFieldsOf(p)`: that helper returns a raw
+ * `VenueProfile` slice (UI shape, and it includes `name`/`address`, which are
+ * NOT listing fields — see `venueShapeOk()`'s top-level `hasAll` in
+ * `firestore.rules`). Collapsing the two produced a version of this file that
+ * broke `venues.test.ts`'s round-trip assertion that `name` survives
+ * `toVenueDocFields` — that test is correct, and `name`/`address` belong only
+ * in the venue document, never in `venueEdits.listing`. `toVenueDocFields`
+ * below is the document-shaped mapper; this is the listing-only one. Keep
+ * both.
+ *
+ * `timeZone` is one of the thirteen `venueListingFields()` keys but is not
+ * part of `VenueProfile` — it lives on `VenueMeta` and the editor has no
+ * control for it (Constraint 7: `types.ts`'s UI shapes don't change for
+ * this). `ctx.timeZone` threads the venue's current zone through so the
+ * submitted draft carries it forward unchanged rather than a fabricated `""`
+ * that would blank it out the moment an admin approves the draft.
+ */
+export function toVenueEditListing(p: VenueProfile, ctx: { timeZone: string }): Record<string, unknown> {
+  return {
+    about: p.about,
+    socialLinks: p.socialLinks,
+    genres: p.genres,
+    dressCode: p.dressCode,
+    agePolicy: p.agePolicy,
+    tableLink: p.tableLink,
+    cover: { min: p.coverMin, max: p.coverMax, currency: p.currency },
+    capacity: p.capacity,
+    amenities: p.amenities,
+    hours: p.hours,
+    exceptions: p.exceptions,
+    photos: p.photos ?? [],
+    timeZone: ctx.timeZone,
+  };
 }
 
 // ---------------------------------------------------------------------------

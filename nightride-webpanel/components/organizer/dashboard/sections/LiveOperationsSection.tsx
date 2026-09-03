@@ -24,6 +24,7 @@ import {
 } from "@/lib/organizer/dashboard/store";
 import { DOOR_STATUSES } from "@/lib/organizer/dashboard/constants";
 import { deriveEventChip, toISODate, venueName } from "@/lib/organizer/dashboard/format";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { Toggle } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
 
@@ -79,6 +80,7 @@ export function LiveOperationsSection() {
     profile,
     editingVenue,
     venues,
+    venueMeta,
     venueOrder,
     events,
     reviews,
@@ -458,7 +460,7 @@ export function LiveOperationsSection() {
             </p>
           ) : (
             nextNights.map((ev) => {
-              const chip = deriveEventChip(ev, now);
+              const chip = deriveEventChip(ev, now, resolveTimeZone(venueMeta[ev.venue]?.timeZone));
               const [, month, day] = ev.date.split("-");
               return (
                 <Link

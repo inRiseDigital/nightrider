@@ -25,6 +25,10 @@ const MODERATION_STYLES = {
     label: "PASSED AUTO-SCAN",
     className: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30",
   },
+  rejected: {
+    label: "REJECTED BY MODERATION",
+    className: "bg-red-500/10 text-red-400 ring-red-500/30",
+  },
 } as const;
 
 /** The dialog sits on --m3-surf2, so notched field labels must mask that tone. */
@@ -65,7 +69,9 @@ export function EventEditor() {
       ? MODERATION_STYLES.pending
       : eventDraft.moderationFlag === "clean"
         ? MODERATION_STYLES.clean
-        : null;
+        : eventDraft.moderationFlag === "rejected"
+          ? MODERATION_STYLES.rejected
+          : null;
 
   // Only verified venues can host a submission.
   const selectableVenues = venueOrder

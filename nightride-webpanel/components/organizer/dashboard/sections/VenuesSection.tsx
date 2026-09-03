@@ -53,6 +53,7 @@ export function VenuesSection() {
     editingVenue,
     setEditingVenue,
     profile,
+    venuePendingReview,
     venueTab,
     setVenueTab,
     addingVenue,
@@ -193,10 +194,28 @@ export function VenuesSection() {
               ))}
             </div>
 
-            {venueTab === "profile" && <ProfileTab />}
+            {venuePendingReview && (
+              <Card
+                className="mb-6 max-w-[640px] text-[13px]"
+                style={{ borderColor: "var(--m3-warn)", color: "var(--m3-on)" }}
+              >
+                Submitted for review — these listing fields show what you submitted and can&apos;t
+                be edited again until an admin approves or rejects it. Withdraw the submission
+                below to make further changes.
+              </Card>
+            )}
+
+            {/* Listing fields (not the menu — that publishes immediately and
+                is never part of a `venueEdits` submission) become read-only
+                while a submission is pending review; `<fieldset disabled>`
+                propagates to every native input/select/textarea/button
+                inside without threading a prop through each one. */}
+            <fieldset disabled={venuePendingReview} className={venuePendingReview ? "opacity-70" : undefined}>
+              {venueTab === "profile" && <ProfileTab />}
+              {venueTab === "hours" && <HoursTab />}
+              {venueTab === "links" && <LinksTab />}
+            </fieldset>
             {venueTab === "menu" && <VenueMenuSection />}
-            {venueTab === "hours" && <HoursTab />}
-            {venueTab === "links" && <LinksTab />}
 
             {/* Menu edits publish immediately, so that tab has nothing to save. */}
             <SaveBar />
@@ -218,7 +237,7 @@ export function VenuesSection() {
  * content showing through the gap.
  */
 function SaveBar() {
-  const { editingVenue, venueDirty, venueBusy, venueActionError, saveVenue, discardVenue } =
+  const { editingVenue, venueDirty, venuePendingReview, venueBusy, venueActionError, saveVenue, discardVenue } =
     useOrganizerDashboard();
 
   return (
@@ -238,18 +257,20 @@ function SaveBar() {
           Unsaved changes
         </span>
       )}
-      <FilledButton
-        onClick={() => saveVenue(editingVenue)}
-        disabled={!venueDirty}
-        loading={venueBusy}
-        tonal={!venueDirty}
-        className={venueDirty ? undefined : "cursor-default hover:opacity-100"}
-      >
-        Save changes
-      </FilledButton>
-      {venueDirty && (
+      {!venuePendingReview && (
+        <FilledButton
+          onClick={() => saveVenue(editingVenue)}
+          disabled={!venueDirty}
+          loading={venueBusy}
+          tonal={!venueDirty}
+          className={venueDirty ? undefined : "cursor-default hover:opacity-100"}
+        >
+          Save changes
+        </FilledButton>
+      )}
+      {(venueDirty || venuePendingReview) && (
         <OutlinedButton onClick={() => discardVenue(editingVenue)} disabled={venueBusy}>
-          Discard
+          {venuePendingReview ? "Withdraw submission" : "Discard"}
         </OutlinedButton>
       )}
       <p
@@ -257,9 +278,11 @@ function SaveBar() {
         style={{ color: venueActionError ? "var(--m3-err)" : "var(--m3-onv)" }}
       >
         {venueActionError ||
-          (venueDirty
-            ? "Unsaved edits are only visible to you until you save."
-            : "Edits to a verified venue are reviewed before going live.")}
+          (venuePendingReview
+            ? "Submitted for review — the published listing won't change until an admin acts on it."
+            : venueDirty
+              ? "Unsaved edits are only visible to you until you save."
+              : "Edits to a verified venue are reviewed before going live.")}
       </p>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getDocs, orderBy, query, Timestamp } from "firebase/firestore";
+import { getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
 import { venueActivityCol } from "../data/refs";
 import { parseActivityEntry } from "../data/activity";
 import { describeFirestoreError } from "../data/errors";
@@ -31,7 +31,13 @@ export function useActivity(venueIds: string[]) {
     setLoading(true);
     try {
       const snaps = venueIds.length
-        ? await Promise.all(venueIds.map((id) => getDocs(query(venueActivityCol(id), orderBy("at", "desc")))))
+        ? await Promise.all(
+            // `limit(50)` — finding 7: an unbounded read of a subcollection
+            // the module doc above already says "grows unbounded". Each
+            // venue's own most-recent 50 is plenty for "reconstruct recent
+            // changes"; the 180-day pruning follow-up is the real fix.
+            venueIds.map((id) => getDocs(query(venueActivityCol(id), orderBy("at", "desc"), limit(50))))
+          )
         : [];
       const entries: { entry: ActivityEntry; atMs: number }[] = [];
       for (const snap of snaps) {

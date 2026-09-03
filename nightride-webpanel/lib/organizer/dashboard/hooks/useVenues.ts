@@ -45,6 +45,7 @@ import type { DoorStatus, MenuItem, TonightState, VenueMeta, VenueProfile, Verif
 import { useAsyncAction } from "./useAsyncAction";
 import { useVenueEditor } from "./useVenueEditor";
 import { useLatest } from "./useLatest";
+import { decideDiscardVenueAction } from "./discard-venue-action";
 
 export type VenueTab = "profile" | "menu" | "hours" | "links";
 
@@ -637,19 +638,25 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
 
   const discardVenue = useCallback(
     async (id: string) => {
-      if (venueDrafts[id]) {
-        discard(id);
-        showSnack("Changes discarded.");
-        return;
-      }
-      // Withdraw a submitted-but-unreviewed draft — `firestore.rules`'
-      // `venueEdits` `allow delete` permits this exactly while
-      // `reviewedBy == null`, i.e. `status: 'pending'`.
-      if (pendingEditByVenue[id]?.status === "pending") {
+      const action = decideDiscardVenueAction(Boolean(venueDrafts[id]), pendingEditByVenue[id]?.status);
+      if (action.kind === "withdraw") {
+        // `firestore.rules`' `venueEdits` `allow delete` permits this
+        // exactly while `reviewedBy == null`, i.e. `status: 'pending'`.
         const ok = await run(async () => {
           await deleteDoc(venueEditsDocRef(id));
         });
-        if (ok) showSnack("Submission withdrawn.");
+        if (ok) {
+          // Clear any local draft alongside the withdraw — leaving one
+          // behind would immediately re-dirty the venue with edits the
+          // organizer never asked to keep.
+          if (action.clearDraft) discard(id);
+          showSnack("Submission withdrawn.");
+        }
+        return;
+      }
+      if (action.kind === "discardDraft") {
+        discard(id);
+        showSnack("Changes discarded.");
       }
     },
     [venueDrafts, discard, showSnack, pendingEditByVenue, run]

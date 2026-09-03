@@ -99,8 +99,13 @@ function networkLabel(link: SocialLink) {
  * is pending, falling back to `images[slotId]` (the published photo) once
  * settled — and, on failure, staying exactly where it was: a failed upload
  * must never clear the tile, only show the error plus a retry.
+ *
+ * `disabled` gates the hero/gallery slots while a listing submission is
+ * pending review (see `VenueAppPreview`'s doc comment) — the picker, drop
+ * target, and remove control all become inert so the control reads as
+ * unavailable rather than silently accepting a click that goes nowhere.
  */
-function useImageUpload(slotId: string) {
+function useImageUpload(slotId: string, disabled = false) {
   const { images, commitSlotImage, showSnack } = useOrganizerDashboard();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -162,23 +167,30 @@ function useImageUpload(slotId: string) {
     if (pendingFileRef.current) startUpload(pendingFileRef.current);
   }, [startUpload]);
 
-  const openPicker = useCallback(() => inputRef.current?.click(), []);
+  const openPicker = useCallback(() => {
+    if (disabled) return;
+    inputRef.current?.click();
+  }, [disabled]);
 
   const onDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
       setDragging(false);
+      if (disabled) return;
       readFile(e.dataTransfer.files?.[0]);
     },
-    [readFile]
+    [disabled, readFile]
   );
 
-  const onDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  }, []);
+  const onDragOver = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!disabled) setDragging(true);
+    },
+    [disabled]
+  );
 
   const onDragLeave = useCallback(() => setDragging(false), []);
 
@@ -188,8 +200,9 @@ function useImageUpload(slotId: string) {
       type="file"
       accept="image/jpeg,image/png,image/webp"
       className="sr-only"
+      disabled={disabled}
       onChange={(e) => {
-        readFile(e.target.files?.[0]);
+        if (!disabled) readFile(e.target.files?.[0]);
         e.target.value = "";
       }}
     />
@@ -201,6 +214,7 @@ function useImageUpload(slotId: string) {
     uploading,
     progress,
     error,
+    disabled,
     retry,
     openPicker,
     onDrop,
@@ -234,9 +248,13 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
  */
 export function VenueAppPreview() {
   // The phone shows the *published* listing — drafted edits only appear here
-  // once the save bar commits them. Menu and images are live either way,
-  // since neither goes through the draft.
-  const { savedProfile, editingVenue, events, images, requestRemoveImage, venueMeta } =
+  // once the save bar commits them. Menu images are live either way, since
+  // menu edits bypass the draft entirely — but hero/gallery photos ARE
+  // listing fields (they route through `commitSlotImage` into the venue's
+  // draft, same as any other profile field), so their pickers must be
+  // gated by `venuePendingReview` exactly like the fieldset around the
+  // Profile/Hours/Links tabs.
+  const { savedProfile, editingVenue, events, images, requestRemoveImage, venueMeta, venuePendingReview } =
     useOrganizerDashboard();
   const profile = savedProfile;
   const now = useNow();
@@ -247,7 +265,7 @@ export function VenueAppPreview() {
 
   const hero = heroSlotId(editingVenue);
   const gallery = gallerySlotIds(editingVenue);
-  const heroUpload = useImageUpload(hero);
+  const heroUpload = useImageUpload(hero, venuePendingReview);
 
   const dayIdx = now ? mondayFirstIndex(now) : 0;
   const todayISO = now ? toISODate(now) : "";
@@ -318,7 +336,8 @@ export function VenueAppPreview() {
             onDragOver={heroUpload.onDragOver}
             onDragLeave={heroUpload.onDragLeave}
             aria-label={heroUpload.src ? "Replace hero photo" : "Add hero photo"}
-            className="group relative h-[220px] cursor-pointer"
+            aria-disabled={heroUpload.disabled}
+            className={`group relative h-[220px] ${heroUpload.disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
             style={{
               background:
                 "radial-gradient(120% 90% at 20% 20%, #3B1C6B 0%, transparent 60%), radial-gradient(110% 80% at 78% 12%, #1E4FA8 0%, transparent 58%), radial-gradient(90% 70% at 55% 45%, #C2277E 0%, transparent 62%), linear-gradient(180deg, #1A0A22 0%, #0B0510 100%)",
@@ -334,16 +353,18 @@ export function VenueAppPreview() {
                 <span className="text-[11px]">Drop your hero photo</span>
               </div>
             )}
-            <div
-              className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 ${
-                heroUpload.dragging ? "opacity-100" : ""
-              }`}
-            >
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
-                <Camera size={15} />
-                {heroUpload.src ? "Replace photo" : "Add photo"}
-              </span>
-            </div>
+            {!heroUpload.disabled && (
+              <div
+                className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 ${
+                  heroUpload.dragging ? "opacity-100" : ""
+                }`}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                  <Camera size={15} />
+                  {heroUpload.src ? "Replace photo" : "Add photo"}
+                </span>
+              </div>
+            )}
             <div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -370,7 +391,9 @@ export function VenueAppPreview() {
             <div className="absolute left-3 top-11 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white backdrop-blur">
               <ArrowLeft size={17} />
             </div>
-            {heroUpload.src && <RemoveButton onClick={() => requestRemoveImage(hero)} />}
+            {heroUpload.src && !heroUpload.disabled && (
+              <RemoveButton onClick={() => requestRemoveImage(hero)} />
+            )}
 
             {heroUpload.uploading && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-black/40">
@@ -581,7 +604,12 @@ export function VenueAppPreview() {
             <Section title="GALLERY">
               <div className="nr-phone-scroll flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((slotId) => (
-                  <GalleryTile key={slotId} slotId={slotId} onRemove={requestRemoveImage} />
+                  <GalleryTile
+                    key={slotId}
+                    slotId={slotId}
+                    onRemove={requestRemoveImage}
+                    disabled={venuePendingReview}
+                  />
                 ))}
               </div>
             </Section>
@@ -876,11 +904,13 @@ function Expect({
 function GalleryTile({
   slotId,
   onRemove,
+  disabled = false,
 }: {
   slotId: string;
   onRemove: (slotId: string) => void;
+  disabled?: boolean;
 }) {
-  const upload = useImageUpload(slotId);
+  const upload = useImageUpload(slotId, disabled);
   const src = upload.src;
 
   return (
@@ -893,7 +923,10 @@ function GalleryTile({
       onDragOver={upload.onDragOver}
       onDragLeave={upload.onDragLeave}
       aria-label={src ? "Replace gallery photo" : "Add gallery photo"}
-      className="group relative h-[92px] w-[74px] shrink-0 cursor-pointer overflow-hidden rounded-lg border border-dashed"
+      aria-disabled={upload.disabled}
+      className={`group relative h-[92px] w-[74px] shrink-0 overflow-hidden rounded-lg border border-dashed ${
+        upload.disabled ? "cursor-not-allowed" : "cursor-pointer"
+      }`}
       style={{
         borderColor: upload.dragging ? PINK : HAIRLINE,
         background: src ? "transparent" : "#FFFDFA",
@@ -908,14 +941,16 @@ function GalleryTile({
           <ImagePlus size={16} />
         </div>
       )}
-      <div
-        className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 ${
-          upload.dragging ? "opacity-100" : ""
-        }`}
-      >
-        <Camera size={14} color="#fff" />
-      </div>
-      {src && <RemoveButton onClick={() => onRemove(slotId)} />}
+      {!upload.disabled && (
+        <div
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 ${
+            upload.dragging ? "opacity-100" : ""
+          }`}
+        >
+          <Camera size={14} color="#fff" />
+        </div>
+      )}
+      {src && !upload.disabled && <RemoveButton onClick={() => onRemove(slotId)} />}
       {upload.uploading && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-black/40">
           <div className="h-full bg-white transition-[width]" style={{ width: `${Math.round(upload.progress * 100)}%` }} />

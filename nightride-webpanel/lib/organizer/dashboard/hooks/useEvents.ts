@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { doc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { doc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { eventDocRef, eventsCol } from "../data/refs";
 import { describeFirestoreError } from "../data/errors";
 import { parseOrganizerEvent, toEventDocFields } from "../data/events";
@@ -236,16 +236,29 @@ export function useEvents(
    * `commitEvent` — the ordering constraint (T12 brief, and the storage rule
    * itself: `isEventOwner()` has nothing else to authorize against) is
    * "create the draft, upload, then patch", so this only ever runs against
-   * an event that already exists. Still the raw-remainder merge every event
-   * write uses (Global Constraint 2): spreads the freshest `rawDocs` entry
-   * first so a photo patch can never blank a field this panel doesn't model.
+   * an event that already exists.
+   *
+   * Fix round 1: this is a single-field `updateDoc`, NOT a whole-document
+   * `setDoc({ ...raw, [field]: url })` — spreading `rawDocsRef.current`
+   * looked like it followed the raw-remainder-merge pattern every other
+   * event write uses, but `rawDocsRef` only refreshes after `run()`'s
+   * reload completes, so a cover upload and a poster upload fired in quick
+   * succession (both `ImageSlot`s are independently clickable, nothing
+   * locks one while the other is in flight) would both read the SAME stale
+   * `raw`, and whichever `setDoc` landed second would silently revert the
+   * other's field to its pre-upload value — the Storage object would exist,
+   * successfully uploaded, and simply not be referenced by the document.
+   * `updateDoc` touches only `[field]`, so two concurrent patches to
+   * different fields compose correctly regardless of ordering. Global
+   * Constraint 2's raw-remainder-merge concern (a whole-document write
+   * silently dropping a field this panel doesn't model) does not apply to a
+   * single-field dot-path update — there is no second field it could drop.
    */
   const patchEventImage = useCallback(
     (eventId: string, field: "coverImage" | "posterImage", url: string) =>
       run(async () => {
-        const raw = rawDocsRef.current[eventId];
-        if (!raw) throw new Error("Save this event before adding images.");
-        await setDoc(eventDocRef(eventId), { ...raw, [field]: url });
+        if (!rawDocsRef.current[eventId]) throw new Error("Save this event before adding images.");
+        await updateDoc(eventDocRef(eventId), { [field]: url });
       }),
     [run, rawDocsRef]
   );

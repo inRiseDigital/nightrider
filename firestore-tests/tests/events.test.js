@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, afterEach, describe, it } from 'vitest';
+import { beforeAll, afterAll, afterEach, describe, it, expect } from 'vitest';
 import { assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import {
   doc,
@@ -454,5 +454,63 @@ describe('events/{eventId}', () => {
         baseEvent({ organizerUid: org, source: 'organizer', endAt: null }),
       ),
     );
+  });
+
+  // T12 fix round 1, finding 2: `patchEventImage` (nightride-webpanel's
+  // useEvents.ts) used to `setDoc({ ...staleRawDoc, [field]: url })` — a
+  // whole-document write built from a client-side snapshot that only
+  // refreshes after a reload completes. A cover upload and a poster upload
+  // fired close together both read the same stale snapshot, and whichever
+  // write landed second silently reverted the other field. The fix is a
+  // single-field `updateDoc`, which composes correctly against whatever the
+  // SERVER's current document is, not a client-held snapshot — this proves
+  // that against the real emulator, not by reasoning about it.
+  it('71. two concurrent single-field updateDoc calls (coverImage, posterImage) both land — the mechanism `patchEventImage` now relies on', async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev71', baseEvent({ organizerUid: org, status: 'published', coverImage: '', posterImage: '' }));
+    const ctx = testEnv.authenticatedContext(org);
+    const ref = doc(ctx.firestore(), 'events/ev71');
+
+    await Promise.all([
+      assertSucceeds(updateDoc(ref, { coverImage: 'https://example.com/cover.jpg' })),
+      assertSucceeds(updateDoc(ref, { posterImage: 'https://example.com/poster.jpg' })),
+    ]);
+
+    // `org` (organizerUid match) and, separately, "published" status both
+    // authorize the read directly — no need to drop to an unrestricted context.
+    const finalDoc = await getDoc(ref);
+    const data = finalDoc.data();
+    expect(data.coverImage).toBe('https://example.com/cover.jpg');
+    expect(data.posterImage).toBe('https://example.com/poster.jpg');
+  });
+
+  // The bug finding 2 fixes, reproduced directly: the OLD `setDoc({...raw,
+  // field: url})` shape, run twice from the same stale `raw` snapshot (as
+  // `rawDocsRef.current` would be if both uploads started before either
+  // reload completed), loses whichever field was set first. This is not a
+  // rules assertion — both writes are individually valid — it demonstrates
+  // why `patchEventImage` had to stop doing this.
+  it('72. (regression demonstration) two whole-document setDoc calls from the SAME stale snapshot silently drop one field — this is the bug finding 2 fixed', async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev72', baseEvent({ organizerUid: org, status: 'published', coverImage: '', posterImage: '' }));
+    const ctx = testEnv.authenticatedContext(org);
+    const ref = doc(ctx.firestore(), 'events/ev72');
+
+    const staleRaw = (await getDoc(ref)).data(); // both "uploads" read this once, before either write
+
+    await Promise.all([
+      assertSucceeds(setDoc(ref, { ...staleRaw, coverImage: 'https://example.com/cover.jpg' })),
+      assertSucceeds(setDoc(ref, { ...staleRaw, posterImage: 'https://example.com/poster.jpg' })),
+    ]);
+
+    const finalDoc = await getDoc(ref);
+    const data = finalDoc.data();
+    // Exactly one of the two fields survives — which one is a race, not
+    // something this test should pin down. The point is that BOTH being set
+    // is false with the old shape, in contrast to test 71 above.
+    const bothSet = data.coverImage === 'https://example.com/cover.jpg' && data.posterImage === 'https://example.com/poster.jpg';
+    expect(bothSet).toBe(false);
   });
 });

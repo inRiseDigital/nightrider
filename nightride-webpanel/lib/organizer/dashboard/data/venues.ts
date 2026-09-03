@@ -364,3 +364,26 @@ export function parseMenuSection(id: string, data: Record<string, unknown> | und
 export function toMenuSectionFields(s: MenuSection): Record<string, unknown> {
   return { name: s.name, items: s.items };
 }
+
+/**
+ * `photos[index] = value` immutably, padding with `""` rather than leaving a
+ * sparse-array hole. T12 fix round 1: the four gallery tiles
+ * (`gallery-{venueId}-{i}` -> `photos[i+1]`) are independently droppable in
+ * any order, so a brand-new venue's `photos` array can be shorter than
+ * `index` when a slot lands — plain `photos[index] = value` on a short array
+ * leaves a hole, and `[...sparse][0] === undefined` in that case.
+ * `toVenueEditListing`'s bare `{ ...p }` spread would carry that `undefined`
+ * straight into `saveVenue`'s batch write, which the Firestore SDK rejects
+ * outright (no `ignoreUndefinedProperties` is set anywhere in
+ * `lib/firebase.ts`) — a Storage upload that already succeeded would then
+ * fail to save with an opaque error. Padding on every write means `photos`
+ * is never sparse to begin with. Lives here (not `store.tsx`, where the two
+ * callers are) because it's pure and this module is the one with unit
+ * tests that don't transitively import Firebase — see `venues.test.ts`.
+ */
+export function setPhotoAt(photos: string[] | undefined, index: number, value: string): string[] {
+  const next = [...(photos ?? [])];
+  while (next.length <= index) next.push("");
+  next[index] = value;
+  return next;
+}

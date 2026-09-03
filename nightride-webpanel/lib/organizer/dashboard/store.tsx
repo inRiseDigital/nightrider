@@ -16,6 +16,7 @@ import { useActivity, type ActivityState } from "./hooks/useActivity";
 import { useAccountSettings, type AccountSettingsState } from "./hooks/useAccountSettings";
 import { useDashboardUi, type DashboardUiState } from "./hooks/useDashboardUi";
 import { eventSlotIds, gallerySlotId, heroSlotId, menuItemSlotId, parseSlotId } from "./data/images";
+import { setPhotoAt } from "./data/venues";
 import type { VenueProfile } from "./types";
 
 export type { VenueTab } from "./hooks/useVenues";
@@ -170,19 +171,14 @@ export function useOrganizerDashboard() {
       const slot = parseSlotId(slotId);
       if (!slot) return;
       if (slot.kind === "hero") {
-        venues.updateVenueListing(slot.venueId, (p) => {
-          const next = [...(p.photos ?? [])];
-          next[0] = url;
-          return { ...p, photos: next };
-        });
+        venues.updateVenueListing(slot.venueId, (p) => ({ ...p, photos: setPhotoAt(p.photos, 0, url) }));
         return;
       }
       if (slot.kind === "gallery") {
-        venues.updateVenueListing(slot.venueId, (p) => {
-          const next = [...(p.photos ?? [])];
-          next[slot.index + 1] = url;
-          return { ...p, photos: next };
-        });
+        venues.updateVenueListing(slot.venueId, (p) => ({
+          ...p,
+          photos: setPhotoAt(p.photos, slot.index + 1, url),
+        }));
         return;
       }
       if (slot.kind === "menu") {
@@ -216,19 +212,14 @@ export function useOrganizerDashboard() {
       const slot = parseSlotId(slotId);
       if (!slot) return;
       if (slot.kind === "hero") {
-        venues.updateVenueListing(slot.venueId, (p) => {
-          const next = [...(p.photos ?? [])];
-          next[0] = "";
-          return { ...p, photos: next };
-        });
+        venues.updateVenueListing(slot.venueId, (p) => ({ ...p, photos: setPhotoAt(p.photos, 0, "") }));
         return;
       }
       if (slot.kind === "gallery") {
-        venues.updateVenueListing(slot.venueId, (p) => {
-          const next = [...(p.photos ?? [])];
-          next[slot.index + 1] = "";
-          return { ...p, photos: next };
-        });
+        venues.updateVenueListing(slot.venueId, (p) => ({
+          ...p,
+          photos: setPhotoAt(p.photos, slot.index + 1, ""),
+        }));
         return;
       }
       if (slot.kind === "menu") {

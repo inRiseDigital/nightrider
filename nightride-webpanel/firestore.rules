@@ -391,6 +391,18 @@ service cloud.firestore {
       // partially-migrated venue document stays writable.
       function venueShapeOk() {
         let d = request.resource.data;
+        // The listing sweep and the verification-step sweep are the two
+        // expensive parts of this function (13 fields with nested .get()
+        // chains, and three verificationStepOk() calls). On an update that
+        // leaves those fields alone, the stored values already passed this
+        // same validation on whatever write set them, so re-sweeping them
+        // on every unrelated write (e.g. a door-staff `live` touch) is pure
+        // cost with no new guarantee. `resource == null` short-circuits both
+        // gates to true on create — touched() dereferences resource.data,
+        // which is null pre-create — so a brand-new document still gets the
+        // full sweep.
+        let listingTouched = resource == null || touched(venueListingFields());
+        let verificationTouched = resource == null || touched(['verification']);
         return d.keys().hasAll([
               'name', 'geo', 'geohash', 'city', 'countryCode', 'source', 'status', 'verified'
             ])
@@ -409,30 +421,34 @@ service cloud.firestore {
           // organizerReview's script.lines; the client checks it, and
           // Firestore's 1 MB document limit is the only server-side
           // backstop. ──
-          && d.get('about', '') is string && d.get('about', '').size() <= 2000
-          && d.get('socialLinks', []) is list && d.get('socialLinks', []).size() <= 8
-          && d.get('genres', []) is list && d.get('genres', []).size() <= 10
-          && d.get('dressCode', '') is string
-          && d.get('agePolicy', '') is string
-          && d.get('tableLink', '') is string
-          && d.get('cover', {}).get('min', 0) is number
-          && d.get('cover', {}).get('max', 0) is number
-          && d.get('cover', {}).get('currency', '') is string
-          // Backfilled as present-and-zero, never absent: 0 means unknown and
-          // is what liveOk()'s crowdLevel derivation divides against.
-          && d.get('capacity', 0) is number && d.get('capacity', 0) >= 0
-          && d.get('amenities', []) is list && d.get('amenities', []).size() <= 20
-          && d.get('hours', []) is list
-          && (d.get('hours', []).size() == 0 || d.get('hours', []).size() == 7)
-          && d.get('exceptions', []) is list && d.get('exceptions', []).size() <= 20
-          && d.get('photos', []) is list && d.get('photos', []).size() <= 5
-          && d.get('timeZone', '') is string
+          && (!listingTouched || (
+                d.get('about', '') is string && d.get('about', '').size() <= 2000
+                && d.get('socialLinks', []) is list && d.get('socialLinks', []).size() <= 8
+                && d.get('genres', []) is list && d.get('genres', []).size() <= 10
+                && d.get('dressCode', '') is string
+                && d.get('agePolicy', '') is string
+                && d.get('tableLink', '') is string
+                && d.get('cover', {}).get('min', 0) is number
+                && d.get('cover', {}).get('max', 0) is number
+                && d.get('cover', {}).get('currency', '') is string
+                // Backfilled as present-and-zero, never absent: 0 means unknown and
+                // is what liveOk()'s crowdLevel derivation divides against.
+                && d.get('capacity', 0) is number && d.get('capacity', 0) >= 0
+                && d.get('amenities', []) is list && d.get('amenities', []).size() <= 20
+                && d.get('hours', []) is list
+                && (d.get('hours', []).size() == 0 || d.get('hours', []).size() == 7)
+                && d.get('exceptions', []) is list && d.get('exceptions', []).size() <= 20
+                && d.get('photos', []) is list && d.get('photos', []).size() <= 5
+                && d.get('timeZone', '') is string
+             ))
           // ── Authorization, denormalised. ──
           && d.get('editorUids', []) is list
           && d.get('editors', {}) is map
-          && verificationStepOk(d.get('verification', {}).get('license', {}))
-          && verificationStepOk(d.get('verification', {}).get('gps', {}))
-          && verificationStepOk(d.get('verification', {}).get('video', {}));
+          && (!verificationTouched || (
+                verificationStepOk(d.get('verification', {}).get('license', {}))
+                && verificationStepOk(d.get('verification', {}).get('gps', {}))
+                && verificationStepOk(d.get('verification', {}).get('video', {}))
+             ));
       }
 
       // A single VenueVerifyStep, validated with `.get()` defaults so a venue
@@ -536,18 +552,23 @@ service cloud.firestore {
       }
 
       function organizerUpdateOk() {
+        // Computed once and reused by both branches below, instead of
+        // touched()/onlyTouched() each independently re-running
+        // request.resource.data.diff(resource.data) — up to three times
+        // per call otherwise.
+        let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
         return isOrganizer()
           && (
                // Door staff exist to update the door — it is their whole
                // surface, and the only place their write matters urgently.
                (roleIn(resource, ['door'])
-                 && onlyTouched(['live', 'updatedAt'])
-                 && (!touched(['live']) || liveOk()))
+                 && changedKeys.hasOnly(['live', 'updatedAt'])
+                 && (!changedKeys.hasAny(['live']) || liveOk()))
                ||
                (roleIn(resource, ['owner', 'manager'])
-                 && !touched(venuePinnedFields())
-                 && !touched(venueListingFields())
-                 && (!touched(['live']) || liveOk()))
+                 && !changedKeys.hasAny(venuePinnedFields())
+                 && !changedKeys.hasAny(venueListingFields())
+                 && (!changedKeys.hasAny(['live']) || liveOk()))
              );
       }
 

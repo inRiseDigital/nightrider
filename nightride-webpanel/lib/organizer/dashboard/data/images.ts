@@ -1,8 +1,8 @@
 /**
  * Slot-id helpers plus the Storage side of every organizer image slot.
  *
- * A slot id (`hero-{venueId}`, `gallery-{venueId}-{i}`, `menu-{venueId}-{itemId}`,
- * `event-{eventId}-cover`/`-poster`) is the shared-identity mechanism between
+ * A slot id (`hero~{venueId}`, `gallery~{venueId}~{i}`, `menu~{venueId}~{itemId}`,
+ * `event~{eventId}~cover`/`~poster`) is the shared-identity mechanism between
  * an editor tile and its live-preview counterpart — six components depend on
  * these helpers and none of that changes here. What changes (T12) is what a
  * slot *resolves to*: an `https` download URL on the owning Firestore
@@ -19,40 +19,48 @@ import { getBucket } from "../../../firebase";
 import { resizeImageFile, uploadResumable, type UploadProgressHandler } from "../../application-service";
 import { GALLERY_SLOT_COUNT } from "../constants";
 
+// `~` separates fields within a slot id. Venue/event/menu-item ids are NOT
+// guaranteed hyphen-free — admin-created venues can carry readable slugs
+// (e.g. `admin-sunset-rooftop-melbourne`), and `nextMenuId` in useVenues.ts
+// produces hyphenated item ids too — so `-` can't double as the field
+// separator without ambiguity. `~` never appears in a Firestore doc id or in
+// `nextMenuId`'s output, so splitting on it is unambiguous regardless of
+// what either id contains. Slot ids are purely an in-memory/DOM identifier,
+// rebuilt fresh every render and never persisted, so this format is free to
+// change without any migration.
 export function heroSlotId(venueId: string) {
-  return `hero-${venueId}`;
+  return `hero~${venueId}`;
 }
 export function gallerySlotId(venueId: string, index: number) {
-  return `gallery-${venueId}-${index}`;
+  return `gallery~${venueId}~${index}`;
 }
 export function gallerySlotIds(venueId: string) {
   return Array.from({ length: GALLERY_SLOT_COUNT }, (_, i) => gallerySlotId(venueId, i));
 }
 export function menuItemSlotId(venueId: string, itemId: string) {
-  return `menu-${venueId}-${itemId}`;
+  return `menu~${venueId}~${itemId}`;
 }
 /**
- * `event-{eventId}-cover`/`-poster` — no `-img-` infix. Matches the T12
- * brief's contract table exactly; earlier (localStorage-only) slot ids used
- * `event-img-{eventKey}-...`, which never lined up with a Storage path.
+ * `event~{eventId}~cover`/`~poster`. Matches the T12 brief's contract table
+ * in shape (just `~`-delimited, see the note above); earlier
+ * (localStorage-only) slot ids used `event-img-{eventKey}-...`, which never
+ * lined up with a Storage path.
  */
 export function eventSlotIds(eventId: string) {
-  return { cover: `event-${eventId}-cover`, poster: `event-${eventId}-poster` };
+  return { cover: `event~${eventId}~cover`, poster: `event~${eventId}~poster` };
 }
 
 // ---------------------------------------------------------------------------
-// Slot id <-> Storage path — the T12 brief's contract table, verbatim.
+// Slot id <-> Storage path — the T12 brief's contract table, `~`-delimited.
 //
-//   hero-{venueId}              venuePhotos/{venueId}/hero.jpg           venues.photos[0]
-//   gallery-{venueId}-{i}       venuePhotos/{venueId}/gallery/{i}.jpg    venues.photos[i+1]
-//   menu-{venueId}-{itemId}     venuePhotos/{venueId}/menu/{itemId}.jpg  menuSections.items[].image
-//   event-{eventId}-cover       eventMedia/{eventId}/cover.jpg           events.coverImage
-//   event-{eventId}-poster      eventMedia/{eventId}/poster.jpg          events.posterImage
+//   hero~{venueId}              venuePhotos/{venueId}/hero.jpg           venues.photos[0]
+//   gallery~{venueId}~{i}       venuePhotos/{venueId}/gallery/{i}.jpg    venues.photos[i+1]
+//   menu~{venueId}~{itemId}     venuePhotos/{venueId}/menu/{itemId}.jpg  menuSections.items[].image
+//   event~{eventId}~cover       eventMedia/{eventId}/cover.jpg           events.coverImage
+//   event~{eventId}~poster      eventMedia/{eventId}/poster.jpg          events.posterImage
 //
-// Venue/event ids are Firestore auto-ids (no hyphens) or `osm_{osmId}`
-// (hyphen-free too), so a leading `[^-]+` capture is safe; a menu item id
-// (`nextMenuId` in useVenues.ts) DOES contain hyphens, so it takes the
-// greedy remainder instead.
+// Split on `~`, not `-` — see the note by the builder functions above: venue
+// ids, event ids, and menu item ids can all legitimately contain hyphens.
 // ---------------------------------------------------------------------------
 
 export type ParsedSlot =
@@ -63,11 +71,11 @@ export type ParsedSlot =
 
 export function parseSlotId(slotId: string): ParsedSlot | null {
   let m: RegExpExecArray | null;
-  if ((m = /^hero-([^-]+)$/.exec(slotId))) return { kind: "hero", venueId: m[1] };
-  if ((m = /^gallery-([^-]+)-(\d+)$/.exec(slotId)))
+  if ((m = /^hero~([^~]+)$/.exec(slotId))) return { kind: "hero", venueId: m[1] };
+  if ((m = /^gallery~([^~]+)~(\d+)$/.exec(slotId)))
     return { kind: "gallery", venueId: m[1], index: Number(m[2]) };
-  if ((m = /^menu-([^-]+)-(.+)$/.exec(slotId))) return { kind: "menu", venueId: m[1], itemId: m[2] };
-  if ((m = /^event-([^-]+)-(cover|poster)$/.exec(slotId)))
+  if ((m = /^menu~([^~]+)~(.+)$/.exec(slotId))) return { kind: "menu", venueId: m[1], itemId: m[2] };
+  if ((m = /^event~([^~]+)~(cover|poster)$/.exec(slotId)))
     return { kind: "event", eventId: m[1], field: m[2] as "cover" | "poster" };
   return null;
 }

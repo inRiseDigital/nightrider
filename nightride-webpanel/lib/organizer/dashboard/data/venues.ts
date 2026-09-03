@@ -431,7 +431,7 @@ export function toMenuSectionFields(s: MenuSection): Record<string, unknown> {
 /**
  * `photos[index] = value` immutably, padding with `""` rather than leaving a
  * sparse-array hole. T12 fix round 1: the four gallery tiles
- * (`gallery-{venueId}-{i}` -> `photos[i+1]`) are independently droppable in
+ * (`gallery~{venueId}~{i}` -> `photos[i+1]`) are independently droppable in
  * any order, so a brand-new venue's `photos` array can be shorter than
  * `index` when a slot lands — plain `photos[index] = value` on a short array
  * leaves a hole, and `[...sparse][0] === undefined` in that case.

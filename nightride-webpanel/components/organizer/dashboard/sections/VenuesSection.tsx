@@ -2,6 +2,7 @@
 
 import { Pencil, Plus, X } from "lucide-react";
 import { useOrganizerDashboard, type VenueTab } from "@/lib/organizer/dashboard/store";
+import { LAUNCH_MARKETS } from "@/lib/organizer/dashboard/data/venues";
 import {
   AGE_POLICIES,
   AMENITIES,
@@ -46,9 +47,13 @@ export function VenuesSection() {
   const {
     venueOrder,
     venues,
+    venuesLoading,
+    venuesError,
+    venueBusy,
     editingVenue,
     setEditingVenue,
     profile,
+    venuePendingReview,
     venueTab,
     setVenueTab,
     addingVenue,
@@ -58,8 +63,45 @@ export function VenuesSection() {
     setNewVenueName,
     newVenueCity,
     setNewVenueCity,
+    newVenueCountry,
+    setNewVenueCountry,
+    approximateLocationVenues,
     createVenue,
   } = useOrganizerDashboard();
+
+  // Gate tier: every section below dereferences `profile` with no null
+  // check, so it stays non-nullable (a blank placeholder) even before the
+  // venues listener resolves — but that placeholder must never render as if
+  // it were a real (if empty) venue while we're still loading.
+  if (venuesLoading) {
+    return (
+      <div className="flex h-40 items-center justify-center text-[13px] text-[var(--m3-onv)]">
+        Loading your venues…
+      </div>
+    );
+  }
+
+  if (venuesError) {
+    return (
+      <Card className="max-w-[480px] text-[13px]" style={{ color: "var(--m3-err)" }}>
+        {venuesError}
+      </Card>
+    );
+  }
+
+  if (venueOrder.length === 0 && !addingVenue) {
+    return (
+      <Card className="max-w-[480px] flex-col gap-3 text-center">
+        <p className="text-sm text-[var(--m3-on)]">You don&apos;t have any venues yet.</p>
+        <p className="text-[13px] text-[var(--m3-onv)]">
+          Add your first venue to unlock the rest of the dashboard.
+        </p>
+        <FilledButton icon={<Plus size={18} />} onClick={openAddVenue} className="mx-auto mt-2">
+          Add venue
+        </FilledButton>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -79,6 +121,17 @@ export function VenuesSection() {
         }
       />
 
+      {approximateLocationVenues.has(editingVenue) && (
+        <Card
+          className="mb-6 max-w-[640px] text-[13px]"
+          style={{ borderColor: "var(--m3-warn)", color: "var(--m3-on)" }}
+        >
+          This venue&apos;s map location is approximate — device location wasn&apos;t
+          available when it was created, so it was placed at the centre of its market
+          instead. Contact support to get its precise location fixed.
+        </Card>
+      )}
+
       {addingVenue && (
         <Card className="mb-6 flex max-w-[480px] flex-col gap-6">
           <SectionLabel>Add a new venue</SectionLabel>
@@ -88,18 +141,39 @@ export function VenuesSection() {
             onChange={(e) => setNewVenueName(e.target.value)}
           />
           <TextField
-            label="City, country"
+            label="City"
             value={newVenueCity}
             onChange={(e) => setNewVenueCity(e.target.value)}
           />
+          <Select
+            label="Market"
+            value={newVenueCountry}
+            onChange={(e) => setNewVenueCountry(e.target.value)}
+            options={[
+              { value: "", label: "Select a launch market…" },
+              ...LAUNCH_MARKETS.map((m) => ({ value: m.countryCode, label: m.label })),
+            ]}
+          />
+          <p className="-mt-3 text-xs text-[var(--m3-outline)]">
+            Night Ride currently launches in these four markets — this sets the venue&apos;s
+            country and its map location.
+          </p>
           <div className="flex justify-end gap-2">
-            <TextButton onClick={cancelAddVenue}>Cancel</TextButton>
-            <FilledButton onClick={createVenue}>Create &amp; verify</FilledButton>
+            <TextButton onClick={cancelAddVenue} disabled={venueBusy}>
+              Cancel
+            </TextButton>
+            <FilledButton
+              onClick={createVenue}
+              loading={venueBusy}
+              disabled={!newVenueName.trim() || !newVenueCountry}
+            >
+              Create &amp; verify
+            </FilledButton>
           </div>
         </Card>
       )}
 
-      {!profile.verified ? (
+      {venueOrder.length === 0 ? null : !profile.verified ? (
         <VenueVerifyPending />
       ) : (
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1.3fr_1fr]">
@@ -120,12 +194,29 @@ export function VenuesSection() {
               ))}
             </div>
 
+            {venuePendingReview && (
+              <Card
+                className="mb-6 max-w-[640px] text-[13px]"
+                style={{ borderColor: "var(--m3-warn)", color: "var(--m3-on)" }}
+              >
+                Name/address change submitted for review — those two fields show what you
+                submitted and can&apos;t be edited again until an admin approves or rejects it.
+                Everything else on this venue still saves normally. Withdraw the submission
+                below to make further changes to the name or address.
+              </Card>
+            )}
+
+            {/* Only name/address require review — everything else here is a
+                direct save, so nothing below is disabled while a rename is
+                pending; ProfileTab disables just those two fields itself. */}
             {venueTab === "profile" && <ProfileTab />}
-            {venueTab === "menu" && <VenueMenuSection />}
             {venueTab === "hours" && <HoursTab />}
             {venueTab === "links" && <LinksTab />}
+            {venueTab === "menu" && <VenueMenuSection />}
 
-            {/* Menu edits publish immediately, so that tab has nothing to save. */}
+            {/* Covers all four tabs, menu included — `venueDirty` is true
+                whenever either the profile draft or the menu working copy
+                differs from what's saved. */}
             <SaveBar />
           </div>
 
@@ -145,7 +236,8 @@ export function VenuesSection() {
  * content showing through the gap.
  */
 function SaveBar() {
-  const { editingVenue, venueDirty, saveVenue, discardVenue } = useOrganizerDashboard();
+  const { editingVenue, venueDirty, venuePendingReview, venueBusy, venueActionError, saveVenue, discardVenue } =
+    useOrganizerDashboard();
 
   return (
     <div
@@ -167,18 +259,27 @@ function SaveBar() {
       <FilledButton
         onClick={() => saveVenue(editingVenue)}
         disabled={!venueDirty}
+        loading={venueBusy}
         tonal={!venueDirty}
         className={venueDirty ? undefined : "cursor-default hover:opacity-100"}
       >
         Save changes
       </FilledButton>
-      {venueDirty && (
-        <OutlinedButton onClick={() => discardVenue(editingVenue)}>Discard</OutlinedButton>
+      {(venueDirty || venuePendingReview) && (
+        <OutlinedButton onClick={() => discardVenue(editingVenue)} disabled={venueBusy}>
+          {venuePendingReview ? "Withdraw submission" : "Discard"}
+        </OutlinedButton>
       )}
-      <p className="text-[13px] text-[var(--m3-onv)]">
-        {venueDirty
-          ? "Unsaved edits are only visible to you until you save."
-          : "Edits to a verified venue are reviewed before going live."}
+      <p
+        className="text-[13px]"
+        style={{ color: venueActionError ? "var(--m3-err)" : "var(--m3-onv)" }}
+      >
+        {venueActionError ||
+          (venuePendingReview
+            ? "Name/address change submitted for review — everything else can still be saved normally."
+            : venueDirty
+              ? "Unsaved edits are only visible to you until you save."
+              : "Renaming or re-addressing a venue is reviewed before going live — everything else here, menu included, saves immediately once you click Save.")}
       </p>
     </div>
   );
@@ -188,6 +289,7 @@ function ProfileTab() {
   const {
     profile,
     editingVenue,
+    venuePendingReview,
     toggleVenueSetValue,
     setVenueField,
     addSocialLink,
@@ -201,11 +303,13 @@ function ProfileTab() {
         <TextField
           label="Venue name"
           value={profile.name}
+          disabled={venuePendingReview}
           onChange={(e) => setVenueField(editingVenue, "name", e.target.value)}
         />
         <TextField
           label="Address"
           value={profile.address}
+          disabled={venuePendingReview}
           onChange={(e) => setVenueField(editingVenue, "address", e.target.value)}
         />
         <div className="grid grid-cols-2 gap-4">

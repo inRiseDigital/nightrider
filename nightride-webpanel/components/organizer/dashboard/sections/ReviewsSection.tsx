@@ -15,6 +15,9 @@ function initialsFor(author: string) {
 export function ReviewsSection() {
   const {
     reviews,
+    reviewsLoading,
+    reviewsError,
+    reviewsActionError,
     profile,
     setReviewReply,
     toggleReviewFlag,
@@ -23,8 +26,40 @@ export function ReviewsSection() {
     deletePostedReply,
   } = useOrganizerDashboard();
 
+  if (reviewsLoading) {
+    return (
+      <div className="flex h-40 items-center justify-center text-[13px] text-[var(--m3-onv)]">
+        Loading reviews…
+      </div>
+    );
+  }
+
+  if (reviewsError) {
+    return (
+      <div className="max-w-[480px] rounded-xl bg-[var(--m3-surf1)] p-5 text-[13px]" style={{ color: "var(--m3-err)" }}>
+        {reviewsError}
+      </div>
+    );
+  }
+
+  if (reviews.length === 0) {
+    return (
+      <div className="max-w-[480px] rounded-xl bg-[var(--m3-surf1)] p-5 text-[13px] text-[var(--m3-onv)]">
+        No reviews yet.
+      </div>
+    );
+  }
+
   return (
     <div className="flex max-w-[820px] flex-col gap-4">
+      {reviewsActionError && (
+        <p
+          className="rounded-xl bg-[var(--m3-surf1)] px-4 py-3 text-[13px]"
+          style={{ color: "var(--m3-err)" }}
+        >
+          {reviewsActionError}
+        </p>
+      )}
       {reviews.map((r) => {
         const canSend = r.reply.trim().length > 0;
         return (

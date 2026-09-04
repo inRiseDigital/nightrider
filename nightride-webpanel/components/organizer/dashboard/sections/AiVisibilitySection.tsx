@@ -3,13 +3,9 @@
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { useNow, useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
-import { MOCK_AI_INTENTS, MOCK_AI_RECOMMEND_COUNT } from "@/lib/organizer/dashboard/mock-data";
-import {
-  MOCK_AI_PROMPTS,
-  MOCK_AI_SCORE,
-  MOCK_AI_TIPS,
-  type AiPrompt,
-} from "@/lib/organizer/dashboard/mock-analytics";
+import type { AiPrompt } from "@/lib/organizer/dashboard/mock-analytics";
+import { isEventLive } from "@/lib/organizer/dashboard/format";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { Card, FieldLabel, SectionLabel, VenueSwitcher } from "../ui/Primitives";
 
 /** Chip tone per ranking band — top spots read as success, absence as neutral. */
@@ -31,9 +27,25 @@ interface Diagnostic {
 
 export function AiVisibilitySection() {
   const router = useRouter();
-  const { venueOrder, venues, editingVenue, setEditingVenue, profile, events, setVenueTab, openNewEvent } =
-    useOrganizerDashboard();
+  const {
+    venueOrder,
+    venues,
+    venueMeta,
+    editingVenue,
+    setEditingVenue,
+    profile,
+    events,
+    setVenueTab,
+    openNewEvent,
+    aiVisibility,
+    aiLoading,
+    aiError,
+  } = useOrganizerDashboard();
   const now = useNow();
+  const timeZone = resolveTimeZone(venueMeta[editingVenue]?.timeZone);
+  const score = aiVisibility?.score ?? 0;
+  const prompts = aiVisibility?.prompts ?? [];
+  const tips = aiVisibility?.tips ?? [];
 
   const goToVenueProfile = () => {
     setVenueTab("profile");
@@ -47,7 +59,7 @@ export function AiVisibilitySection() {
   const upcomingSoon = now
     ? events.some((e) => {
         if (e.venue !== editingVenue) return false;
-        if (!["live", "scheduled", "in_review"].includes(e.status)) return false;
+        if (!(isEventLive(e, now, timeZone) || e.status === "scheduled" || e.status === "in_review")) return false;
         const days = (new Date(e.date).getTime() - now.getTime()) / 86_400_000;
         return days < 14 && days >= -1;
       })
@@ -108,6 +120,8 @@ export function AiVisibilitySection() {
         onSelect={setEditingVenue}
       />
 
+      {aiError && <p className="mb-3 text-xs text-[var(--m3-err)]">Couldn&apos;t load AI visibility: {aiError}</p>}
+
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div
           className="flex flex-col items-center rounded-2xl p-6 text-center"
@@ -116,26 +130,34 @@ export function AiVisibilitySection() {
           <h3 className="self-start text-base font-medium tracking-[0.15px] text-[var(--m3-on)]">
             AI recommendation score
           </h3>
-          <div
-            className="my-6 mb-2 flex h-[180px] w-[180px] items-center justify-center rounded-full"
-            style={{
-              background: `conic-gradient(var(--m3-pri) 0turn ${
-                MOCK_AI_SCORE / 100
-              }turn, var(--m3-surf3) ${MOCK_AI_SCORE / 100}turn 1turn)`,
-            }}
-            role="img"
-            aria-label={`AI recommendation score ${MOCK_AI_SCORE} of 100`}
-          >
+          {aiLoading ? (
+            <div className="my-6 mb-2 h-[180px] w-[180px] animate-pulse rounded-full" style={{ background: "var(--m3-surf3)" }} />
+          ) : !aiVisibility ? (
             <div
-              className="flex h-36 w-36 flex-col items-center justify-center rounded-full"
-              style={{ background: "var(--m3-surf2)" }}
+              className="my-6 mb-2 flex h-[180px] w-[180px] flex-col items-center justify-center rounded-full"
+              style={{ background: "var(--m3-surf3)" }}
             >
-              <span className="font-mono text-[40px] font-medium leading-none text-[var(--m3-on)]">
-                {MOCK_AI_SCORE}
-              </span>
-              <span className="mt-1 text-xs tracking-[0.5px] text-[var(--m3-onv)]">of 100</span>
+              <span className="font-mono text-[40px] font-medium leading-none text-[var(--m3-on)]">—</span>
+              <span className="mt-1 text-xs tracking-[0.5px] text-[var(--m3-onv)]">no data yet</span>
             </div>
-          </div>
+          ) : (
+            <div
+              className="my-6 mb-2 flex h-[180px] w-[180px] items-center justify-center rounded-full"
+              style={{
+                background: `conic-gradient(var(--m3-pri) 0turn ${score / 100}turn, var(--m3-surf3) ${score / 100}turn 1turn)`,
+              }}
+              role="img"
+              aria-label={`AI recommendation score ${score} of 100`}
+            >
+              <div
+                className="flex h-36 w-36 flex-col items-center justify-center rounded-full"
+                style={{ background: "var(--m3-surf2)" }}
+              >
+                <span className="font-mono text-[40px] font-medium leading-none text-[var(--m3-on)]">{score}</span>
+                <span className="mt-1 text-xs tracking-[0.5px] text-[var(--m3-onv)]">of 100</span>
+              </div>
+            </div>
+          )}
           <p className="max-w-[280px] text-[13px] leading-5 text-[var(--m3-onv)]">
             How often Night Ride&apos;s assistant surfaces your venue for matching requests.
           </p>
@@ -145,52 +167,58 @@ export function AiVisibilitySection() {
           <h3 className="px-5 pb-2 pt-3 text-base font-medium tracking-[0.15px] text-[var(--m3-on)]">
             Where you appear
           </h3>
-          {MOCK_AI_PROMPTS.map((p) => (
-            <div
-              key={p.prompt}
-              className="flex min-h-16 items-center gap-4 border-b border-[var(--m3-outlinev)] px-5 py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-[var(--m3-on)]">&ldquo;{p.prompt}&rdquo;</p>
-                <p className="mt-0.5 text-xs text-[var(--m3-onv)]">{p.volume}</p>
-              </div>
-              <span
-                className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.5px]"
-                style={RANK_CHIP[p.band]}
+          {prompts.length === 0 ? (
+            <p className="px-5 py-4 text-xs text-[var(--m3-outline)]">
+              {aiLoading ? "Loading…" : "No AI-visibility data yet for this venue."}
+            </p>
+          ) : (
+            prompts.map((p) => (
+              <div
+                key={p.prompt}
+                className="flex min-h-16 items-center gap-4 border-b border-[var(--m3-outlinev)] px-5 py-3"
               >
-                {p.rank}
-              </span>
-            </div>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-[var(--m3-on)]">&ldquo;{p.prompt}&rdquo;</p>
+                  <p className="mt-0.5 text-xs text-[var(--m3-onv)]">{p.volume}</p>
+                </div>
+                <span
+                  className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-[0.5px]"
+                  style={RANK_CHIP[p.band]}
+                >
+                  {p.rank}
+                </span>
+              </div>
+            ))
+          )}
           <div className="px-5 py-4">
             <SectionLabel className="mb-2.5">Raise your score</SectionLabel>
-            {MOCK_AI_TIPS.map((tip) => (
-              <div key={tip} className="mb-3 flex items-start gap-3 last:mb-0">
-                <CheckCircle2 size={18} className="mt-px shrink-0" color="var(--m3-ter)" />
-                <p className="text-[13px] leading-[19px] text-[var(--m3-onv)]">{tip}</p>
-              </div>
-            ))}
+            {tips.length === 0 ? (
+              <p className="text-[13px] text-[var(--m3-outline)]">
+                {aiLoading ? "Loading…" : "No tips yet for this venue."}
+              </p>
+            ) : (
+              tips.map((tip) => (
+                <div key={tip} className="mb-3 flex items-start gap-3 last:mb-0">
+                  <CheckCircle2 size={18} className="mt-px shrink-0" color="var(--m3-ter)" />
+                  <p className="text-[13px] leading-[19px] text-[var(--m3-onv)]">{tip}</p>
+                </div>
+              ))
+            )}
           </div>
         </Card>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-          <FieldLabel>Recommended by the AI companion this week</FieldLabel>
-          <p className="mt-2 font-display text-[32px] leading-none text-[var(--m3-on)]">
-            {MOCK_AI_RECOMMEND_COUNT}
-          </p>
-        </div>
-        <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
-          <FieldLabel className="mb-2.5">By intent</FieldLabel>
-          {MOCK_AI_INTENTS.map((i) => (
-            <div key={i.label} className="flex justify-between py-0.5 text-xs">
-              <span className="text-[var(--m3-on)]">&ldquo;{i.label}&rdquo;</span>
-              <span className="font-mono text-[var(--m3-onv)]">{i.count}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/*
+       * Finding 9: this used to also render two tiles of local MOCK_AI_*
+       * constants (a weekly-recommendation count and an intent breakdown)
+       * unconditionally, with no loading/error state, beside the
+       * Firestore-sourced score/prompts/tips above which have both. No
+       * producer populates those numbers — `aiVisibility/current`'s shape
+       * (plan A3) has neither a weekly-recommendation count nor an intent
+       * breakdown, and PartyAgent AI-visibility scoring is a named
+       * not-built follow-up. Deleted rather than extended: that would be
+       * speculative shape design for a producer that doesn't exist.
+       */}
 
       <div className="rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)] p-[18px]">
         <FieldLabel className="mb-3.5">Why am I not being recommended more?</FieldLabel>

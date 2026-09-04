@@ -5,7 +5,31 @@ import { INBOX_TYPE_STYLES } from "@/lib/organizer/dashboard/constants";
 import { StatusChip } from "../ui/StatusChip";
 
 export function InboxSection() {
-  const { inbox, toggleInboxItem } = useOrganizerDashboard();
+  const { inbox, inboxLoading, inboxError, toggleInboxItem } = useOrganizerDashboard();
+
+  if (inboxLoading) {
+    return (
+      <div className="flex h-40 items-center justify-center text-[13px] text-[var(--m3-onv)]">
+        Loading inbox…
+      </div>
+    );
+  }
+
+  if (inboxError) {
+    return (
+      <div className="max-w-[480px] rounded-lg bg-[var(--m3-surf1)] p-5 text-[13px]" style={{ color: "var(--m3-err)" }}>
+        {inboxError}
+      </div>
+    );
+  }
+
+  if (inbox.length === 0) {
+    return (
+      <div className="max-w-[480px] rounded-lg bg-[var(--m3-surf1)] p-5 text-[13px] text-[var(--m3-onv)]">
+        No messages.
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--m3-outlinev)] bg-[var(--m3-surf1)]">

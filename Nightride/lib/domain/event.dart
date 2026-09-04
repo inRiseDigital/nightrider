@@ -7,7 +7,14 @@
 // because the Firestore rules validate that shape on every create AND update.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-const List<String> kEventStatuses = ['draft', 'published', 'archived'];
+const List<String> kEventStatuses = [
+  'draft',
+  'scheduled',
+  'in_review',
+  'published',
+  'cancelled',
+  'archived',
+];
 const List<String> kEventSources = ['organizer', 'admin', 'scraped'];
 const List<String> kPerformerTypes = ['DJ', 'Band', 'Comedian', 'LiveAct', 'Other'];
 
@@ -195,13 +202,21 @@ class Event {
   /// the client.
   final num popularityScore;
 
-  final String status; // 'draft' | 'published' | 'archived'
+  final String status; // see kEventStatuses
   final String source; // 'organizer' | 'admin' | 'scraped'
   final String? organizerUid;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
 
   bool get isPublished => status == 'published';
+
+  /// "Live" is never a stored status — derived here from `status` + the
+  /// event's own time window, given the caller's clock.
+  bool isLive(DateTime now) =>
+      status == 'published' &&
+      startAt != null &&
+      !startAt!.toDate().isAfter(now) &&
+      (endAt == null || !now.isAfter(endAt!.toDate()));
 
   DateTime? get startDateTime => startAt?.toDate();
 

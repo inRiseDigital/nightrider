@@ -21,20 +21,25 @@ export function Snackbar() {
   }, [snack, dismissSnack]);
 
   if (!snack) return null;
+  const isError = snack.tone === "error";
 
   return (
     <div
       role="status"
       aria-live="polite"
       className="fixed bottom-6 left-[112px] z-[80] flex min-w-[344px] max-w-[520px] items-center gap-4 rounded px-4 py-3.5 shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
-      style={{ background: "var(--m3-on)", color: "#1B1B1C" }}
+      style={
+        isError
+          ? { background: "var(--m3-errc)", color: "var(--m3-onerrc)" }
+          : { background: "var(--m3-on)", color: "#1B1B1C" }
+      }
     >
-      <p className="flex-1 text-sm leading-5 tracking-[0.25px]">{snack}</p>
+      <p className="flex-1 text-sm leading-5 tracking-[0.25px]">{snack.text}</p>
       <button
         type="button"
         onClick={dismissSnack}
         className="shrink-0 text-sm font-medium"
-        style={{ color: "var(--m3-pric)" }}
+        style={{ color: isError ? "var(--m3-onerrc)" : "var(--m3-pric)" }}
       >
         Dismiss
       </button>

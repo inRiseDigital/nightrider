@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, afterEach, describe, it } from 'vitest';
+import { beforeAll, afterAll, afterEach, describe, it, expect } from 'vitest';
 import { assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import {
   doc,
@@ -277,5 +277,240 @@ describe('events/{eventId}', () => {
         name: 'Hacked Name',
       }),
     );
+  });
+
+  it("66a. organizer creates 'scheduled' with a scheduledPublish timestamp -> ALLOW", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    const ctx = testEnv.authenticatedContext(org);
+    await assertSucceeds(
+      setDoc(
+        doc(ctx.firestore(), `events/ev-${org}`),
+        baseEvent({
+          organizerUid: org,
+          status: 'scheduled',
+          scheduledPublish: new Date(Date.now() + 3600000),
+        }),
+      ),
+    );
+  });
+
+  it("66b. organizer creates 'scheduled' with scheduledPublish absent -> DENY", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    const ctx = testEnv.authenticatedContext(org);
+    await assertFails(
+      setDoc(
+        doc(ctx.firestore(), `events/ev-${org}`),
+        baseEvent({ organizerUid: org, status: 'scheduled' }),
+      ),
+    );
+  });
+
+  it("66c. organizer creates 'in_review' -> ALLOW", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    const ctx = testEnv.authenticatedContext(org);
+    await assertSucceeds(
+      setDoc(
+        doc(ctx.firestore(), `events/ev-${org}`),
+        baseEvent({ organizerUid: org, status: 'in_review' }),
+      ),
+    );
+  });
+
+  it("66d. organizer creates 'cancelled' with cancelReason: '' -> DENY", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    const ctx = testEnv.authenticatedContext(org);
+    await assertFails(
+      setDoc(
+        doc(ctx.firestore(), `events/ev-${org}`),
+        baseEvent({ organizerUid: org, status: 'cancelled', cancelReason: '' }),
+      ),
+    );
+  });
+
+  it("66e. organizer creates 'cancelled' with a reason -> ALLOW", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    const ctx = testEnv.authenticatedContext(org);
+    await assertSucceeds(
+      setDoc(
+        doc(ctx.firestore(), `events/ev-${org}`),
+        baseEvent({ organizerUid: org, status: 'cancelled', cancelReason: 'Venue closed early' }),
+      ),
+    );
+  });
+
+  it("66f. any writer creates status: 'live' -> DENY (live is derived, never stored)", async () => {
+    const org = uid('org');
+    const admin = uid('admin');
+    await seedUsers({
+      [org]: baseUser({ organizerStatus: 'approved' }),
+      [admin]: baseUser({ isAdmin: true }),
+    });
+    const orgCtx = testEnv.authenticatedContext(org);
+    await assertFails(
+      setDoc(
+        doc(orgCtx.firestore(), `events/ev-${org}`),
+        baseEvent({ organizerUid: org, status: 'live' }),
+      ),
+    );
+    const adminCtx = testEnv.authenticatedContext(admin);
+    await assertFails(
+      setDoc(doc(adminCtx.firestore(), 'events/ev-admin-live'), baseEvent({ status: 'live' })),
+    );
+  });
+
+  it("66g. organizer creates 'archived' -> DENY (not an initial state)", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    const ctx = testEnv.authenticatedContext(org);
+    await assertFails(
+      setDoc(
+        doc(ctx.firestore(), `events/ev-${org}`),
+        baseEvent({ organizerUid: org, status: 'archived' }),
+      ),
+    );
+  });
+
+  it("67a. anonymous read of a 'scheduled' event -> DENY", async () => {
+    await seedEvent('ev67a', baseEvent({
+      status: 'scheduled',
+      scheduledPublish: new Date(Date.now() + 3600000),
+    }));
+    const ctx = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(ctx.firestore(), 'events/ev67a')));
+  });
+
+  it("67b. anonymous read of an 'in_review' event -> DENY", async () => {
+    await seedEvent('ev67b', baseEvent({ status: 'in_review' }));
+    const ctx = testEnv.unauthenticatedContext();
+    await assertFails(getDoc(doc(ctx.firestore(), 'events/ev67b')));
+  });
+
+  it("67c. anonymous read of a 'cancelled' event -> ALLOW", async () => {
+    await seedEvent('ev67c', baseEvent({ status: 'cancelled', cancelReason: 'Cancelled' }));
+    const ctx = testEnv.unauthenticatedContext();
+    await assertSucceeds(getDoc(doc(ctx.firestore(), 'events/ev67c')));
+  });
+
+  it("67d. owner-organizer reads their own 'in_review' event -> ALLOW", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev67d', baseEvent({ organizerUid: org, status: 'in_review' }));
+    const ctx = testEnv.authenticatedContext(org);
+    await assertSucceeds(getDoc(doc(ctx.firestore(), 'events/ev67d')));
+  });
+
+  it("68a. organizer writes moderation.flag: 'clean' -> DENY", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev68a', baseEvent({ organizerUid: org, status: 'published' }));
+    const ctx = testEnv.authenticatedContext(org);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'events/ev68a'), { moderation: { flag: 'clean' } }),
+    );
+  });
+
+  it("68b. admin writes moderation.flag: 'clean' -> ALLOW", async () => {
+    const admin = uid('admin');
+    await seedUsers({ [admin]: baseUser({ isAdmin: true }) });
+    await seedEvent('ev68b', baseEvent({ status: 'published' }));
+    const ctx = testEnv.authenticatedContext(admin);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'events/ev68b'), { moderation: { flag: 'clean' } }),
+    );
+  });
+
+  it('69a. organizer writes sales.sold -> DENY', async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev69a', baseEvent({ organizerUid: org, status: 'published' }));
+    const ctx = testEnv.authenticatedContext(org);
+    await assertFails(
+      updateDoc(doc(ctx.firestore(), 'events/ev69a'), { sales: { sold: 10 } }),
+    );
+  });
+
+  it('69b. organizer update leaving moderation and sales untouched -> ALLOW', async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev69b', baseEvent({ organizerUid: org, status: 'published' }));
+    const ctx = testEnv.authenticatedContext(org);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'events/ev69b'), { name: 'Renamed Event' }),
+    );
+  });
+
+  it("70. organizer creates source: 'organizer' with endAt: null -> DENY", async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    const ctx = testEnv.authenticatedContext(org);
+    await assertFails(
+      setDoc(
+        doc(ctx.firestore(), `events/ev-${org}`),
+        baseEvent({ organizerUid: org, source: 'organizer', endAt: null }),
+      ),
+    );
+  });
+
+  // T12 fix round 1, finding 2: `patchEventImage` (nightride-webpanel's
+  // useEvents.ts) used to `setDoc({ ...staleRawDoc, [field]: url })` — a
+  // whole-document write built from a client-side snapshot that only
+  // refreshes after a reload completes. A cover upload and a poster upload
+  // fired close together both read the same stale snapshot, and whichever
+  // write landed second silently reverted the other field. The fix is a
+  // single-field `updateDoc`, which composes correctly against whatever the
+  // SERVER's current document is, not a client-held snapshot — this proves
+  // that against the real emulator, not by reasoning about it.
+  it('71. two concurrent single-field updateDoc calls (coverImage, posterImage) both land — the mechanism `patchEventImage` now relies on', async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev71', baseEvent({ organizerUid: org, status: 'published', coverImage: '', posterImage: '' }));
+    const ctx = testEnv.authenticatedContext(org);
+    const ref = doc(ctx.firestore(), 'events/ev71');
+
+    await Promise.all([
+      assertSucceeds(updateDoc(ref, { coverImage: 'https://example.com/cover.jpg' })),
+      assertSucceeds(updateDoc(ref, { posterImage: 'https://example.com/poster.jpg' })),
+    ]);
+
+    // `org` (organizerUid match) and, separately, "published" status both
+    // authorize the read directly — no need to drop to an unrestricted context.
+    const finalDoc = await getDoc(ref);
+    const data = finalDoc.data();
+    expect(data.coverImage).toBe('https://example.com/cover.jpg');
+    expect(data.posterImage).toBe('https://example.com/poster.jpg');
+  });
+
+  // The bug finding 2 fixes, reproduced directly: the OLD `setDoc({...raw,
+  // field: url})` shape, run twice from the same stale `raw` snapshot (as
+  // `rawDocsRef.current` would be if both uploads started before either
+  // reload completed), loses whichever field was set first. This is not a
+  // rules assertion — both writes are individually valid — it demonstrates
+  // why `patchEventImage` had to stop doing this.
+  it('72. (regression demonstration) two whole-document setDoc calls from the SAME stale snapshot silently drop one field — this is the bug finding 2 fixed', async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedEvent('ev72', baseEvent({ organizerUid: org, status: 'published', coverImage: '', posterImage: '' }));
+    const ctx = testEnv.authenticatedContext(org);
+    const ref = doc(ctx.firestore(), 'events/ev72');
+
+    const staleRaw = (await getDoc(ref)).data(); // both "uploads" read this once, before either write
+
+    await Promise.all([
+      assertSucceeds(setDoc(ref, { ...staleRaw, coverImage: 'https://example.com/cover.jpg' })),
+      assertSucceeds(setDoc(ref, { ...staleRaw, posterImage: 'https://example.com/poster.jpg' })),
+    ]);
+
+    const finalDoc = await getDoc(ref);
+    const data = finalDoc.data();
+    // Exactly one of the two fields survives — which one is a race, not
+    // something this test should pin down. The point is that BOTH being set
+    // is false with the old shape, in contrast to test 71 above.
+    const bothSet = data.coverImage === 'https://example.com/cover.jpg' && data.posterImage === 'https://example.com/poster.jpg';
+    expect(bothSet).toBe(false);
   });
 });

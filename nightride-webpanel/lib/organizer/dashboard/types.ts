@@ -50,6 +50,15 @@ export interface MenuItem {
   /** Indices into `DAYS` (0 = Mon). Empty means available every night. */
   nights: number[];
   soldOut: boolean;
+  /**
+   * `https` download URL from Cloud Storage
+   * (`venuePhotos/{venueId}/menu/{itemId}.jpg`). Optional — a sibling
+   * addition per Global Constraint 7 rather than a required field, so the
+   * existing mock fixtures and every other `MenuItem` literal keep compiling
+   * untouched. Always concretely `""` (never absent) on anything this module
+   * parses or constructs.
+   */
+  image?: string;
 }
 
 export interface MenuSection {
@@ -79,16 +88,54 @@ export interface VenueProfile {
   /** Food & drinks, grouped into sections. Edits go live without review. */
   menu: MenuSection[];
   tableLink: string;
+  /**
+   * `https` download URLs from Cloud Storage. `[0]` is the hero
+   * (`live_hub_service.dart:47` reads `photos.first` as the club-list
+   * thumbnail); `[1..4]` are the gallery. A listing field like every other —
+   * routes through `updateVenueListing`, reaches the app preview only once
+   * the submitted `venueEdits` change is approved. Optional per Global
+   * Constraint 7 (sibling addition, not a required rewrite of every existing
+   * `VenueProfile` literal); always concretely `[]` (never absent) on
+   * anything this module parses or constructs.
+   */
+  photos?: string[];
   /** Only present while `verified` is false. */
   verificationSteps?: Record<VerifyStepId, VerifyStepStatus>;
   /** Which verification accordion row is expanded, if any. */
   openVerifyStep?: VerifyStepId | null;
 }
 
-export type EventStatus = "draft" | "scheduled" | "in_review" | "live" | "cancelled";
+export interface VenueMeta {
+  id: string;
+  ownerUid: string;
+  city: string;
+  countryCode: string; // ISO-3166 alpha-2, uppercase
+  timeZone: string; // IANA, e.g. "Asia/Dubai"
+  geo: { latitude: number; longitude: number } | null;
+  status: "active" | "closed";
+  verified: boolean;
+}
+
+export interface OrganizerProfile {
+  name: string;
+  initials: string;
+  email: string;
+  phone: string;
+}
+
+export type EventStatus =
+  | "draft"
+  | "scheduled"
+  | "in_review"
+  | "published"
+  | "cancelled"
+  | "archived";
+
+/** `"live"` and `"upcoming"` are derived at render time, never stored. */
+export type EventDisplayStatus = EventStatus | "live" | "upcoming";
 
 /** Result of the platform's automated content scan. "" means not yet scanned. */
-export type ModerationFlag = "" | "pending" | "clean";
+export type ModerationFlag = "" | "pending" | "clean" | "rejected";
 
 export interface TicketTier {
   name: string;

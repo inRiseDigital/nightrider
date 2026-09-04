@@ -2,7 +2,8 @@
 
 import { Pencil } from "lucide-react";
 import { useNow, useOrganizerDashboard, type EventFilter } from "@/lib/organizer/dashboard/store";
-import { deriveEventChip, venueName } from "@/lib/organizer/dashboard/format";
+import { deriveEventChip, isEventLive, matchesFilter, venueName } from "@/lib/organizer/dashboard/format";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { Chip, IconButton, SlimTextarea } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
 
@@ -23,6 +24,7 @@ export function EventsSection() {
     eventFilter,
     setEventFilter,
     venues,
+    venueMeta,
     openEditEvent,
     startCancel,
     cancelingEventId,
@@ -30,10 +32,16 @@ export function EventsSection() {
     setCancelReasonInput,
     confirmCancel,
     cancelCancelFlow,
+    eventBusy,
+    eventActionError,
   } = useOrganizerDashboard();
   const now = useNow();
 
-  const rows = events.filter((e) => eventFilter === "all" || e.status === eventFilter);
+  // `matchesFilter`, never raw `e.status === eventFilter` — the "live" filter
+  // id is a legitimate filter on derived state, not a stored status.
+  const rows = events.filter((e) =>
+    matchesFilter(e, eventFilter, now, resolveTimeZone(venueMeta[e.venue]?.timeZone))
+  );
 
   return (
     <>
@@ -68,8 +76,9 @@ export function EventsSection() {
         )}
 
         {rows.map((ev) => {
-          const chip = deriveEventChip(ev, now);
-          const cancelable = ev.status === "live" || ev.status === "scheduled";
+          const evTimeZone = resolveTimeZone(venueMeta[ev.venue]?.timeZone);
+          const chip = deriveEventChip(ev, now, evTimeZone);
+          const cancelable = isEventLive(ev, now, evTimeZone) || ev.status === "scheduled";
           const currency = venues[ev.venue]?.currency ?? "";
 
           return (
@@ -141,16 +150,23 @@ export function EventsSection() {
                   />
                   <button
                     onClick={confirmCancel}
-                    className="whitespace-nowrap rounded-full bg-[#dc2626] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#b91c1c]"
+                    disabled={eventBusy || !cancelReasonInput.trim()}
+                    className="whitespace-nowrap rounded-full bg-[#dc2626] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#b91c1c] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Confirm cancel
                   </button>
                   <button
                     onClick={cancelCancelFlow}
+                    disabled={eventBusy}
                     className="whitespace-nowrap px-3.5 py-2.5 text-xs text-[var(--m3-onv)] hover:text-[var(--m3-on)]"
                   >
                     Never mind
                   </button>
+                  {eventActionError && (
+                    <p className="w-full text-xs" style={{ color: "var(--m3-err)" }}>
+                      {eventActionError}
+                    </p>
+                  )}
                 </div>
               )}
 

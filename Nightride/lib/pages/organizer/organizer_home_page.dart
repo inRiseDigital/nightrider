@@ -145,6 +145,21 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+/// The organizer publish toggle only ever moves between these states; every
+/// other status (`scheduled`, `cancelled`, `archived`) disables the toggle
+/// rather than writing anything.
+String? _nextToggleStatus(String status) {
+  switch (status) {
+    case 'draft':
+    case 'in_review':
+      return 'published';
+    case 'published':
+      return 'draft';
+    default:
+      return null;
+  }
+}
+
 class _EventCard extends StatelessWidget {
   const _EventCard({required this.event, required this.onEdit, required this.onDelete});
   final Event event;
@@ -158,6 +173,7 @@ class _EventCard extends StatelessWidget {
     final dateText = dt == null ? '' : DateFormat('MMM d, yyyy · h:mm a').format(dt);
     final venue = event.venueName;
     final isPublished = event.isPublished;
+    final nextStatus = _nextToggleStatus(event.status);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -180,7 +196,7 @@ class _EventCard extends StatelessWidget {
                   color: isPublished ? Colors.green.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(event.status.toUpperCase(),
+                child: Text(event.status.replaceAll('_', ' ').toUpperCase(),
                     style: TextStyle(color: isPublished ? Colors.greenAccent : Colors.orangeAccent, fontSize: AppResponsive.font(context, 9), fontWeight: FontWeight.w900)),
               ),
             ],
@@ -207,15 +223,16 @@ class _EventCard extends StatelessWidget {
             children: [
               _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', onTap: onEdit),
               Gap(8),
-              _ActionBtn(
-                icon: isPublished ? Icons.visibility_off_outlined : Icons.publish_rounded,
-                label: isPublished ? 'Unpublish' : 'Publish',
-                // Narrow status-only patch — never touches interestedCount/popularityScore.
-                onTap: () => firestoreService.patchEventFields(
-                  event.id,
-                  {'status': isPublished ? 'draft' : 'published'},
+              if (nextStatus != null)
+                _ActionBtn(
+                  icon: isPublished ? Icons.visibility_off_outlined : Icons.publish_rounded,
+                  label: isPublished ? 'Unpublish' : 'Publish',
+                  // Narrow status-only patch — never touches interestedCount/popularityScore.
+                  onTap: () => firestoreService.patchEventFields(
+                    event.id,
+                    {'status': nextStatus},
+                  ),
                 ),
-              ),
               const Spacer(),
               GestureDetector(
                 onTap: onDelete,

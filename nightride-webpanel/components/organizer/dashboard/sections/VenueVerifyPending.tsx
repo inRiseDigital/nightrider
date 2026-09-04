@@ -11,7 +11,7 @@ import { VERIFY_STEPS } from "@/lib/organizer/dashboard/constants";
  * "simulate approval" affordance.
  */
 export function VenueVerifyPending() {
-  const { profile, editingVenue, toggleVerifyStep, approveVenue } = useOrganizerDashboard();
+  const { profile, editingVenue, toggleVerifyStep } = useOrganizerDashboard();
 
   return (
     <div className="max-w-[640px]">
@@ -79,13 +79,6 @@ export function VenueVerifyPending() {
         Once all steps are complete, an admin reviews and approves the venue — then its editor and
         app preview unlock.
       </p>
-
-      <button
-        onClick={() => approveVenue(editingVenue)}
-        className="mt-3.5 border-b border-dashed border-[var(--m3-outlinev)] font-mono text-[11px] text-[var(--m3-outline)] hover:text-[var(--m3-onv)]"
-      >
-        simulate: admin approves this venue
-      </button>
     </div>
   );
 }

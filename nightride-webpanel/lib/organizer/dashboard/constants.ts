@@ -1,7 +1,7 @@
 import type {
   DayName,
   DoorStatus,
-  EventStatus,
+  EventDisplayStatus,
   InboxType,
   TeamRole,
   VerifyStepId,
@@ -46,7 +46,7 @@ export const TEAM_ROLES: TeamRole[] = ["Owner", "Manager", "Door staff"];
  * Status chip styling — M3 tone containers (solid container + on-container
  * text), matching the "Organizer Dashboard Material.dc.html" design source.
  */
-export const EVENT_STATUS_STYLES: Record<EventStatus, { label: string; className: string }> = {
+export const EVENT_STATUS_STYLES: Record<EventDisplayStatus, { label: string; className: string }> = {
   draft: { label: "DRAFT", className: "bg-[var(--m3-surf3)] text-[var(--m3-onv)] ring-white/5" },
   scheduled: {
     label: "SCHEDULED",
@@ -56,20 +56,29 @@ export const EVENT_STATUS_STYLES: Record<EventStatus, { label: string; className
     label: "IN REVIEW",
     className: "bg-[var(--m3-warnc)] text-[var(--m3-onwarnc)] ring-white/5",
   },
-  live: { label: "LIVE", className: "bg-[var(--m3-succ)] text-[var(--m3-onsucc)] ring-white/5" },
+  published: {
+    label: "PUBLISHED",
+    className: "bg-[var(--m3-succ)] text-[var(--m3-onsucc)] ring-white/5",
+  },
   cancelled: {
     label: "CANCELLED",
     className: "bg-[var(--m3-errc)] text-[var(--m3-onerrc)] ring-white/5",
   },
-};
-
-/**
- * A `live` event that has not started yet reads as UPCOMING rather than LIVE —
- * see `deriveEventChip` in ./format.
- */
-export const UPCOMING_STYLE = {
-  label: "UPCOMING",
-  className: "bg-[var(--m3-terc)] text-[var(--m3-onterc)] ring-white/5",
+  archived: {
+    label: "ARCHIVED",
+    className: "bg-[var(--m3-surf3)] text-[var(--m3-onv)] ring-white/5",
+  },
+  /** Derived at render only — a published event whose window is running now. */
+  live: { label: "LIVE", className: "bg-[var(--m3-succ)] text-[var(--m3-onsucc)] ring-white/5" },
+  /**
+   * Derived at render only — a published event that has not started yet (or
+   * whose window has closed for today). Formerly the standalone
+   * `UPCOMING_STYLE`, now folded in as a display-status key.
+   */
+  upcoming: {
+    label: "UPCOMING",
+    className: "bg-[var(--m3-terc)] text-[var(--m3-onterc)] ring-white/5",
+  },
 };
 
 export const DOOR_STATUSES: { id: DoorStatus; label: string; className: string }[] = [

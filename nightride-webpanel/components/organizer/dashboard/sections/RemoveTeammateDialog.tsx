@@ -15,6 +15,7 @@ export function RemoveTeammateDialog() {
     removePassword,
     removeAck,
     removeError,
+    teamBusy,
     setRemovePassword,
     toggleRemoveAck,
     cancelRemoveTeamMember,
@@ -24,7 +25,7 @@ export function RemoveTeammateDialog() {
 
   if (!removeTarget) return null;
 
-  const armed = removeAck && removePassword.length >= 6;
+  const armed = removeAck && removePassword.length >= 6 && !teamBusy;
 
   return (
     <div className="fixed inset-0 z-[75] flex items-center justify-center p-8">
@@ -99,14 +100,15 @@ export function RemoveTeammateDialog() {
           <button
             type="button"
             onClick={confirmRemoveTeamMember}
-            className="inline-flex h-10 items-center rounded-full px-6 text-sm font-medium transition-[filter] hover:brightness-95"
+            disabled={teamBusy}
+            className="inline-flex h-10 items-center rounded-full px-6 text-sm font-medium transition-[filter] hover:brightness-95 disabled:cursor-not-allowed"
             style={
               armed
                 ? { background: "#DC2626", color: "#FFFFFF" }
                 : { background: "var(--m3-surf4)", color: "var(--m3-outline)" }
             }
           >
-            Remove access
+            {teamBusy ? "Verifying…" : "Remove access"}
           </button>
         </div>
       </div>

@@ -11,12 +11,13 @@ import { Card, FilledButton, IconButton, TextField } from "../ui/Primitives";
  * The venue's food & drinks menu — sections of priced items, each with its own
  * photo, availability nights, and sold-out switch.
  *
- * Unlike event submissions, menu edits skip platform review and reach the app
- * immediately, which is why there is no save/submit step here: every control
- * writes straight to the store.
+ * Menu edits never require admin review (unlike a venue rename/re-address),
+ * but they DO need the Save button now, same as hours/links/photos — every
+ * control here writes to the local draft only; `VenuesSection`'s `SaveBar`
+ * commits it.
  */
 export function VenueMenuSection() {
-  const { profile, editingVenue, addMenuSection } = useOrganizerDashboard();
+  const { profile, editingVenue, menuLoading, addMenuSection } = useOrganizerDashboard();
 
   const itemCount = profile.menu.reduce((n, s) => n + s.items.length, 0);
   const soldOutCount = profile.menu.reduce(
@@ -41,14 +42,20 @@ export function VenueMenuSection() {
         </p>
       </div>
 
-      {profile.menu.map((section) => (
-        <SectionCard key={section.id} section={section} />
-      ))}
+      {menuLoading && profile.menu.length === 0 ? (
+        <p className="text-[13px] text-[var(--m3-outline)]">Loading menu…</p>
+      ) : (
+        <>
+          {profile.menu.map((section) => (
+            <SectionCard key={section.id} section={section} />
+          ))}
 
-      {profile.menu.length === 0 && (
-        <p className="text-[13px] text-[var(--m3-outline)]">
-          No menu yet — add a section to start listing drinks, food, or table packages.
-        </p>
+          {profile.menu.length === 0 && (
+            <p className="text-[13px] text-[var(--m3-outline)]">
+              No menu yet — add a section to start listing drinks, food, or table packages.
+            </p>
+          )}
+        </>
       )}
 
       <FilledButton
@@ -63,8 +70,7 @@ export function VenueMenuSection() {
 }
 
 function SectionCard({ section }: { section: MenuSection }) {
-  const { editingVenue, setMenuSectionName, removeMenuSection, addMenuItem } =
-    useOrganizerDashboard();
+  const { editingVenue, setMenuSectionName, removeMenuSection, addMenuItem } = useOrganizerDashboard();
 
   return (
     <Card className="flex flex-col gap-4">

@@ -1,1443 +1,484 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
-import { clockStore, imageSlotStore } from "./browser-stores";
-import { DAYS, GALLERY_SLOT_COUNT, OTP_MIN_LENGTH } from "./constants";
-import {
-  MOCK_ACTIVITY,
-  MOCK_BOOST,
-  MOCK_EVENTS,
-  MOCK_INBOX,
-  MOCK_ORGANIZER,
-  MOCK_PERKS,
-  MOCK_PROMOS,
-  MOCK_PUSH,
-  MOCK_REVIEWS,
-  MOCK_TEAM,
-  MOCK_TONIGHT,
-  MOCK_VENUES,
-  MOCK_VENUE_ORDER,
-} from "./mock-data";
-import type {
-  BoostSlot,
-  DoorStatus,
-  InboxMessage,
-  MenuItem,
-  OrganizerEvent,
-  PromoCode,
-  PushState,
-  RankPerk,
-  TeamMember,
-  TeamRole,
-  TonightState,
-  VenueProfile,
-  VenueReview,
-  VerifyStepId,
-} from "./types";
+import { createContext, useContext, useMemo, useSyncExternalStore, type Context, type ReactNode } from "react";
+import { clockStore } from "./browser-stores";
+import { useOrganizerAuth } from "./auth";
+import { DAYS, GALLERY_SLOT_COUNT } from "./constants";
+import { useVenues, type VenuesState } from "./hooks/useVenues";
+import { useEvents, type EventsState } from "./hooks/useEvents";
+import { useReviews, type ReviewsState } from "./hooks/useReviews";
+import { useInbox, type InboxState } from "./hooks/useInbox";
+import { useTeam, type TeamState } from "./hooks/useTeam";
+import { usePromotion, type PromotionState } from "./hooks/usePromotion";
+import { usePerformance, type PerformanceState } from "./hooks/usePerformance";
+import { useAiVisibility, type AiVisibilityState } from "./hooks/useAiVisibility";
+import { useActivity, type ActivityState } from "./hooks/useActivity";
+import { useAccountSettings, type AccountSettingsState } from "./hooks/useAccountSettings";
+import { useDashboardUi, type DashboardUiState } from "./hooks/useDashboardUi";
+import { eventSlotIds, gallerySlotId, heroSlotId, menuItemSlotId, parseSlotId } from "./data/images";
+import { setPhotoAt } from "./data/venues";
+import type { VenueProfile } from "./types";
 
-export type VenueTab = "profile" | "menu" | "hours" | "links";
-/** Status filter above the events table — "all" plus the statuses worth filtering by. */
-export type EventFilter = "all" | "in_review" | "scheduled" | "live" | "draft";
-export type HomeTab = "tonight" | "activity";
-export type EventsTab = "list" | "calendar";
-export type AudienceTab = "performance" | "reviews" | "ai-visibility";
-export type AccountTab = "team" | "inbox" | "promotion" | "settings";
-export type ChangeField = "email" | "phone";
-export type ChangeStage = "edit" | "otp";
+export type { VenueTab } from "./hooks/useVenues";
+export type { EventFilter, EventsTab } from "./hooks/useEvents";
+export type { AccountTab, AudienceTab, HomeTab } from "./hooks/useDashboardUi";
+export type { ChangeField, ChangeStage } from "./hooks/useAccountSettings";
+export { blankVenueProfile } from "./hooks/useVenues";
+export { blankEventDraft } from "./hooks/useEvents";
+export { heroSlotId, gallerySlotId, gallerySlotIds, menuItemSlotId, eventSlotIds } from "./data/images";
 
-/** Slot ids are shared between the editor and the live app preview, so the
- *  same image renders in both places — same contract as the design's
- *  `<image-slot id>` sidecar. */
-export function heroSlotId(venueId: string) {
-  return `hero-${venueId}`;
-}
-export function gallerySlotId(venueId: string, index: number) {
-  return `gallery-${venueId}-${index}`;
-}
-export function gallerySlotIds(venueId: string) {
-  return Array.from({ length: GALLERY_SLOT_COUNT }, (_, i) => gallerySlotId(venueId, i));
-}
-export function menuItemSlotId(venueId: string, itemId: string) {
-  return `menu-${venueId}-${itemId}`;
-}
-export function eventSlotIds(eventKey: string) {
-  return {
-    cover: `event-img-${eventKey}-cover`,
-    poster: `event-img-${eventKey}-poster`,
-  };
+// ---------------------------------------------------------------------------
+// Eight contexts, one per domain-hook group. Each is published independently
+// so a future consumer can subscribe to just the slice it needs; the facade
+// below (`useOrganizerDashboard`) merges them for the 34 existing call sites,
+// none of which need to change.
+// ---------------------------------------------------------------------------
+
+const IdentityContext = createContext<AccountSettingsState | null>(null);
+const VenuesContext = createContext<VenuesState | null>(null);
+const EventsContext = createContext<EventsState | null>(null);
+const EngagementContext = createContext<{ reviews: ReviewsState; inbox: InboxState } | null>(null);
+const AccountContext = createContext<{ team: TeamState; promotion: PromotionState } | null>(null);
+const AnalyticsContext = createContext<{ performance: PerformanceState; aiVisibility: AiVisibilityState } | null>(null);
+const ActivityContext = createContext<ActivityState | null>(null);
+const UiContext = createContext<DashboardUiState | null>(null);
+
+export function OrganizerDashboardProvider({ children }: { children: ReactNode }) {
+  const { uid, user, organizer, refreshOrganizer } = useOrganizerAuth();
+  const ui = useDashboardUi();
+  // `uid` is guaranteed non-null here: `OrganizerDashboardProvider` only ever
+  // mounts inside `OrganizerGate` once auth status is "approved".
+  const identity = useAccountSettings(uid as string, user, organizer, refreshOrganizer, ui.showSnack);
+  const venues = useVenues(uid as string, ui.showSnack);
+  const events = useEvents(uid as string, venues.data.profiles, venues.data.order, venues.data.meta, ui.showSnack);
+  const reviews = useReviews(venues.data.order, identity.data.organizer, uid as string, ui.showSnack);
+  const inbox = useInbox(uid as string);
+  const team = useTeam(venues.data.order, user, ui.showSnack);
+  const promotion = usePromotion(venues.data.editingVenue || null, ui.showSnack);
+  const now = useNow();
+  const performance = usePerformance(events.data.events, venues.data.order, now, venues.data.meta);
+  const aiVisibility = useAiVisibility(venues.data.editingVenue || null);
+  const activity = useActivity(venues.data.order);
+
+  const engagementValue = useMemo(() => ({ reviews, inbox }), [reviews, inbox]);
+  const accountValue = useMemo(() => ({ team, promotion }), [team, promotion]);
+  const analyticsValue = useMemo(() => ({ performance, aiVisibility }), [performance, aiVisibility]);
+
+  return (
+    <IdentityContext.Provider value={identity}>
+      <VenuesContext.Provider value={venues}>
+        <EventsContext.Provider value={events}>
+          <EngagementContext.Provider value={engagementValue}>
+            <AccountContext.Provider value={accountValue}>
+              <AnalyticsContext.Provider value={analyticsValue}>
+                <ActivityContext.Provider value={activity}>
+                  <UiContext.Provider value={ui}>{children}</UiContext.Provider>
+                </ActivityContext.Provider>
+              </AnalyticsContext.Provider>
+            </AccountContext.Provider>
+          </EngagementContext.Provider>
+        </EventsContext.Provider>
+      </VenuesContext.Provider>
+    </IdentityContext.Provider>
+  );
 }
 
-
-export function blankVenueProfile(name: string, city: string): VenueProfile {
-  return {
-    verified: false,
-    verificationSteps: { license: "active", gps: "active", video: "active" },
-    openVerifyStep: "license",
-    name,
-    city,
-    address: "",
-    about: "",
-    socialLinks: [],
-    genres: [],
-    dressCode: "Casual",
-    agePolicy: "18+",
-    coverMin: 0,
-    coverMax: 0,
-    currency: "$",
-    capacity: 0,
-    amenities: [],
-    hours: DAYS.map((day) => ({ day, closed: false, open: "22:00", close: "04:00" })),
-    exceptions: [],
-    menu: [],
-    tableLink: "",
-  };
+function useCtx<T>(ctx: Context<T | null>, name: string): T {
+  const value = useContext(ctx);
+  if (!value) throw new Error(`${name} must be used inside <OrganizerDashboardProvider>`);
+  return value;
 }
 
 /**
- * Fields that bypass the venue draft. Verification state is set by an admin
- * rather than the organizer, so it writes to the published record directly:
- * it is excluded from the dirty check and preserved when a draft commits.
+ * The pre-refactor `OrganizerDashboardValue` shape, unchanged in every key
+ * name save the three deliberate corrections noted in the task brief
+ * (`organizer`'s type, `activity`'s type, `blankEventDraft`'s signature) and
+ * the deletion of `approveVenue` (a mock backdoor `firestore.rules` doesn't
+ * allow for real: `verified` is admin-only on every organizer write).
+ *
+ * Merges the 8 contexts above into one facade so the 34 existing call sites
+ * across 20 files keep compiling untouched. The dependency array is 8
+ * entries — one per context value, each already its own hook's
+ * pre-memoised object — where the hand-maintained version this replaces ran
+ * to ~55.
  */
-const LIVE_VENUE_FIELDS = ["verified", "verificationSteps", "openVerifyStep"] as const;
-
-/** The draft with live fields overlaid — what the editor should render. */
-function withLiveFields(draft: VenueProfile, saved: VenueProfile): VenueProfile {
-  return {
-    ...draft,
-    verified: saved.verified,
-    verificationSteps: saved.verificationSteps,
-    openVerifyStep: saved.openVerifyStep,
-  };
-}
-
-/** Just the reviewable listing fields, for comparing draft against published. */
-function listingFieldsOf(p: VenueProfile): Partial<VenueProfile> {
-  const listing: Partial<VenueProfile> = { ...p };
-  for (const field of LIVE_VENUE_FIELDS) delete listing[field];
-  return listing;
-}
-
-/** Menu sections and items are added client-side only, so a timestamp plus a
- *  counter is enough to keep React keys unique without a uuid dependency. */
-let menuIdSeq = 0;
-function nextMenuId(prefix: string) {
-  menuIdSeq += 1;
-  return `${prefix}-${Date.now().toString(36)}-${menuIdSeq}`;
-}
-
-export function blankEventDraft(date?: string, venue = MOCK_VENUE_ORDER[0]): OrganizerEvent {
-  return {
-    id: "",
-    name: "",
-    venue,
-    date: date ?? "",
-    startTime: "22:00",
-    endTime: "04:00",
-    lineup: [],
-    tiers: [],
-    status: "draft",
-    recurring: false,
-    recurrenceLabel: "",
-    scheduledPublish: "",
-    notifyOnChange: true,
-    moderationFlag: "",
-    moderationEta: "",
-    cancelReason: "",
-    sold: 0,
-    revenue: 0,
-  };
-}
-
-interface OrganizerDashboardValue {
-  organizer: typeof MOCK_ORGANIZER;
-
-  // ---- Venues ----
-  venueOrder: string[];
-  venues: Record<string, VenueProfile>;
-  editingVenue: string;
-  /** Listing fields as edited (draft when one exists); menu/verification always live. */
-  profile: VenueProfile;
-  /** The published record — what the app preview renders. */
-  savedProfile: VenueProfile;
-  /** True when the selected venue has uncommitted listing edits. */
-  venueDirty: boolean;
-  saveVenue: (id: string) => void;
-  discardVenue: (id: string) => void;
-  venueTab: VenueTab;
-  addingVenue: boolean;
-  newVenueName: string;
-  newVenueCity: string;
-  setEditingVenue: (id: string) => void;
-  setVenueTab: (tab: VenueTab) => void;
-  openAddVenue: () => void;
-  cancelAddVenue: () => void;
-  setNewVenueName: (v: string) => void;
-  setNewVenueCity: (v: string) => void;
-  createVenue: () => void;
-  setVenueField: <K extends keyof VenueProfile>(id: string, field: K, value: VenueProfile[K]) => void;
-  toggleVenueSetValue: (id: string, field: "genres" | "amenities", value: string) => void;
-  addSocialLink: (id: string) => void;
-  removeSocialLink: (id: string, idx: number) => void;
-  setSocialLinkField: (id: string, idx: number, field: "network" | "value", value: string) => void;
-  setHourField: (id: string, dayIdx: number, field: "open" | "close", value: string) => void;
-  toggleDayClosed: (id: string, dayIdx: number) => void;
-  addException: (id: string) => void;
-  removeException: (id: string, idx: number) => void;
-  setExceptionField: (id: string, idx: number, field: "label" | "date", value: string) => void;
-  toggleExceptionClosed: (id: string, idx: number) => void;
-  addMenuSection: (id: string) => void;
-  removeMenuSection: (id: string, sectionId: string) => void;
-  setMenuSectionName: (id: string, sectionId: string, name: string) => void;
-  addMenuItem: (id: string, sectionId: string) => void;
-  removeMenuItem: (id: string, sectionId: string, itemId: string) => void;
-  setMenuItemField: <K extends keyof MenuItem>(
-    id: string,
-    sectionId: string,
-    itemId: string,
-    field: K,
-    value: MenuItem[K]
-  ) => void;
-  toggleMenuItemSoldOut: (id: string, sectionId: string, itemId: string) => void;
-  toggleMenuItemTag: (id: string, sectionId: string, itemId: string, tag: string) => void;
-  toggleMenuItemNight: (id: string, sectionId: string, itemId: string, night: number) => void;
-  toggleVerifyStep: (id: string, step: VerifyStepId) => void;
-  approveVenue: (id: string) => void;
-
-  // ---- Destination tab strips ----
-  homeTab: HomeTab;
-  setHomeTab: (tab: HomeTab) => void;
-  eventsTab: EventsTab;
-  setEventsTab: (tab: EventsTab) => void;
-  audienceTab: AudienceTab;
-  setAudienceTab: (tab: AudienceTab) => void;
-  accountTab: AccountTab;
-  setAccountTab: (tab: AccountTab) => void;
-
-  // ---- Events ----
-  events: OrganizerEvent[];
-  eventFilter: EventFilter;
-  setEventFilter: (f: EventFilter) => void;
-  eventEditorOpen: boolean;
-  editingEventId: string | null;
-  eventDraft: OrganizerEvent | null;
-  lineupInput: string;
-  cancelingEventId: string | null;
-  cancelReasonInput: string;
-  openNewEvent: (date?: string) => void;
-  openEditEvent: (id: string) => void;
-  closeEditor: () => void;
-  updateDraft: <K extends keyof OrganizerEvent>(field: K, value: OrganizerEvent[K]) => void;
-  setLineupInput: (v: string) => void;
-  addLineup: () => void;
-  removeLineup: (idx: number) => void;
-  addTier: () => void;
-  updateTier: (idx: number, field: "name" | "price" | "qty", value: string) => void;
-  removeTier: (idx: number) => void;
-  saveDraftEvent: () => void;
-  submitEvent: () => void;
-  duplicateEvent: (id: string) => void;
-  startCancel: (id: string) => void;
-  cancelCancelFlow: () => void;
-  setCancelReasonInput: (v: string) => void;
-  confirmCancel: () => void;
-
-  // ---- Calendar ----
-  calendarOffset: number;
-  calendarVenueFilter: string;
-  /** The day whose event list is open, or null. */
-  dayDialog: { iso: string; label: string } | null;
-  openDayDialog: (iso: string, label: string) => void;
-  closeDayDialog: () => void;
-  shiftCalendar: (delta: number) => void;
-  setCalendarVenueFilter: (id: string) => void;
-
-  // ---- Tonight ----
-  tonight: TonightState;
-  setDoorStatus: (status: DoorStatus) => void;
-  setQueueMinutes: (v: number) => void;
-  setFlashText: (v: string) => void;
-  setFlashUntil: (v: string) => void;
-  toggleFlash: () => void;
-  toggleEmergency: () => void;
-
-  // ---- Performance ----
-  perfVenueFilter: string;
-  perfEventId: string | null;
-  setPerfVenueFilter: (id: string) => void;
-  setPerfEventId: (id: string) => void;
-
-  // ---- Promotion ----
-  push: PushState;
-  setPushMessage: (v: string) => void;
-  sendPush: () => void;
-  promos: PromoCode[];
-  addPromo: () => void;
-  updatePromo: (idx: number, field: "code" | "desc", value: string) => void;
-  removePromo: (idx: number) => void;
-  perks: RankPerk[];
-  updatePerk: (idx: number, value: string) => void;
-  boost: BoostSlot;
-  setBoostNight: (v: string) => void;
-  toggleBoost: () => void;
-
-  // ---- Team ----
-  team: TeamMember[];
-  activity: typeof MOCK_ACTIVITY;
-  inviteEmail: string;
-  setInviteEmail: (v: string) => void;
-  sendInvite: () => void;
-  setTeamRole: (id: string, role: TeamRole) => void;
-  /** The member queued for removal — drives the confirm dialog. */
-  removeTarget: TeamMember | null;
-  removePassword: string;
-  removeAck: boolean;
-  removeError: string;
-  startRemoveTeamMember: (id: string) => void;
-  setRemovePassword: (v: string) => void;
-  toggleRemoveAck: () => void;
-  cancelRemoveTeamMember: () => void;
-  confirmRemoveTeamMember: () => void;
-
-  // ---- Snackbar ----
-  /** Empty while nothing is showing. */
-  snack: string;
-  showSnack: (text: string) => void;
-  dismissSnack: () => void;
-
-  // ---- Reviews & inbox ----
-  reviews: VenueReview[];
-  setReviewReply: (id: string, value: string) => void;
-  toggleReviewFlag: (id: string) => void;
-  sendReviewReply: (id: string) => void;
-  editPostedReply: (id: string) => void;
-  deletePostedReply: (id: string) => void;
-  inbox: InboxMessage[];
-  toggleInboxItem: (id: string) => void;
-  hasUnreadInbox: boolean;
-
-  // ---- Settings / account ----
-  accountEmail: string;
-  accountPhone: string;
-  changeField: ChangeField | null;
-  changeStage: ChangeStage;
-  changeValue: string;
-  changeOtp: string;
-  changeError: string;
-  startChangeField: (field: ChangeField) => void;
-  cancelChangeField: () => void;
-  setChangeValue: (v: string) => void;
-  setChangeOtp: (v: string) => void;
-  submitNewValue: () => void;
-  submitOtp: () => void;
-
-  // ---- Image slots ----
-  images: Record<string, string>;
-  setImage: (slotId: string, dataUrl: string) => void;
-  confirmRemoveSlotId: string | null;
-  requestRemoveImage: (slotId: string) => void;
-  cancelRemoveImage: () => void;
-  confirmRemoveImage: () => void;
-}
-
-const OrganizerDashboardContext = createContext<OrganizerDashboardValue | null>(null);
-
-export function OrganizerDashboardProvider({ children }: { children: ReactNode }) {
-  // ---- Venues ----
-  const [venueOrder, setVenueOrder] = useState<string[]>(MOCK_VENUE_ORDER);
-  const [venues, setVenues] = useState<Record<string, VenueProfile>>(MOCK_VENUES);
-  /**
-   * Unsaved listing edits, keyed by venue id. A draft is created lazily on the
-   * first edit and cleared on save/discard, so `venues` always holds the
-   * published version the app preview renders. Drafts survive switching venues.
-   */
-  const [venueDrafts, setVenueDrafts] = useState<Record<string, VenueProfile>>({});
-  const [editingVenue, setEditingVenue] = useState(MOCK_VENUE_ORDER[0]);
-  const [venueTab, setVenueTab] = useState<VenueTab>("profile");
-  const [homeTab, setHomeTab] = useState<HomeTab>("tonight");
-  const [eventsTab, setEventsTab] = useState<EventsTab>("list");
-  const [audienceTab, setAudienceTab] = useState<AudienceTab>("performance");
-  const [accountTab, setAccountTab] = useState<AccountTab>("team");
-  const [addingVenue, setAddingVenue] = useState(false);
-  const [newVenueName, setNewVenueName] = useState("");
-  const [newVenueCity, setNewVenueCity] = useState("");
-
-  // ---- Events ----
-  const [events, setEvents] = useState<OrganizerEvent[]>(MOCK_EVENTS);
-  const [eventFilter, setEventFilter] = useState<EventFilter>("all");
-  const [eventEditorOpen, setEventEditorOpen] = useState(false);
-  const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  const [eventDraft, setEventDraft] = useState<OrganizerEvent | null>(null);
-  const [lineupInput, setLineupInput] = useState("");
-  const [cancelingEventId, setCancelingEventId] = useState<string | null>(null);
-  const [cancelReasonInput, setCancelReasonInput] = useState("");
-
-  // ---- Calendar / performance filters ----
-  const [calendarOffset, setCalendarOffset] = useState(0);
-  const [calendarVenueFilter, setCalendarVenueFilter] = useState("all");
-  const [dayDialog, setDayDialog] = useState<{ iso: string; label: string } | null>(null);
-  const [perfVenueFilter, setPerfVenueFilterState] = useState("all");
-  const [perfEventId, setPerfEventId] = useState<string | null>("e1");
-
-  // ---- Tonight / promotion / team ----
-  const [tonight, setTonight] = useState<TonightState>(MOCK_TONIGHT);
-  const [push, setPush] = useState<PushState>(MOCK_PUSH);
-  const [promos, setPromos] = useState<PromoCode[]>(MOCK_PROMOS);
-  const [perks, setPerks] = useState<RankPerk[]>(MOCK_PERKS);
-  const [boost, setBoost] = useState<BoostSlot>(MOCK_BOOST);
-  const [team, setTeam] = useState<TeamMember[]>(MOCK_TEAM);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);
-  const [removePassword, setRemovePassword] = useState("");
-  const [removeAck, setRemoveAck] = useState(false);
-  const [removeError, setRemoveError] = useState("");
-
-  // ---- Snackbar ----
-  const [snack, setSnack] = useState("");
-
-  // ---- Reviews / inbox / account ----
-  const [reviews, setReviews] = useState<VenueReview[]>(MOCK_REVIEWS);
-  const [inbox, setInbox] = useState<InboxMessage[]>(MOCK_INBOX);
-  const [accountEmail, setAccountEmail] = useState(MOCK_ORGANIZER.email);
-  const [accountPhone, setAccountPhone] = useState(MOCK_ORGANIZER.phone);
-  const [changeField, setChangeField] = useState<ChangeField | null>(null);
-  const [changeStage, setChangeStage] = useState<ChangeStage>("edit");
-  const [changeValue, setChangeValue] = useState("");
-  const [changeOtp, setChangeOtp] = useState("");
-  const [changeError, setChangeError] = useState("");
-
-  /**
-   * Every mutation that changes something a guest or teammate would notice
-   * confirms itself here, the way the design does. Declared before the
-   * mutators so they can all reach it.
-   */
-  const showSnack = useCallback((text: string) => setSnack(text), []);
-  const dismissSnack = useCallback(() => setSnack(""), []);
-
-  // ---- Image slots ----
-  const images = useSyncExternalStore(
-    imageSlotStore.subscribe,
-    imageSlotStore.getSnapshot,
-    imageSlotStore.getServerSnapshot
-  );
-  const [confirmRemoveSlotId, setConfirmRemoveSlotId] = useState<string | null>(null);
-
-  const setImage = useCallback((slotId: string, dataUrl: string) => {
-    imageSlotStore.set(slotId, dataUrl);
-  }, []);
-
-  const requestRemoveImage = useCallback((slotId: string) => setConfirmRemoveSlotId(slotId), []);
-  const cancelRemoveImage = useCallback(() => setConfirmRemoveSlotId(null), []);
-  const confirmRemoveImage = useCallback(() => {
-    if (confirmRemoveSlotId) imageSlotStore.remove(confirmRemoveSlotId);
-    setConfirmRemoveSlotId(null);
-  }, [confirmRemoveSlotId]);
-
-  // ---- Venue mutators ----
-  /** Writes straight to the published record — for menu and verification only. */
-  const updateVenue = useCallback((id: string, fn: (p: VenueProfile) => VenueProfile) => {
-    setVenues((prev) => ({ ...prev, [id]: fn(prev[id]) }));
-  }, []);
-
-  /**
-   * Writes into the venue's draft, seeding it from the published record on the
-   * first edit. Every reviewable listing field goes through here, so nothing
-   * reaches the app preview until the save bar commits it.
-   */
-  const updateVenueListing = useCallback(
-    (id: string, fn: (p: VenueProfile) => VenueProfile) => {
-      setVenueDrafts((prev) => {
-        const base = prev[id] ?? venues[id];
-        if (!base) return prev;
-        return { ...prev, [id]: fn(base) };
-      });
-    },
-    [venues]
-  );
-
-  const setVenueField = useCallback(
-    <K extends keyof VenueProfile>(id: string, field: K, value: VenueProfile[K]) => {
-      updateVenueListing(id, (p) => ({ ...p, [field]: value }));
-    },
-    [updateVenueListing]
-  );
-
-  const toggleVenueSetValue = useCallback(
-    (id: string, field: "genres" | "amenities", value: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        [field]: p[field].includes(value)
-          ? p[field].filter((x) => x !== value)
-          : [...p[field], value],
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const addSocialLink = useCallback(
-    (id: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        socialLinks: [...p.socialLinks, { network: "instagram", value: "" }],
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const removeSocialLink = useCallback(
-    (id: string, idx: number) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        socialLinks: p.socialLinks.filter((_, i) => i !== idx),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const setSocialLinkField = useCallback(
-    (id: string, idx: number, field: "network" | "value", value: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        socialLinks: p.socialLinks.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const setHourField = useCallback(
-    (id: string, dayIdx: number, field: "open" | "close", value: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        hours: p.hours.map((h, i) => (i === dayIdx ? { ...h, [field]: value } : h)),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const toggleDayClosed = useCallback(
-    (id: string, dayIdx: number) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        hours: p.hours.map((h, i) => (i === dayIdx ? { ...h, closed: !h.closed } : h)),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const addException = useCallback(
-    (id: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        exceptions: [...p.exceptions, { label: "New exception", date: "", closed: true }],
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const removeException = useCallback(
-    (id: string, idx: number) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        exceptions: p.exceptions.filter((_, i) => i !== idx),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const setExceptionField = useCallback(
-    (id: string, idx: number, field: "label" | "date", value: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        exceptions: p.exceptions.map((e, i) => (i === idx ? { ...e, [field]: value } : e)),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const toggleExceptionClosed = useCallback(
-    (id: string, idx: number) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        exceptions: p.exceptions.map((e, i) => (i === idx ? { ...e, closed: !e.closed } : e)),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  /** Commits the draft's listing fields, leaving live fields (menu, verification) alone. */
-  const saveVenue = useCallback(
-    (id: string) => {
-      if (!venueDrafts[id]) {
-        showSnack("No changes to save.");
-        return;
-      }
-      setVenueDrafts((prevDrafts) => {
-        const draft = prevDrafts[id];
-        if (!draft) return prevDrafts;
-        setVenues((prev) => ({ ...prev, [id]: { ...prev[id], ...listingFieldsOf(draft) } }));
-        const next = { ...prevDrafts };
-        delete next[id];
-        return next;
-      });
-      showSnack("Changes saved and submitted for review.");
-    },
-    [venueDrafts, showSnack]
-  );
-
-  const discardVenue = useCallback(
-    (id: string) => {
-      if (!venueDrafts[id]) return;
-      setVenueDrafts((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      showSnack("Changes discarded.");
-    },
-    [venueDrafts, showSnack]
-  );
-
-  // ---- Menu mutators ----
-  /** Rewrites one item in place; every per-item edit funnels through here. */
-  const patchMenuItem = useCallback(
-    (id: string, sectionId: string, itemId: string, patch: Partial<MenuItem>) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: p.menu.map((sec) =>
-          sec.id !== sectionId
-            ? sec
-            : {
-                ...sec,
-                items: sec.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)),
-              }
-        ),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const addMenuSection = useCallback(
-    (id: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: [...p.menu, { id: nextMenuId("sec"), name: "New section", items: [] }],
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const removeMenuSection = useCallback(
-    (id: string, sectionId: string) => {
-      updateVenueListing(id, (p) => ({ ...p, menu: p.menu.filter((s) => s.id !== sectionId) }));
-    },
-    [updateVenueListing]
-  );
-
-  const setMenuSectionName = useCallback(
-    (id: string, sectionId: string, name: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: p.menu.map((s) => (s.id === sectionId ? { ...s, name } : s)),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const addMenuItem = useCallback(
-    (id: string, sectionId: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: p.menu.map((s) =>
-          s.id !== sectionId
-            ? s
-            : {
-                ...s,
-                items: [
-                  ...s.items,
-                  {
-                    id: nextMenuId("item"),
-                    name: "",
-                    price: 0,
-                    desc: "",
-                    size: "",
-                    serves: "",
-                    tags: [],
-                    nights: [],
-                    soldOut: false,
-                  },
-                ],
-              }
-        ),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const removeMenuItem = useCallback(
-    (id: string, sectionId: string, itemId: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: p.menu.map((s) =>
-          s.id !== sectionId ? s : { ...s, items: s.items.filter((it) => it.id !== itemId) }
-        ),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const setMenuItemField = useCallback(
-    <K extends keyof MenuItem>(
-      id: string,
-      sectionId: string,
-      itemId: string,
-      field: K,
-      value: MenuItem[K]
-    ) => {
-      patchMenuItem(id, sectionId, itemId, { [field]: value } as Partial<MenuItem>);
-    },
-    [patchMenuItem]
-  );
-
-  const toggleMenuItemSoldOut = useCallback(
-    (id: string, sectionId: string, itemId: string) => {
-      // Menu lives in the draft once edited, so read the draft first.
-      const item = (venueDrafts[id] ?? venues[id])?.menu
-        .find((s) => s.id === sectionId)
-        ?.items.find((it) => it.id === itemId);
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: p.menu.map((s) =>
-          s.id !== sectionId
-            ? s
-            : {
-                ...s,
-                items: s.items.map((it) =>
-                  it.id === itemId ? { ...it, soldOut: !it.soldOut } : it
-                ),
-              }
-        ),
-      }));
-      const name = item?.name || "Item";
-      showSnack(item?.soldOut ? `${name} is back on the menu.` : `${name} marked sold out.`);
-    },
-    [venueDrafts, venues, updateVenueListing, showSnack]
-  );
-
-  const toggleMenuItemTag = useCallback(
-    (id: string, sectionId: string, itemId: string, tag: string) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: p.menu.map((s) =>
-          s.id !== sectionId
-            ? s
-            : {
-                ...s,
-                items: s.items.map((it) =>
-                  it.id !== itemId
-                    ? it
-                    : {
-                        ...it,
-                        tags: it.tags.includes(tag)
-                          ? it.tags.filter((t) => t !== tag)
-                          : [...it.tags, tag],
-                      }
-                ),
-              }
-        ),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const toggleMenuItemNight = useCallback(
-    (id: string, sectionId: string, itemId: string, night: number) => {
-      updateVenueListing(id, (p) => ({
-        ...p,
-        menu: p.menu.map((s) =>
-          s.id !== sectionId
-            ? s
-            : {
-                ...s,
-                items: s.items.map((it) =>
-                  it.id !== itemId
-                    ? it
-                    : {
-                        ...it,
-                        nights: it.nights.includes(night)
-                          ? it.nights.filter((n) => n !== night)
-                          : [...it.nights, night].sort((a, b) => a - b),
-                      }
-                ),
-              }
-        ),
-      }));
-    },
-    [updateVenueListing]
-  );
-
-  const toggleVerifyStep = useCallback(
-    (id: string, step: VerifyStepId) => {
-      updateVenue(id, (p) => ({ ...p, openVerifyStep: p.openVerifyStep === step ? null : step }));
-    },
-    [updateVenue]
-  );
-
-  const approveVenue = useCallback(
-    (id: string) => updateVenue(id, (p) => ({ ...p, verified: true })),
-    [updateVenue]
-  );
-
-  const openAddVenue = useCallback(() => {
-    setAddingVenue(true);
-    setNewVenueName("");
-    setNewVenueCity("");
-  }, []);
-
-  const cancelAddVenue = useCallback(() => setAddingVenue(false), []);
-
-  const createVenue = useCallback(() => {
-    const name = newVenueName.trim();
-    if (!name) return;
-    const id = `venue-${Date.now()}`;
-    setVenues((prev) => ({
-      ...prev,
-      [id]: blankVenueProfile(name, newVenueCity.trim() || "City, Country"),
-    }));
-    setVenueOrder((prev) => [...prev, id]);
-    setEditingVenue(id);
-    setAddingVenue(false);
-    setNewVenueName("");
-    setNewVenueCity("");
-  }, [newVenueName, newVenueCity]);
-
-  // ---- Event mutators ----
-  const openNewEvent = useCallback(
-    (date?: string) => {
-      const firstVerified = venueOrder.find((id) => venues[id]?.verified) ?? venueOrder[0];
-      setEventDraft(blankEventDraft(date, firstVerified));
-      setEditingEventId(null);
-      setEventEditorOpen(true);
-      setLineupInput("");
-    },
-    [venueOrder, venues]
-  );
-
-  const openEditEvent = useCallback(
-    (id: string) => {
-      const ev = events.find((e) => e.id === id);
-      if (!ev) return;
-      setEventDraft({ ...ev, lineup: [...ev.lineup], tiers: ev.tiers.map((t) => ({ ...t })) });
-      setEditingEventId(id);
-      setEventEditorOpen(true);
-      setLineupInput("");
-    },
-    [events]
-  );
-
-  const closeEditor = useCallback(() => {
-    setEventEditorOpen(false);
-    setEventDraft(null);
-    setEditingEventId(null);
-    setLineupInput("");
-  }, []);
-
-  const updateDraft = useCallback(
-    <K extends keyof OrganizerEvent>(field: K, value: OrganizerEvent[K]) => {
-      setEventDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
-    },
-    []
-  );
-
-  const addLineup = useCallback(() => {
-    const v = lineupInput.trim();
-    if (!v) return;
-    setEventDraft((prev) => (prev ? { ...prev, lineup: [...prev.lineup, v] } : prev));
-    setLineupInput("");
-  }, [lineupInput]);
-
-  const removeLineup = useCallback((idx: number) => {
-    setEventDraft((prev) =>
-      prev ? { ...prev, lineup: prev.lineup.filter((_, i) => i !== idx) } : prev
-    );
-  }, []);
-
-  const addTier = useCallback(() => {
-    setEventDraft((prev) =>
-      prev ? { ...prev, tiers: [...prev.tiers, { name: "New Tier", price: 0, qty: 0 }] } : prev
-    );
-  }, []);
-
-  const updateTier = useCallback(
-    (idx: number, field: "name" | "price" | "qty", value: string) => {
-      setEventDraft((prev) =>
-        prev
-          ? {
-              ...prev,
-              tiers: prev.tiers.map((t, i) =>
-                i === idx
-                  ? { ...t, [field]: field === "name" ? value : Number(value) || 0 }
-                  : t
-              ),
-            }
-          : prev
-      );
-    },
-    []
-  );
-
-  const removeTier = useCallback((idx: number) => {
-    setEventDraft((prev) =>
-      prev ? { ...prev, tiers: prev.tiers.filter((_, i) => i !== idx) } : prev
-    );
-  }, []);
-
-  const commitEvent = useCallback(
-    (status: OrganizerEvent["status"], extra: Partial<OrganizerEvent> = {}) => {
-      setEvents((prev) => {
-        if (!eventDraft) return prev;
-        const draft: OrganizerEvent = { ...eventDraft, status, ...extra };
-        if (editingEventId) return prev.map((e) => (e.id === editingEventId ? draft : e));
-        return [...prev, { ...draft, id: `e${Date.now()}` }];
-      });
-      closeEditor();
-    },
-    [eventDraft, editingEventId, closeEditor]
-  );
-
-  const saveDraftEvent = useCallback(() => {
-    commitEvent("draft");
-    showSnack("Draft saved.");
-  }, [commitEvent, showSnack]);
-
-  const submitEvent = useCallback(() => {
-    // Scheduling publishes later without review; submitting now enters the queue.
-    const scheduled = !!eventDraft?.scheduledPublish;
-    commitEvent(
-      scheduled ? "scheduled" : "in_review",
-      scheduled ? {} : { moderationFlag: "pending", moderationEta: "~2h remaining" }
-    );
-    showSnack(
-      scheduled ? "Event scheduled to publish." : "Event submitted for review — usually under 2h."
-    );
-  }, [eventDraft, commitEvent, showSnack]);
-
-  const duplicateEvent = useCallback((id: string) => {
-    setEvents((prev) => {
-      const src = prev.find((e) => e.id === id);
-      if (!src) return prev;
-      return [
-        ...prev,
-        {
-          ...src,
-          id: `e${Date.now()}`,
-          name: `${src.name} (Copy)`,
-          status: "draft",
-          recurring: false,
-          cancelReason: "",
-          // A copy starts from scratch — takings belong to the original night.
-          sold: 0,
-          revenue: 0,
-        },
-      ];
-    });
-  }, []);
-
-  const openDayDialog = useCallback((iso: string, label: string) => {
-    setDayDialog({ iso, label });
-  }, []);
-
-  const closeDayDialog = useCallback(() => setDayDialog(null), []);
-
-  const startCancel = useCallback((id: string) => {
-    setCancelingEventId(id);
-    setCancelReasonInput("");
-  }, []);
-
-  const cancelCancelFlow = useCallback(() => {
-    setCancelingEventId(null);
-    setCancelReasonInput("");
-  }, []);
-
-  const confirmCancel = useCallback(() => {
-    const target = events.find((e) => e.id === cancelingEventId);
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === cancelingEventId
-          ? { ...e, status: "cancelled" as const, cancelReason: cancelReasonInput }
-          : e
-      )
-    );
-    setCancelingEventId(null);
-    setCancelReasonInput("");
-    showSnack(`${target?.name ?? "Event"} cancelled — ticket holders notified.`);
-  }, [events, cancelingEventId, cancelReasonInput, showSnack]);
-
-  // ---- Performance ----
-  const setPerfVenueFilter = useCallback(
-    (id: string) => {
-      setPerfVenueFilterState(id);
-      // Keep the selected event valid for the new venue filter.
-      const eligible = events.filter(
-        (e) =>
-          (e.status === "live" || e.status === "scheduled" || e.status === "in_review") &&
-          (id === "all" || e.venue === id)
-      );
-      setPerfEventId((prev) =>
-        eligible.some((e) => e.id === prev) ? prev : (eligible[0]?.id ?? null)
-      );
-    },
-    [events]
-  );
-
-  // ---- Tonight ----
-  const setDoorStatus = useCallback(
-    (status: DoorStatus) => {
-      setTonight((p) => ({ ...p, status }));
-      showSnack(`Door status set to ${status}.`);
-    },
-    [showSnack]
-  );
-  const setQueueMinutes = useCallback(
-    (v: number) => setTonight((p) => ({ ...p, queueMinutes: v })),
-    []
-  );
-  const setFlashText = useCallback((v: string) => setTonight((p) => ({ ...p, flashText: v })), []);
-  const setFlashUntil = useCallback((v: string) => setTonight((p) => ({ ...p, flashUntil: v })), []);
-  const toggleFlash = useCallback(() => {
-    setTonight((p) => ({ ...p, flashActive: !p.flashActive }));
-    showSnack(tonight.flashActive ? "Flash offer ended." : "Flash offer is live.");
-  }, [tonight.flashActive, showSnack]);
-  const toggleEmergency = useCallback(() => {
-    setTonight((p) => ({ ...p, emergencyActive: !p.emergencyActive }));
-    showSnack(
-      tonight.emergencyActive
-        ? "Venue reopened — you're back on the map."
-        : "Emergency close requested — platform admin notified."
-    );
-  }, [tonight.emergencyActive, showSnack]);
-
-  // ---- Promotion ----
-  const setPushMessage = useCallback((v: string) => setPush((p) => ({ ...p, message: v })), []);
-  const sendPush = useCallback(() => {
-    if (push.rateUsed >= push.rateMax) {
-      showSnack("No pushes left this week.");
-      return;
-    }
-    if (!push.message.trim()) {
-      showSnack("Write a message first.");
-      return;
-    }
-    setPush((p) => ({ ...p, rateUsed: p.rateUsed + 1, message: "" }));
-    showSnack("Push queued for 240 followers.");
-  }, [push.rateUsed, push.rateMax, push.message, showSnack]);
-  const addPromo = useCallback(
-    () => setPromos((p) => [...p, { code: "NEWCODE", desc: "", maxUses: 100, used: 0 }]),
-    []
-  );
-  const updatePromo = useCallback((idx: number, field: "code" | "desc", value: string) => {
-    setPromos((p) => p.map((x, i) => (i === idx ? { ...x, [field]: value } : x)));
-  }, []);
-  const removePromo = useCallback(
-    (idx: number) => setPromos((p) => p.filter((_, i) => i !== idx)),
-    []
-  );
-  const updatePerk = useCallback((idx: number, value: string) => {
-    setPerks((p) => p.map((x, i) => (i === idx ? { ...x, perk: value } : x)));
-  }, []);
-  const setBoostNight = useCallback((v: string) => setBoost((b) => ({ ...b, night: v })), []);
-  const toggleBoost = useCallback(() => setBoost((b) => ({ ...b, active: !b.active })), []);
-
-  // ---- Team ----
-  /** Invited staff start on the narrowest role; the owner widens it after. */
-  const sendInvite = useCallback(() => {
-    const email = inviteEmail.trim();
-    if (!email) {
-      showSnack("Enter an email address first.");
-      return;
-    }
-    const name = email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    setTeam((p) => [...p, { id: `tm${Date.now()}`, name, email, role: "Door staff" }]);
-    setInviteEmail("");
-    showSnack(`Invite sent to ${email}.`);
-  }, [inviteEmail, showSnack]);
-
-  const setTeamRole = useCallback(
-    (id: string, role: TeamRole) => {
-      setTeam((p) => p.map((m) => (m.id === id ? { ...m, role } : m)));
-      const member = team.find((m) => m.id === id);
-      if (member) showSnack(`${member.name} is now ${role}.`);
-    },
-    [team, showSnack]
-  );
-
-  const removeTarget = team.find((m) => m.id === removeTargetId) ?? null;
-
-  const resetRemoveFlow = useCallback(() => {
-    setRemoveTargetId(null);
-    setRemovePassword("");
-    setRemoveAck(false);
-    setRemoveError("");
-  }, []);
-
-  const startRemoveTeamMember = useCallback((id: string) => {
-    setRemoveTargetId(id);
-    setRemovePassword("");
-    setRemoveAck(false);
-    setRemoveError("");
-  }, []);
-
-  const setRemovePasswordValue = useCallback((v: string) => {
-    setRemovePassword(v);
-    setRemoveError("");
-  }, []);
-
-  const toggleRemoveAck = useCallback(() => {
-    setRemoveAck((v) => !v);
-    setRemoveError("");
-  }, []);
-
-  const confirmRemoveTeamMember = useCallback(() => {
-    if (!removeTarget) return;
-    // Mock auth: any password of a plausible length passes, except one demo
-    // value kept around so the error state is reachable without a backend.
-    if (removePassword.length < 6) {
-      setRemoveError("Enter your account password to continue.");
-      return;
-    }
-    if (removePassword === "wrongpass") {
-      setRemoveError("That password doesn't match our records.");
-      return;
-    }
-    if (!removeAck) {
-      setRemoveError("Tick the box to confirm you understand.");
-      return;
-    }
-    setTeam((p) => p.filter((m) => m.id !== removeTarget.id));
-    resetRemoveFlow();
-    showSnack(`${removeTarget.name} removed — access revoked and the platform admin was notified.`);
-  }, [removeTarget, removePassword, removeAck, resetRemoveFlow, showSnack]);
-
-  // ---- Reviews / inbox ----
-  const setReviewReply = useCallback((id: string, value: string) => {
-    setReviews((p) => p.map((r) => (r.id === id ? { ...r, reply: value } : r)));
-  }, []);
-  const toggleReviewFlag = useCallback(
-    (id: string) => {
-      const wasFlagged = reviews.find((r) => r.id === id)?.flagged;
-      setReviews((p) => p.map((r) => (r.id === id ? { ...r, flagged: !r.flagged } : r)));
-      showSnack(wasFlagged ? "Report withdrawn." : "Review reported to Trust & Safety.");
-    },
-    [reviews, showSnack]
-  );
-  /** Publishes the composer draft as the public reply guests see. */
-  const sendReviewReply = useCallback(
-    (id: string) => {
-      const target = reviews.find((r) => r.id === id);
-      if (!target?.reply.trim()) {
-        showSnack("Write a reply first.");
-        return;
-      }
-      const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      setReviews((p) =>
-        p.map((r) =>
-          r.id === id && r.reply.trim()
-            ? { ...r, posted: r.reply.trim(), postedWhen: today, reply: "" }
-            : r
-        )
-      );
-      showSnack(target.posted ? "Reply updated." : "Reply posted publicly.");
-    },
-    [reviews, showSnack]
-  );
-  /** Moves the posted reply back into the composer for another pass. */
-  const editPostedReply = useCallback((id: string) => {
-    setReviews((p) =>
-      p.map((r) => (r.id === id ? { ...r, reply: r.posted, posted: "", postedWhen: "" } : r))
-    );
-  }, []);
-  const deletePostedReply = useCallback(
-    (id: string) => {
-      setReviews((p) => p.map((r) => (r.id === id ? { ...r, posted: "", postedWhen: "" } : r)));
-      showSnack("Reply removed.");
-    },
-    [showSnack]
-  );
-  const toggleInboxItem = useCallback((id: string) => {
-    setInbox((p) => p.map((m) => (m.id === id ? { ...m, open: !m.open } : m)));
-  }, []);
-
-  // ---- Account ----
-  const startChangeField = useCallback(
-    (field: ChangeField) => {
-      setChangeField(field);
-      setChangeStage("edit");
-      setChangeValue(field === "email" ? accountEmail : accountPhone);
-      setChangeOtp("");
-      setChangeError("");
-    },
-    [accountEmail, accountPhone]
-  );
-
-  const cancelChangeField = useCallback(() => {
-    setChangeField(null);
-    setChangeStage("edit");
-    setChangeValue("");
-    setChangeOtp("");
-    setChangeError("");
-  }, []);
-
-  const submitNewValue = useCallback(() => {
-    if (!changeValue.trim()) {
-      setChangeError("Enter a value.");
-      return;
-    }
-    setChangeStage("otp");
-    setChangeOtp("");
-    setChangeError("");
-  }, [changeValue]);
-
-  const submitOtp = useCallback(() => {
-    // No SMS or email is actually sent — any code of OTP_MIN_LENGTH digits passes.
-    if (changeOtp.trim().length < OTP_MIN_LENGTH) {
-      setChangeError("Enter the code we sent you.");
-      return;
-    }
-    if (changeField === "email") setAccountEmail(changeValue.trim());
-    if (changeField === "phone") setAccountPhone(changeValue.trim());
-    cancelChangeField();
-  }, [changeOtp, changeField, changeValue, cancelChangeField]);
-
-  const savedProfile = venues[editingVenue];
-  const draft = venueDrafts[editingVenue];
-  // The editor sees drafted listing fields; the menu and verification state it
-  // shows are always the live ones, since those never enter the draft.
-  const profile = draft ? withLiveFields(draft, savedProfile) : savedProfile;
-  const venueDirty =
-    !!draft &&
-    JSON.stringify(listingFieldsOf(draft)) !== JSON.stringify(listingFieldsOf(savedProfile));
-  const hasUnreadInbox = inbox.some((m) => !m.open);
-
-  const value = useMemo<OrganizerDashboardValue>(
-    () => ({
-      organizer: MOCK_ORGANIZER,
-
-      venueOrder,
-      venues,
-      editingVenue,
-      profile,
-      savedProfile,
-      venueDirty,
-      saveVenue,
-      discardVenue,
-      venueTab,
-      addingVenue,
-      newVenueName,
-      newVenueCity,
-      setEditingVenue,
-      setVenueTab,
-      openAddVenue,
-      cancelAddVenue,
-      setNewVenueName,
-      setNewVenueCity,
-      createVenue,
-      setVenueField,
-      toggleVenueSetValue,
-      addSocialLink,
-      removeSocialLink,
-      setSocialLinkField,
-      setHourField,
-      toggleDayClosed,
-      addException,
-      removeException,
-      setExceptionField,
-      toggleExceptionClosed,
-      addMenuSection,
-      removeMenuSection,
-      setMenuSectionName,
-      addMenuItem,
-      removeMenuItem,
-      setMenuItemField,
-      toggleMenuItemSoldOut,
-      toggleMenuItemTag,
-      toggleMenuItemNight,
-      toggleVerifyStep,
-      approveVenue,
-
-      homeTab,
-      setHomeTab,
-      eventsTab,
-      setEventsTab,
-      audienceTab,
-      setAudienceTab,
-      accountTab,
-      setAccountTab,
-
-      events,
-      eventFilter,
-      setEventFilter,
-      eventEditorOpen,
-      editingEventId,
-      eventDraft,
-      lineupInput,
-      cancelingEventId,
-      cancelReasonInput,
-      openNewEvent,
-      openEditEvent,
-      closeEditor,
-      updateDraft,
-      setLineupInput,
-      addLineup,
-      removeLineup,
-      addTier,
-      updateTier,
-      removeTier,
-      saveDraftEvent,
-      submitEvent,
-      duplicateEvent,
-      startCancel,
-      cancelCancelFlow,
-      setCancelReasonInput,
-      confirmCancel,
-
-      calendarOffset,
-      calendarVenueFilter,
-      shiftCalendar: (delta: number) => setCalendarOffset((o) => o + delta),
-      setCalendarVenueFilter,
-      dayDialog,
-      openDayDialog,
-      closeDayDialog,
-
-      tonight,
-      setDoorStatus,
-      setQueueMinutes,
-      setFlashText,
-      setFlashUntil,
-      toggleFlash,
-      toggleEmergency,
-
-      perfVenueFilter,
-      perfEventId,
-      setPerfVenueFilter,
-      setPerfEventId,
-
-      push,
-      setPushMessage,
-      sendPush,
-      promos,
-      addPromo,
-      updatePromo,
-      removePromo,
-      perks,
-      updatePerk,
-      boost,
-      setBoostNight,
-      toggleBoost,
-
-      team,
-      activity: MOCK_ACTIVITY,
-      inviteEmail,
-      setInviteEmail,
-      sendInvite,
-      setTeamRole,
-      removeTarget,
-      removePassword,
-      removeAck,
-      removeError,
-      startRemoveTeamMember,
-      setRemovePassword: setRemovePasswordValue,
-      toggleRemoveAck,
-      cancelRemoveTeamMember: resetRemoveFlow,
-      confirmRemoveTeamMember,
-
-      snack,
-      showSnack,
-      dismissSnack,
-
-      reviews,
-      setReviewReply,
-      toggleReviewFlag,
-      sendReviewReply,
-      editPostedReply,
-      deletePostedReply,
-      inbox,
-      toggleInboxItem,
-      hasUnreadInbox,
-
-      accountEmail,
-      accountPhone,
-      changeField,
-      changeStage,
-      changeValue,
-      changeOtp,
-      changeError,
-      startChangeField,
-      cancelChangeField,
-      setChangeValue,
-      setChangeOtp,
-      submitNewValue,
-      submitOtp,
-
-      images,
-      setImage,
-      confirmRemoveSlotId,
-      requestRemoveImage,
-      cancelRemoveImage,
-      confirmRemoveImage,
-    }),
-    [
-      venueOrder, venues, editingVenue, profile, savedProfile, venueDirty, saveVenue,
-      discardVenue, venueTab, addingVenue, newVenueName, newVenueCity,
-      openAddVenue, cancelAddVenue, createVenue, setVenueField, toggleVenueSetValue,
-      addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
-      toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,
-      addMenuSection, removeMenuSection, setMenuSectionName, addMenuItem, removeMenuItem,
-      setMenuItemField, toggleMenuItemSoldOut, toggleMenuItemTag, toggleMenuItemNight,
-      toggleVerifyStep, approveVenue,
-      homeTab, eventsTab, audienceTab, accountTab,
-      events, eventFilter, eventEditorOpen, editingEventId, eventDraft, lineupInput,
-      cancelingEventId,
-      cancelReasonInput, openNewEvent, openEditEvent, closeEditor, updateDraft, addLineup,
-      removeLineup, addTier, updateTier, removeTier, saveDraftEvent, submitEvent, duplicateEvent,
-      startCancel, cancelCancelFlow, confirmCancel,
-      calendarOffset, calendarVenueFilter, dayDialog, openDayDialog, closeDayDialog,
-      tonight, setDoorStatus, setQueueMinutes, setFlashText, setFlashUntil, toggleFlash,
-      toggleEmergency,
-      perfVenueFilter, perfEventId, setPerfVenueFilter,
-      push, setPushMessage, sendPush, promos, addPromo, updatePromo, removePromo, perks, updatePerk,
-      boost, setBoostNight, toggleBoost,
-      team, inviteEmail, sendInvite, setTeamRole,
-      removeTarget, removePassword, removeAck, removeError, startRemoveTeamMember,
-      setRemovePasswordValue, toggleRemoveAck, resetRemoveFlow, confirmRemoveTeamMember,
-      snack, showSnack, dismissSnack,
-      reviews, setReviewReply, toggleReviewFlag, sendReviewReply, editPostedReply,
-      deletePostedReply, inbox, toggleInboxItem, hasUnreadInbox,
-      accountEmail, accountPhone, changeField, changeStage, changeValue, changeOtp, changeError,
-      startChangeField, cancelChangeField, submitNewValue, submitOtp,
-      images, setImage, confirmRemoveSlotId, requestRemoveImage, cancelRemoveImage,
-      confirmRemoveImage,
-    ]
-  );
-
-  return (
-    <OrganizerDashboardContext.Provider value={value}>
-      {children}
-    </OrganizerDashboardContext.Provider>
-  );
-}
-
 export function useOrganizerDashboard() {
-  const ctx = useContext(OrganizerDashboardContext);
-  if (!ctx) {
-    throw new Error("useOrganizerDashboard must be used inside <OrganizerDashboardProvider>");
-  }
-  return ctx;
+  const identity = useCtx(IdentityContext, "useOrganizerDashboard");
+  const venues = useCtx(VenuesContext, "useOrganizerDashboard");
+  const events = useCtx(EventsContext, "useOrganizerDashboard");
+  const engagement = useCtx(EngagementContext, "useOrganizerDashboard");
+  const account = useCtx(AccountContext, "useOrganizerDashboard");
+  const analytics = useCtx(AnalyticsContext, "useOrganizerDashboard");
+  const activity = useCtx(ActivityContext, "useOrganizerDashboard");
+  const ui = useCtx(UiContext, "useOrganizerDashboard");
+
+  return useMemo(() => {
+    const v = venues.data;
+    const e = events.data;
+    const r = engagement.reviews.data;
+    const ib = engagement.inbox.data;
+    const t = account.team.data;
+    const pr = account.promotion.data;
+    const perf = analytics.performance.data;
+    const az = analytics.aiVisibility.data;
+    const idn = identity.data;
+    const u = ui.data;
+
+    // ---- Image slots (T12) ----
+    // Derived from the loaded venue/event documents, not stored — the
+    // localStorage `imageSlotStore` sidecar is gone (browser-stores.ts).
+    // Sourced from `v.profiles` (the SAVED/published venue snapshot, same as
+    // `LiveOperationsSection`'s "missing hero" reminder reads) and `e.eventMedia`
+    // (raw `coverImage`/`posterImage`, refetched after every `patchEventImage`).
+    // A slot mid-upload or sitting in an unsaved draft is NOT reflected here —
+    // `ImageSlot`/the hero-and-gallery preview keep their own local override
+    // for that window, exactly so the tile never has to wait on Save (let
+    // alone admin review) to show what was just picked.
+    //
+    // Exception: the currently-editing venue while its listing submission is
+    // pending review. `v.profile` already overlays `pendingEdit.listing`
+    // (including `photos`) onto the saved snapshot for exactly this venue —
+    // reusing it here, instead of `p.photos` from the raw saved doc, is what
+    // keeps a submitted-but-not-yet-approved hero/gallery photo visible after
+    // a refresh (`localSrc`'s in-memory override doesn't survive one, and the
+    // photo itself isn't on the venue doc until an admin approves it).
+    const images: Record<string, string> = {};
+    for (const [id, p] of Object.entries(v.profiles as Record<string, VenueProfile>)) {
+      const photos = (id === v.editingVenue && v.venuePendingReview ? v.profile.photos : p.photos) ?? [];
+      if (photos[0]) images[heroSlotId(id)] = photos[0];
+      for (let i = 0; i < GALLERY_SLOT_COUNT; i++) {
+        const url = photos[i + 1];
+        if (url) images[gallerySlotId(id, i)] = url;
+      }
+      for (const section of p.menu) {
+        for (const item of section.items) {
+          if (item.image) images[menuItemSlotId(id, item.id)] = item.image;
+        }
+      }
+    }
+    for (const [id, media] of Object.entries(events.data.eventMedia)) {
+      const slots = eventSlotIds(id);
+      if (media.coverImage) images[slots.cover] = media.coverImage;
+      if (media.posterImage) images[slots.poster] = media.posterImage;
+    }
+
+    /**
+     * Writes an uploaded slot's `https` URL onto the document that owns it —
+     * the one place that knows what a slot id resolves to. Venue photos
+     * (hero/gallery) route through `updateVenueListing`'s function form (not
+     * `setVenueField`) specifically so a second slot upload started before
+     * the first has landed still composes against the in-progress draft
+     * rather than a stale outer snapshot. Menu images are a local draft edit
+     * too now (`setMenuItemField`) — the Save button commits them along with
+     * the rest of the menu tab. Event images require the event to already
+     * exist (T12 brief's ordering constraint; the `eventMedia` storage rule
+     * has nothing else to authorize against) and go through the
+     * raw-remainder merge every event write uses, via `patchEventImage`.
+     */
+    async function commitSlotImage(slotId: string, url: string): Promise<void> {
+      const slot = parseSlotId(slotId);
+      if (!slot) return;
+      if (slot.kind === "hero") {
+        venues.updateVenueListing(slot.venueId, (p) => ({ ...p, photos: setPhotoAt(p.photos, 0, url) }));
+        return;
+      }
+      if (slot.kind === "gallery") {
+        venues.updateVenueListing(slot.venueId, (p) => ({
+          ...p,
+          photos: setPhotoAt(p.photos, slot.index + 1, url),
+        }));
+        return;
+      }
+      if (slot.kind === "menu") {
+        const section = (v.profiles[slot.venueId] as VenueProfile | undefined)?.menu.find((s) =>
+          s.items.some((it) => it.id === slot.itemId)
+        );
+        if (!section) throw new Error("That menu item no longer exists — reload and try again.");
+        venues.setMenuItemField(slot.venueId, section.id, slot.itemId, "image", url);
+        return;
+      }
+      // slot.kind === "event"
+      const field = slot.field === "cover" ? "coverImage" : "posterImage";
+      const ok = await events.patchEventImage(slot.eventId, field, url);
+      if (!ok) throw new Error(events.actionError || "Could not save that image.");
+    }
+
+    /**
+     * Clears a slot's Firestore-field reference. Deliberately does NOT
+     * delete the underlying Storage object here: a hero/gallery slot is a
+     * profile field, so "remove" on one only queues a local draft change —
+     * the currently PUBLISHED photo (what the live app and this same tile
+     * are showing right now, via `images` above) is still that object until
+     * the organizer clicks Save. Deleting it immediately would 404 the live
+     * app's hero shot before the change is even saved. Orphaned objects are
+     * the named, accepted follow-up (`sweepOrphanImages`) — the same
+     * trade-off the brief makes for uploads, applied symmetrically to
+     * removes.
+     */
+    async function removeSlotImage(slotId: string): Promise<void> {
+      const slot = parseSlotId(slotId);
+      if (!slot) return;
+      if (slot.kind === "hero") {
+        venues.updateVenueListing(slot.venueId, (p) => ({ ...p, photos: setPhotoAt(p.photos, 0, "") }));
+        return;
+      }
+      if (slot.kind === "gallery") {
+        venues.updateVenueListing(slot.venueId, (p) => ({
+          ...p,
+          photos: setPhotoAt(p.photos, slot.index + 1, ""),
+        }));
+        return;
+      }
+      if (slot.kind === "menu") {
+        const section = (v.profiles[slot.venueId] as VenueProfile | undefined)?.menu.find((s) =>
+          s.items.some((it) => it.id === slot.itemId)
+        );
+        if (!section) return;
+        venues.setMenuItemField(slot.venueId, section.id, slot.itemId, "image", "");
+        return;
+      }
+      // slot.kind === "event"
+      const field = slot.field === "cover" ? "coverImage" : "posterImage";
+      await events.patchEventImage(slot.eventId, field, "");
+    }
+
+    const confirmRemoveImage = async () => {
+      const slotId = u.confirmRemoveSlotId;
+      if (!slotId) return;
+      try {
+        await removeSlotImage(slotId);
+      } catch (err) {
+        ui.showSnack(err instanceof Error ? err.message : "Could not remove that image.", "error");
+      } finally {
+        ui.cancelRemoveImage();
+      }
+    };
+
+    return {
+      organizer: idn.organizer,
+
+      // ---- Venues ----
+      // `v.order`/`v.profiles` are the hook's internal names (fix round:
+      // renamed from `venueOrder`/`venues` so the hook's own `data` shape is
+      // `{ order, profiles, meta }` per the brief); re-mapped back to the
+      // `venueOrder`/`venues` keys every existing call site already uses, so
+      // no consumer outside this file needs to change.
+      venueOrder: v.order,
+      venues: v.profiles,
+      venueMeta: v.meta,
+      venuesLoading: v.venuesLoading,
+      venuesError: v.venuesError,
+      editingVenue: v.editingVenue,
+      profile: v.profile,
+      savedProfile: v.savedProfile,
+      venueDirty: v.venueDirty,
+      venuePendingReview: v.venuePendingReview,
+      venueBusy: venues.busy,
+      venueActionError: venues.actionError,
+      liveBusyByVenue: v.liveBusyByVenue,
+      menuLoading: v.menuLoading,
+      saveVenue: venues.saveVenue,
+      discardVenue: venues.discardVenue,
+      venueTab: v.venueTab,
+      addingVenue: v.addingVenue,
+      newVenueName: v.newVenueName,
+      newVenueCity: v.newVenueCity,
+      newVenueCountry: v.newVenueCountry,
+      approximateLocationVenues: v.approximateLocationVenues,
+      setEditingVenue: venues.setEditingVenue,
+      setVenueTab: venues.setVenueTab,
+      openAddVenue: venues.openAddVenue,
+      cancelAddVenue: venues.cancelAddVenue,
+      setNewVenueName: venues.setNewVenueName,
+      setNewVenueCity: venues.setNewVenueCity,
+      setNewVenueCountry: venues.setNewVenueCountry,
+      createVenue: () => venues.createVenue(DAYS),
+      setVenueField: venues.setVenueField,
+      toggleVenueSetValue: venues.toggleVenueSetValue,
+      addSocialLink: venues.addSocialLink,
+      removeSocialLink: venues.removeSocialLink,
+      setSocialLinkField: venues.setSocialLinkField,
+      setHourField: venues.setHourField,
+      toggleDayClosed: venues.toggleDayClosed,
+      addException: venues.addException,
+      removeException: venues.removeException,
+      setExceptionField: venues.setExceptionField,
+      toggleExceptionClosed: venues.toggleExceptionClosed,
+      addMenuSection: venues.addMenuSection,
+      removeMenuSection: venues.removeMenuSection,
+      setMenuSectionName: venues.setMenuSectionName,
+      addMenuItem: venues.addMenuItem,
+      removeMenuItem: venues.removeMenuItem,
+      setMenuItemField: venues.setMenuItemField,
+      toggleMenuItemSoldOut: venues.toggleMenuItemSoldOut,
+      toggleMenuItemTag: venues.toggleMenuItemTag,
+      toggleMenuItemNight: venues.toggleMenuItemNight,
+      toggleVerifyStep: venues.toggleVerifyStep,
+
+      // ---- Destination tab strips ----
+      homeTab: u.homeTab,
+      setHomeTab: ui.setHomeTab,
+      eventsTab: e.eventsTab,
+      setEventsTab: events.setEventsTab,
+      audienceTab: u.audienceTab,
+      setAudienceTab: ui.setAudienceTab,
+      accountTab: u.accountTab,
+      setAccountTab: ui.setAccountTab,
+
+      // ---- Events ----
+      events: e.events,
+      eventsLoading: e.eventsLoading,
+      eventsError: e.eventsError,
+      eventBusy: events.busy,
+      eventActionError: events.actionError,
+      eventFilter: e.eventFilter,
+      setEventFilter: events.setEventFilter,
+      eventEditorOpen: e.eventEditorOpen,
+      editingEventId: e.editingEventId,
+      eventDraft: e.eventDraft,
+      lineupInput: e.lineupInput,
+      cancelingEventId: e.cancelingEventId,
+      cancelReasonInput: e.cancelReasonInput,
+      openNewEvent: events.openNewEvent,
+      openEditEvent: events.openEditEvent,
+      closeEditor: events.closeEditor,
+      updateDraft: events.updateDraft,
+      setLineupInput: events.setLineupInput,
+      addLineup: events.addLineup,
+      removeLineup: events.removeLineup,
+      addTier: events.addTier,
+      updateTier: events.updateTier,
+      removeTier: events.removeTier,
+      saveDraftEvent: events.saveDraftEvent,
+      submitEvent: events.submitEvent,
+      duplicateEvent: events.duplicateEvent,
+      startCancel: events.startCancel,
+      cancelCancelFlow: events.cancelCancelFlow,
+      setCancelReasonInput: events.setCancelReasonInput,
+      confirmCancel: events.confirmCancel,
+
+      // ---- Calendar ----
+      calendarOffset: e.calendarOffset,
+      calendarVenueFilter: e.calendarVenueFilter,
+      dayDialog: e.dayDialog,
+      openDayDialog: events.openDayDialog,
+      closeDayDialog: events.closeDayDialog,
+      shiftCalendar: events.shiftCalendar,
+      setCalendarVenueFilter: events.setCalendarVenueFilter,
+
+      // ---- Tonight ----
+      tonightByVenue: v.tonightByVenue,
+      setDoorStatus: venues.setDoorStatus,
+      setQueueMinutes: venues.setQueueMinutes,
+      setFlashText: venues.setFlashText,
+      setFlashUntil: venues.setFlashUntil,
+      toggleFlash: venues.toggleFlash,
+      toggleEmergency: venues.toggleEmergency,
+      flushQueueMinutesNow: venues.flushQueueMinutesNow,
+      flushFlashNow: venues.flushFlashNow,
+
+      // ---- Performance ----
+      perfVenueFilter: perf.perfVenueFilter,
+      perfEventId: perf.perfEventId,
+      setPerfVenueFilter: analytics.performance.setPerfVenueFilter,
+      setPerfEventId: analytics.performance.setPerfEventId,
+      perfMetrics: perf.metrics,
+      perfLoading: analytics.performance.loading,
+      perfError: analytics.performance.error,
+
+      // ---- AI visibility ----
+      aiVisibility: az.visibility,
+      aiLoading: analytics.aiVisibility.loading,
+      aiError: analytics.aiVisibility.error,
+
+      // ---- Promotion ----
+      push: pr.push,
+      setPushMessage: account.promotion.setPushMessage,
+      sendPush: account.promotion.sendPush,
+      promos: pr.promos,
+      addPromo: account.promotion.addPromo,
+      updatePromo: account.promotion.updatePromo,
+      removePromo: account.promotion.removePromo,
+      perks: pr.perks,
+      boost: pr.boost,
+      setBoostNight: account.promotion.setBoostNight,
+      toggleBoost: account.promotion.toggleBoost,
+      promotionLoading: account.promotion.loading,
+      promotionError: account.promotion.error,
+      promotionBusy: account.promotion.busy,
+      promotionActionError: account.promotion.actionError,
+
+      // ---- Team ----
+      team: t.team,
+      teamLoading: account.team.loading,
+      teamError: account.team.error,
+      teamBusy: account.team.busy,
+      activity: activity.data.activity,
+      activityLoading: activity.loading,
+      activityError: activity.error,
+      inviteEmail: t.inviteEmail,
+      setInviteEmail: account.team.setInviteEmail,
+      sendInvite: account.team.sendInvite,
+      setTeamRole: account.team.setTeamRole,
+      removeTarget: t.removeTarget,
+      removePassword: t.removePassword,
+      removeAck: t.removeAck,
+      removeError: t.removeError,
+      startRemoveTeamMember: account.team.startRemoveTeamMember,
+      setRemovePassword: account.team.setRemovePassword,
+      toggleRemoveAck: account.team.toggleRemoveAck,
+      cancelRemoveTeamMember: account.team.cancelRemoveTeamMember,
+      confirmRemoveTeamMember: account.team.confirmRemoveTeamMember,
+
+      // ---- Snackbar ----
+      snack: u.snack,
+      showSnack: ui.showSnack,
+      dismissSnack: ui.dismissSnack,
+
+      // ---- Reviews & inbox ----
+      reviews: r.reviews,
+      reviewsLoading: engagement.reviews.loading,
+      reviewsError: engagement.reviews.error,
+      reviewsActionError: engagement.reviews.actionError,
+      setReviewReply: engagement.reviews.setReviewReply,
+      toggleReviewFlag: engagement.reviews.toggleReviewFlag,
+      sendReviewReply: engagement.reviews.sendReviewReply,
+      editPostedReply: engagement.reviews.editPostedReply,
+      deletePostedReply: engagement.reviews.deletePostedReply,
+      inbox: ib.inbox,
+      inboxLoading: engagement.inbox.loading,
+      inboxError: engagement.inbox.error,
+      toggleInboxItem: engagement.inbox.toggleInboxItem,
+      hasUnreadInbox: ib.hasUnreadInbox,
+
+      // ---- Settings / account ----
+      accountEmail: idn.accountEmail,
+      accountPhone: idn.accountPhone,
+      changeField: idn.changeField,
+      changeStage: idn.changeStage,
+      changeValue: idn.changeValue,
+      changeOtp: idn.changeOtp,
+      changeError: idn.changeError,
+      startChangeField: identity.startChangeField,
+      cancelChangeField: identity.cancelChangeField,
+      setChangeValue: identity.setChangeValue,
+      setChangeOtp: identity.setChangeOtp,
+      submitNewValue: identity.submitNewValue,
+      submitOtp: identity.submitOtp,
+      preferences: idn.preferences,
+      prefsLoading: idn.prefsLoading,
+      prefsError: idn.prefsError,
+      togglePreference: identity.togglePreference,
+
+      // ---- Image slots ----
+      images,
+      commitSlotImage,
+      confirmRemoveSlotId: u.confirmRemoveSlotId,
+      requestRemoveImage: ui.requestRemoveImage,
+      cancelRemoveImage: ui.cancelRemoveImage,
+      confirmRemoveImage,
+    };
+  }, [identity, venues, events, engagement, account, analytics, activity, ui]);
 }
 
 /**
@@ -1448,9 +489,5 @@ export function useOrganizerDashboard() {
  * client, so callers render a stable fallback while this is null.
  */
 export function useNow(): Date | null {
-  return useSyncExternalStore(
-    clockStore.subscribe,
-    clockStore.getSnapshot,
-    clockStore.getServerSnapshot
-  );
+  return useSyncExternalStore(clockStore.subscribe, clockStore.getSnapshot, clockStore.getServerSnapshot);
 }

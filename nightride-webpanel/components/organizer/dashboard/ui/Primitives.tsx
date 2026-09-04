@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/components/admin/ui/cn";
 
 /**
@@ -304,20 +304,28 @@ export function Select({
   );
 }
 
-/** M3 filled button — 40px tall, fully rounded, 24px horizontal padding. */
+/**
+ * M3 filled button — 40px tall, fully rounded, 24px horizontal padding.
+ * `loading` disables the button and swaps the leading icon for a spinner,
+ * same treatment as `AccentButton`.
+ */
 export function FilledButton({
   children,
   icon,
   tonal = false,
+  loading = false,
+  disabled,
   className,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: ReactNode; tonal?: boolean }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: ReactNode; tonal?: boolean; loading?: boolean }) {
   return (
     <button
       type="button"
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-full px-6 text-sm font-medium transition-opacity hover:opacity-90",
-        icon && "pl-4",
+        "inline-flex h-10 items-center gap-2 rounded-full px-6 text-sm font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
+        (icon || loading) && "pl-4",
         className
       )}
       style={
@@ -327,7 +335,7 @@ export function FilledButton({
       }
       {...props}
     >
-      {icon}
+      {loading ? <Loader2 size={16} className="animate-spin" aria-hidden /> : icon}
       {children}
     </button>
   );
@@ -337,20 +345,24 @@ export function FilledButton({
 export function OutlinedButton({
   children,
   icon,
+  loading = false,
+  disabled,
   className,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: ReactNode }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: ReactNode; loading?: boolean }) {
   return (
     <button
       type="button"
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-full border px-5 text-sm font-medium transition-colors hover:bg-[var(--m3-surf3)]",
+        "inline-flex h-10 items-center gap-2 rounded-full border px-5 text-sm font-medium transition-colors hover:bg-[var(--m3-surf3)] disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       style={{ borderColor: "var(--m3-outline)", color: "var(--m3-onv)" }}
       {...props}
     >
-      {icon}
+      {loading ? <Loader2 size={16} className="animate-spin" aria-hidden /> : icon}
       {children}
     </button>
   );
@@ -494,10 +506,12 @@ export function Toggle({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: () => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -506,7 +520,8 @@ export function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={onChange}
-      className="relative h-6 w-10 shrink-0 rounded-full border-2 transition-colors"
+      disabled={disabled}
+      className="relative h-6 w-10 shrink-0 rounded-full border-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         background: checked ? "var(--m3-pric)" : "var(--m3-surf3)",
         borderColor: checked ? "var(--m3-pric)" : "var(--m3-outline)",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ArrowLeft,
   AtSign,
@@ -32,8 +32,10 @@ import {
   useNow,
   useOrganizerDashboard,
 } from "@/lib/organizer/dashboard/store";
+import { uploadSlotImage } from "@/lib/organizer/dashboard/data/images";
+import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { DAYS } from "@/lib/organizer/dashboard/constants";
-import { hoursTextFor, isOpenOn, mondayFirstIndex, toISODate } from "@/lib/organizer/dashboard/format";
+import { hoursTextFor, isEventLive, isOpenOn, mondayFirstIndex, toISODate } from "@/lib/organizer/dashboard/format";
 import type { SocialLink } from "@/lib/organizer/dashboard/types";
 import { SectionEyebrow } from "../ui/Primitives";
 
@@ -43,14 +45,6 @@ const CREAM = "#FAF5EF";
 const INK = "#191519";
 const MUTED = "#6E6469";
 const HAIRLINE = "#EFE4DA";
-
-/** Shown only while the venue has no menu of its own. */
-const FOOD_CARDS = [
-  { key: "f1", title: "Signature Drinks", body: "Creative cocktails, premium spirits & local beers." },
-  { key: "f2", title: "Bar Bites", body: "Tasty bites to keep you going all night." },
-  { key: "f3", title: "Bottle Service", body: "Premium bottles & VIP packages available." },
-  { key: "f4", title: "Late Night Menu", body: "Kitchen open until 3AM every night." },
-];
 
 function priceTier(coverMin: number, currency: string) {
   const cheapMax = currency === "¥" ? 1500 : 60;
@@ -89,41 +83,106 @@ function networkLabel(link: SocialLink) {
  * Click-to-browse / drag-and-drop upload for one image slot, styled for the
  * cream preview rather than the M3 editor. This is the venue's only image
  * upload surface — the Profile tab just displays what's set here.
+ *
+ * T12: uploads to Cloud Storage (`uploadSlotImage`, resized client-side)
+ * instead of reading a `FileReader.readAsDataURL` blob into `localStorage`,
+ * then writes the resulting `https` URL onto the venue's listing draft via
+ * `commitSlotImage`. `src` is the local objectURL/final URL while an upload
+ * is pending, falling back to `images[slotId]` (the published photo) once
+ * settled — and, on failure, staying exactly where it was: a failed upload
+ * must never clear the tile, only show the error plus a retry.
+ *
+ * `disabled` gates the hero/gallery slots while a listing submission is
+ * pending review (see `VenueAppPreview`'s doc comment) — the picker, drop
+ * target, and remove control all become inert so the control reads as
+ * unavailable rather than silently accepting a click that goes nowhere.
  */
-function useImageUpload(slotId: string) {
-  const { setImage } = useOrganizerDashboard();
+function useImageUpload(slotId: string, disabled = false) {
+  const { images, commitSlotImage, showSnack } = useOrganizerDashboard();
   const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
+  const [localSrc, setLocalSrc] = useState<string | null>(null);
+  const pendingFileRef = useRef<File | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const revokeObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }, []);
+  useEffect(() => () => revokeObjectUrl(), [revokeObjectUrl]);
+
+  const startUpload = useCallback(
+    (file: File) => {
+      pendingFileRef.current = file;
+      revokeObjectUrl();
+      const objectUrl = URL.createObjectURL(file);
+      objectUrlRef.current = objectUrl;
+      setLocalSrc(objectUrl);
+      setError("");
+      setUploading(true);
+      setProgress(0);
+
+      uploadSlotImage(slotId, file, setProgress)
+        .then(async (url) => {
+          await commitSlotImage(slotId, url);
+          revokeObjectUrl();
+          setLocalSrc(url);
+          setUploading(false);
+          setProgress(0);
+          pendingFileRef.current = null;
+        })
+        .catch((err) => {
+          setUploading(false);
+          const message = err instanceof Error ? err.message : "Upload failed. Try again.";
+          setError(message);
+          showSnack(message, "error");
+          // `localSrc` deliberately stays set on failure.
+        });
+    },
+    [slotId, commitSlotImage, showSnack, revokeObjectUrl]
+  );
 
   const readFile = useCallback(
     (file: File | undefined) => {
       if (!file || !file.type.startsWith("image/")) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") setImage(slotId, reader.result);
-      };
-      reader.readAsDataURL(file);
+      startUpload(file);
     },
-    [slotId, setImage]
+    [startUpload]
   );
 
-  const openPicker = useCallback(() => inputRef.current?.click(), []);
+  const retry = useCallback(() => {
+    if (pendingFileRef.current) startUpload(pendingFileRef.current);
+  }, [startUpload]);
+
+  const openPicker = useCallback(() => {
+    if (disabled) return;
+    inputRef.current?.click();
+  }, [disabled]);
 
   const onDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
       setDragging(false);
+      if (disabled) return;
       readFile(e.dataTransfer.files?.[0]);
     },
-    [readFile]
+    [disabled, readFile]
   );
 
-  const onDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  }, []);
+  const onDragOver = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!disabled) setDragging(true);
+    },
+    [disabled]
+  );
 
   const onDragLeave = useCallback(() => setDragging(false), []);
 
@@ -131,16 +190,30 @@ function useImageUpload(slotId: string) {
     <input
       ref={inputRef}
       type="file"
-      accept="image/*"
+      accept="image/jpeg,image/png,image/webp"
       className="sr-only"
+      disabled={disabled}
       onChange={(e) => {
-        readFile(e.target.files?.[0]);
+        if (!disabled) readFile(e.target.files?.[0]);
         e.target.value = "";
       }}
     />
   );
 
-  return { dragging, openPicker, onDrop, onDragOver, onDragLeave, input };
+  return {
+    src: localSrc ?? images[slotId],
+    dragging,
+    uploading,
+    progress,
+    error,
+    disabled,
+    retry,
+    openPicker,
+    onDrop,
+    onDragOver,
+    onDragLeave,
+    input,
+  };
 }
 
 function RemoveButton({ onClick }: { onClick: () => void }) {
@@ -167,12 +240,18 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
  */
 export function VenueAppPreview() {
   // The phone shows the *published* listing — drafted edits only appear here
-  // once the save bar commits them. Menu and images are live either way,
-  // since neither goes through the draft.
-  const { savedProfile, editingVenue, events, images, requestRemoveImage } =
+  // once the save bar commits them. Menu images are live either way, since
+  // menu edits bypass the draft entirely. Hero/gallery photos route through
+  // `commitSlotImage` into the venue's draft too, same as any other profile
+  // field — but only `name`/`address` require admin review now
+  // (`venueReviewedFields()`), so their pickers are never gated on
+  // `venuePendingReview`; a rename pending review doesn't block a photo
+  // upload.
+  const { savedProfile, editingVenue, events, images, requestRemoveImage, venueMeta } =
     useOrganizerDashboard();
   const profile = savedProfile;
   const now = useNow();
+  const timeZone = resolveTimeZone(venueMeta[editingVenue]?.timeZone);
   const [liked, setLiked] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -189,27 +268,31 @@ export function VenueAppPreview() {
 
   const ageBadge = profile.agePolicy.match(/\d+/)?.[0];
 
-  /** Real menu items, sold-out ones hidden — guests only see what they can order. */
-  const menuCards = useMemo(() => {
-    const cards = profile.menu.flatMap((section) =>
-      section.items
-        .filter((item) => !item.soldOut && item.name.trim())
-        .map((item) => ({
-          key: item.id,
-          title: item.name,
-          body: item.desc || section.name,
-          price: item.price ? `${profile.currency}${item.price.toLocaleString()}` : "",
-          photo: images[menuItemSlotId(editingVenue, item.id)],
-        }))
-    );
-
-    if (cards.length) return cards;
-    return FOOD_CARDS.map((c) => ({ ...c, price: "", photo: undefined as string | undefined }));
-  }, [profile.menu, profile.currency, images, editingVenue]);
+  /**
+   * Real menu items only, sold-out ones hidden — guests only see what they
+   * can order. Empty (not a generic placeholder) when the venue hasn't added
+   * a menu yet, so the "FOOD & DRINKS" section below can hide itself rather
+   * than showing filler that isn't actually on the menu.
+   */
+  const menuCards = useMemo(
+    () =>
+      profile.menu.flatMap((section) =>
+        section.items
+          .filter((item) => !item.soldOut && item.name.trim())
+          .map((item) => ({
+            key: item.id,
+            title: item.name,
+            body: item.desc || section.name,
+            price: item.price ? `${profile.currency}${item.price.toLocaleString()}` : "",
+            photo: images[menuItemSlotId(editingVenue, item.id)],
+          }))
+      ),
+    [profile.menu, profile.currency, images, editingVenue]
+  );
 
   const highlights = useMemo(() => {
     const upcoming = events
-      .filter((e) => e.venue === editingVenue && (e.status === "scheduled" || e.status === "live"))
+      .filter((e) => e.venue === editingVenue && (e.status === "scheduled" || isEventLive(e, now, timeZone)))
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 4)
       .map((e) => {
@@ -228,7 +311,7 @@ export function VenueAppPreview() {
       { key: "h2", title: "Ladies Night", day: "FRI", meta: "Free entry before 12AM" },
       { key: "h3", title: "Cocktail Hour", day: "SAT", meta: "2-for-1 cocktails" },
     ];
-  }, [events, editingVenue]);
+  }, [events, editingVenue, now, timeZone]);
 
   return (
     <div className="flex flex-col gap-3.5 lg:sticky lg:top-0">
@@ -249,33 +332,36 @@ export function VenueAppPreview() {
             onDrop={heroUpload.onDrop}
             onDragOver={heroUpload.onDragOver}
             onDragLeave={heroUpload.onDragLeave}
-            aria-label={images[hero] ? "Replace hero photo" : "Add hero photo"}
-            className="group relative h-[220px] cursor-pointer"
+            aria-label={heroUpload.src ? "Replace hero photo" : "Add hero photo"}
+            aria-disabled={heroUpload.disabled}
+            className={`group relative h-[220px] ${heroUpload.disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
             style={{
               background:
                 "radial-gradient(120% 90% at 20% 20%, #3B1C6B 0%, transparent 60%), radial-gradient(110% 80% at 78% 12%, #1E4FA8 0%, transparent 58%), radial-gradient(90% 70% at 55% 45%, #C2277E 0%, transparent 62%), linear-gradient(180deg, #1A0A22 0%, #0B0510 100%)",
             }}
           >
             {heroUpload.input}
-            {images[hero] ? (
+            {heroUpload.src ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={images[hero]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={heroUpload.src} alt="" className="absolute inset-0 h-full w-full object-cover" />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white/70">
                 <ImagePlus size={22} />
                 <span className="text-[11px]">Drop your hero photo</span>
               </div>
             )}
-            <div
-              className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 ${
-                heroUpload.dragging ? "opacity-100" : ""
-              }`}
-            >
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
-                <Camera size={15} />
-                {images[hero] ? "Replace photo" : "Add photo"}
-              </span>
-            </div>
+            {!heroUpload.disabled && (
+              <div
+                className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 ${
+                  heroUpload.dragging ? "opacity-100" : ""
+                }`}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                  <Camera size={15} />
+                  {heroUpload.src ? "Replace photo" : "Add photo"}
+                </span>
+              </div>
+            )}
             <div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -302,7 +388,34 @@ export function VenueAppPreview() {
             <div className="absolute left-3 top-11 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white backdrop-blur">
               <ArrowLeft size={17} />
             </div>
-            {images[hero] && <RemoveButton onClick={() => requestRemoveImage(hero)} />}
+            {heroUpload.src && !heroUpload.disabled && (
+              <RemoveButton onClick={() => requestRemoveImage(hero)} />
+            )}
+
+            {heroUpload.uploading && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-black/40">
+                <div
+                  className="h-full bg-white transition-[width]"
+                  style={{ width: `${Math.round(heroUpload.progress * 100)}%` }}
+                />
+              </div>
+            )}
+            {heroUpload.error && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-black/75 px-3 py-1.5 text-[11px] text-white"
+              >
+                <span className="truncate" title={heroUpload.error}>
+                  {heroUpload.error}
+                </span>
+                <button
+                  onClick={heroUpload.retry}
+                  className="shrink-0 rounded bg-white/20 px-2 py-0.5 font-semibold hover:bg-white/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
             <div
               className="pointer-events-none absolute left-4 bottom-14 rounded-full px-3 py-1 text-[10px] font-bold tracking-widest text-white"
@@ -394,39 +507,37 @@ export function VenueAppPreview() {
               </div>
             </Section>
 
-            <Section
-              title="FOOD & DRINKS"
-              action="View menu"
-              onAction={profile.menu.length ? () => setMenuOpen(true) : undefined}
-            >
-              <div className="nr-phone-scroll flex gap-3 overflow-x-auto pb-1">
-                {menuCards.map((card) => (
-                  <div
-                    key={card.key}
-                    className="flex w-[200px] shrink-0 overflow-hidden rounded-xl border"
-                    style={{ background: "#FFFDFA", borderColor: HAIRLINE }}
-                  >
-                    <div className="w-20 shrink-0 overflow-hidden" style={{ background: "#2A1A10" }}>
-                      {card.photo && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={card.photo} alt="" className="h-full w-full object-cover" />
-                      )}
-                    </div>
-                    <div className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
-                      <p className="text-[12px] font-semibold leading-tight">{card.title}</p>
-                      <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
-                        {card.body}
-                      </p>
-                      {card.price && (
-                        <p className="text-[10px] font-semibold" style={{ color: PINK }}>
-                          {card.price}
+            {menuCards.length > 0 && (
+              <Section title="FOOD & DRINKS" action="View menu" onAction={() => setMenuOpen(true)}>
+                <div className="nr-phone-scroll flex gap-3 overflow-x-auto pb-1">
+                  {menuCards.map((card) => (
+                    <div
+                      key={card.key}
+                      className="flex w-[200px] shrink-0 overflow-hidden rounded-xl border"
+                      style={{ background: "#FFFDFA", borderColor: HAIRLINE }}
+                    >
+                      <div className="w-20 shrink-0 overflow-hidden" style={{ background: "#2A1A10" }}>
+                        {card.photo && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={card.photo} alt="" className="h-full w-full object-cover" />
+                        )}
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
+                        <p className="text-[12px] font-semibold leading-tight">{card.title}</p>
+                        <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
+                          {card.body}
                         </p>
-                      )}
+                        {card.price && (
+                          <p className="text-[10px] font-semibold" style={{ color: PINK }}>
+                            {card.price}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </Section>
+                  ))}
+                </div>
+              </Section>
+            )}
 
             <Section title="TONIGHT'S HIGHLIGHTS">
               <div className="nr-phone-scroll flex gap-3 overflow-x-auto pb-1">
@@ -488,7 +599,11 @@ export function VenueAppPreview() {
             <Section title="GALLERY">
               <div className="nr-phone-scroll flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((slotId) => (
-                  <GalleryTile key={slotId} slotId={slotId} src={images[slotId]} onRemove={requestRemoveImage} />
+                  <GalleryTile
+                    key={slotId}
+                    slotId={slotId}
+                    onRemove={requestRemoveImage}
+                  />
                 ))}
               </div>
             </Section>
@@ -782,14 +897,15 @@ function Expect({
 
 function GalleryTile({
   slotId,
-  src,
   onRemove,
+  disabled = false,
 }: {
   slotId: string;
-  src: string | undefined;
   onRemove: (slotId: string) => void;
+  disabled?: boolean;
 }) {
-  const upload = useImageUpload(slotId);
+  const upload = useImageUpload(slotId, disabled);
+  const src = upload.src;
 
   return (
     <div
@@ -801,7 +917,10 @@ function GalleryTile({
       onDragOver={upload.onDragOver}
       onDragLeave={upload.onDragLeave}
       aria-label={src ? "Replace gallery photo" : "Add gallery photo"}
-      className="group relative h-[92px] w-[74px] shrink-0 cursor-pointer overflow-hidden rounded-lg border border-dashed"
+      aria-disabled={upload.disabled}
+      className={`group relative h-[92px] w-[74px] shrink-0 overflow-hidden rounded-lg border border-dashed ${
+        upload.disabled ? "cursor-not-allowed" : "cursor-pointer"
+      }`}
       style={{
         borderColor: upload.dragging ? PINK : HAIRLINE,
         background: src ? "transparent" : "#FFFDFA",
@@ -816,14 +935,35 @@ function GalleryTile({
           <ImagePlus size={16} />
         </div>
       )}
-      <div
-        className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 ${
-          upload.dragging ? "opacity-100" : ""
-        }`}
-      >
-        <Camera size={14} color="#fff" />
-      </div>
-      {src && <RemoveButton onClick={() => onRemove(slotId)} />}
+      {!upload.disabled && (
+        <div
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 ${
+            upload.dragging ? "opacity-100" : ""
+          }`}
+        >
+          <Camera size={14} color="#fff" />
+        </div>
+      )}
+      {src && !upload.disabled && <RemoveButton onClick={() => onRemove(slotId)} />}
+      {upload.uploading && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-black/40">
+          <div className="h-full bg-white transition-[width]" style={{ width: `${Math.round(upload.progress * 100)}%` }} />
+        </div>
+      )}
+      {upload.error && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            upload.retry();
+          }}
+          title={upload.error}
+          aria-label="Retry upload"
+          className="absolute inset-x-0 bottom-0 truncate bg-black/75 px-1 py-0.5 text-center text-[8px] font-semibold text-white"
+        >
+          Retry
+        </button>
+      )}
     </div>
   );
 }

@@ -295,6 +295,12 @@ export async function acceptVenueAddressStep(user: UserRecord, review: AdminRevi
       source: "admin",
       osmId: null,
       ownerUid: user.uid,
+      // firestore.rules' canEditVenue() and storage.rules' isVenueEditor()
+      // both key off `editors`, not `ownerUid` — mirrors the webpanel's own
+      // createVenue() (useVenues.ts). Omitting these left every admin-approved
+      // venue's owner unable to write their own listing or upload photos.
+      editorUids: [user.uid],
+      editors: { [user.uid]: "owner" },
       verified: true,
       status: "active",
       createdAt: now,
@@ -439,7 +445,19 @@ export async function setVenueStatus(venueId: string, status: VenueStatus): Prom
 }
 
 export async function transferVenueOwner(venueId: string, newOwnerUid: string): Promise<void> {
-  await updateDoc(doc(getDb(), "venues", venueId), { ownerUid: newOwnerUid, updatedAt: serverTimestamp() });
+  const venueRef = doc(getDb(), "venues", venueId);
+  const snap = await getDoc(venueRef);
+  const data = snap.data() ?? {};
+  const priorOwnerUid = typeof data.ownerUid === "string" ? data.ownerUid : null;
+  const editors = { ...(data.editors as Record<string, string> | undefined) };
+  // Same rules dependency as the venue-creation site above: `ownerUid` alone
+  // doesn't grant `editors`/`storage.rules` access — the new owner needs an
+  // `editors` entry, and the outgoing owner's stale "owner" entry would
+  // otherwise leave them with unintended edit rights.
+  if (priorOwnerUid && priorOwnerUid !== newOwnerUid) editors[priorOwnerUid] = "manager";
+  editors[newOwnerUid] = "owner";
+  const editorUids = Array.from(new Set([...(Array.isArray(data.editorUids) ? data.editorUids : []), newOwnerUid]));
+  await updateDoc(venueRef, { ownerUid: newOwnerUid, editors, editorUids, updatedAt: serverTimestamp() });
 }
 
 /**

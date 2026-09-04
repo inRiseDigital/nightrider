@@ -1,5 +1,7 @@
-import { EVENT_STATUS_STYLES, UPCOMING_STYLE } from "./constants";
-import type { OrganizerEvent, VenueProfile } from "./types";
+import { EVENT_STATUS_STYLES } from "./constants";
+import type { EventDisplayStatus, OrganizerEvent, VenueProfile } from "./types";
+import type { EventFilter } from "./store";
+import { zonedToUtc } from "./data/time";
 
 /** ISO "YYYY-MM-DD" in local time — `toISOString` would shift across the date line. */
 export function toISODate(d: Date): string {
@@ -18,26 +20,107 @@ export function minutesOf(time: string): number {
 }
 
 /**
- * The chip shown for an event in a list.
- *
- * A `live` event is only labelled LIVE while it is actually running tonight;
- * outside that window it reads UPCOMING. `now` is null until the client has
- * mounted (the server has no meaningful clock for the organizer's timezone),
- * in which case a `live` event falls back to UPCOMING.
+ * `ev.date` ("YYYY-MM-DD") + a "HH:mm" time, as the UTC instant it names in
+ * `timeZone` — the venue's IANA zone, since `parseOrganizerEvent` produced
+ * `date`/`startTime`/`endTime` from `startAt`/`endAt` via
+ * `timestampsToEventWindow(startAt, endAt, timeZone)`, i.e. already
+ * venue-zoned. Comparing that against `now` (a real UTC instant) in the
+ * *browser's* local zone — which a plain `new Date(y, mo, d, h, mi)`
+ * constructor does — is wrong by the offset between the two zones (finding
+ * 3: a London-based organizer sees a Dubai venue's live window four hours
+ * off). `zonedToUtc` is the same DST-correct conversion `data/time.ts`
+ * already uses for every write of these fields, so this made the same
+ * assumption `eventWindowToTimestamps` makes rather than a new one.
  */
-export function deriveEventChip(ev: OrganizerEvent, now: Date | null) {
-  if (ev.status !== "live") return EVENT_STATUS_STYLES[ev.status];
-  if (!now) return UPCOMING_STYLE;
-  if (ev.date !== toISODate(now)) return UPCOMING_STYLE;
+function dateTimeOf(dateISO: string, time: string, timeZone: string): Date {
+  return zonedToUtc(dateISO, time, timeZone);
+}
 
-  const startMins = minutesOf(ev.startTime);
-  let endMins = minutesOf(ev.endTime);
-  if (endMins <= startMins) endMins += 24 * 60; // closing time is after midnight
-  const nowMins = now.getHours() * 60 + now.getMinutes();
+/**
+ * Is `ev` actually running right now?
+ *
+ * `status == 'published' && startAt <= now && (endAt == null || now <= endAt)`,
+ * expressed here against the event's own `date` + `startTime`/`endTime`
+ * fields rather than a stored `startAt`/`endAt` timestamp pair. Handles the
+ * overnight case (e.g. 22:00-04:00) by rolling the end instant onto the
+ * following calendar day whenever it is not after the start instant — so an
+ * event that starts one night and ends the next morning is still live after
+ * midnight. `now` is null until the client has mounted (the server has no
+ * meaningful clock for the organizer's timezone) — in that case the event is
+ * never live.
+ *
+ * `timeZone` is the venue's IANA zone (`venueMeta[ev.venue].timeZone`,
+ * resolved via `resolveTimeZone` at the call site) — see `dateTimeOf`.
+ *
+ * `ev.endTime === ""` means the stored `endAt` is null — only possible for an
+ * admin- or scraper-written event, since every organizer-authored event has
+ * a required, non-null `endAt`. Per the stored formula
+ * (`endAt == null || now <= endAt`), that is open-ended, not "ends at
+ * midnight" — treating an empty `endTime` as `00:00` would make the event
+ * live for at most an instant instead of indefinitely once started.
+ */
+export function isEventLive(ev: OrganizerEvent, now: Date | null, timeZone: string): boolean {
+  if (!now) return false;
+  if (ev.status !== "published") return false;
 
-  return nowMins >= startMins && nowMins <= endMins
-    ? EVENT_STATUS_STYLES.live
-    : UPCOMING_STYLE;
+  const start = dateTimeOf(ev.date, ev.startTime, timeZone);
+  if (now.getTime() < start.getTime()) return false;
+  if (!ev.endTime) return true;
+
+  let end = dateTimeOf(ev.date, ev.endTime, timeZone);
+  if (end.getTime() <= start.getTime()) {
+    end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // closing time is after midnight
+  }
+
+  return now.getTime() <= end.getTime();
+}
+
+/**
+ * The chip status to render for an event. `'live'` and `'upcoming'` are
+ * derived, never stored — a `published` event reads `'live'` while it is
+ * actually running (see `isEventLive`) and `'upcoming'` otherwise. Every
+ * other stored status passes through unchanged. When `now` is null, a
+ * `published` event falls back to its stored status (`'published'`) rather
+ * than guessing live/upcoming.
+ */
+export function displayStatusOf(ev: OrganizerEvent, now: Date | null, timeZone: string): EventDisplayStatus {
+  if (ev.status !== "published") return ev.status;
+  if (!now) return ev.status;
+  return isEventLive(ev, now, timeZone) ? "live" : "upcoming";
+}
+
+/** The chip shown for an event in a list. */
+export function deriveEventChip(ev: OrganizerEvent, now: Date | null, timeZone: string) {
+  return EVENT_STATUS_STYLES[displayStatusOf(ev, now, timeZone)];
+}
+
+/**
+ * The events-table filter predicate. `filter === "live"` consults the clock
+ * via `isEventLive`; every other filter id matches on the stored status.
+ */
+export function matchesFilter(ev: OrganizerEvent, filter: EventFilter, now: Date | null, timeZone: string): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "live":
+      return isEventLive(ev, now, timeZone);
+    default:
+      return ev.status === filter;
+  }
+}
+
+/**
+ * "Neon Fox Collective" -> "NF". Initials are always derived, never stored.
+ * Uses the first letter of up to the first two words; empty input yields "".
+ */
+export function initialsOf(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]!.toUpperCase())
+    .join("");
 }
 
 export function venueName(venues: Record<string, VenueProfile>, id: string): string {

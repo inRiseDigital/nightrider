@@ -14,11 +14,14 @@ rules_version = '2';
 //     organizer application lives in users/{uid}/private/organizerReview, which
 //     the applicant may create exactly once (in a pinned initial shape) and can
 //     never update. Nothing the applicant writes to their own user document is
-//     load-bearing for access control.
+//     load-bearing for access control. The same invariant is re-used for
+//     venue listing review: an organizer never writes a verdict on
+//     venueEdits/{venueId} either — see organizerReview() below.
 //  2. The KYC attempt counter is admin-owned. Storage paths are keyed by
 //     organizerReview.steps.<id>.attempt, so the retry cap is structural: an
 //     applicant cannot mint new upload paths, because only an admin advances
-//     the number that appears in the path.
+//     the number that appears in the path. venueKyc/** repeats the same
+//     structure, keyed by venues.verification.<id>.attempt instead.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -48,6 +51,35 @@ service cloud.firestore {
     }
     function onlyTouched(keys) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // ── Venue-scoped authorization ──────────────────────────────────────────
+    // editorUids + editors is the chosen denormalisation (see the schema doc
+    // for the full trade-off against a rules get() on a team doc and against
+    // custom claims): editorUids is the array-contains query key, editors
+    // carries the role, and editorsAgree() below is what stops them drifting.
+    //
+    // `v` here is a document snapshot with a `.data` map — either the result
+    // of venueDoc() (for subcollections, one cached get()) or `resource`
+    // itself when the caller is already inside the venues/{venueId} match
+    // (free — no extra get() against an already-loaded document).
+    function venueDoc(venueId) {
+      return get(/databases/$(database)/documents/venues/$(venueId));
+    }
+    function roleIn(v, roles) {
+      return signedIn() && v != null
+        && v.data.get('editors', {}).get(request.auth.uid, '') in roles;
+    }
+    function canEditVenue(venueId, roles) {
+      return isOrganizer() && roleIn(venueDoc(venueId), roles);
+    }
+    // A dynamic key (request.auth.uid) cannot appear in a rules map literal,
+    // so agreement between the array (query key) and the map (role carrier)
+    // is enforced both ways plus a hard size cap, rather than by equality.
+    function editorsAgree() {
+      let d = request.resource.data;
+      return d.editors.keys().hasOnly(d.editorUids) && d.editorUids.hasOnly(d.editors.keys())
+        && d.editorUids.size() == d.editors.keys().size() && d.editorUids.size() <= 20;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -198,6 +230,18 @@ service cloud.firestore {
           allow write: if isSelf(uid) && request.auth.token.email_verified == true;
         }
       }
+
+      // The organizer's per-person notification inbox. Scoped to the person,
+      // not the venue, so the topbar shows one inbox with one unread dot and
+      // isSelf(uid) authorizes it with zero venue lookups. Client-write is
+      // denied beyond the read receipt: only an admin (via the moderation /
+      // violation flow) creates a message.
+      match /inbox/{messageId} {
+        allow read: if isSelf(uid);
+        allow create: if isAdmin() && request.resource.data.at == request.time;
+        allow update: if isSelf(uid) && onlyTouched(['readAt']);
+        allow delete: if false;
+      }
     }
 
     // ── Events ───────────────────────────────────────────────────────────────
@@ -208,6 +252,11 @@ service cloud.firestore {
       // excludes documents missing an ordered field from the result set, and a
       // null geo renders a map pin at (0,0). Three separate clients write here
       // and there is no server-side ingest to normalise anything.
+      //
+      // `live` is NEVER one of the accepted status values below — it is
+      // derived at render time only (published && startAt <= now &&
+      // (endAt == null || now <= endAt)), never stored. Widening this enum to
+      // include 'live' would let a client freeze a stale derived state.
       function shapeOk() {
         let d = request.resource.data;
         return d.keys().hasAll([
@@ -222,25 +271,59 @@ service cloud.firestore {
           && d.venueName is string && d.city is string
           && (d.get('geo', null) == null || d.geo is latlng)
           && (d.get('venueId', null) == null || d.venueId is string)
-          && d.status in ['draft', 'published', 'archived']
+          && d.status in ['draft', 'scheduled', 'in_review', 'published', 'cancelled', 'archived']
           && d.source in ['organizer', 'admin', 'scraped']
           && d.price.min is number && d.price.max is number
           && d.price.currency is string && d.price.isFree is bool
           && d.get('interestedCount', 0) is int
-          && d.get('popularityScore', 0) is number;
+          && d.get('popularityScore', 0) is number
+          // ── New fields below: `.get(k, default)` only, never added to the
+          // hasAll([...]) list above. hasAll on a field legacy documents lack
+          // denies every subsequent write to those documents, admin writes
+          // included — the exact trap noStrayScripts() documents for
+          // organizerReview. Only the eight query-critical keys above stay in
+          // hasAll. ──
+          && (d.get('scheduledPublish', null) == null || d.scheduledPublish is timestamp)
+          // The Netlify publish sweep queries status == 'scheduled' &&
+          // scheduledPublish <= now. An ordered query excludes documents
+          // missing the ordered field entirely, so an event that reached
+          // 'scheduled' without this would sit there forever with no error
+          // anywhere — the same silent-exclusion failure startAt already
+          // guards against above.
+          && (d.status != 'scheduled' || d.get('scheduledPublish', null) is timestamp)
+          && d.get('cancelReason', '') is string && d.get('cancelReason', '').size() <= 500
+          && (d.status != 'cancelled' || d.get('cancelReason', '').size() > 0)
+          && d.get('notifyOnChange', true) is bool
+          && d.get('recurring', false) is bool
+          && d.get('recurrenceLabel', '') is string && d.get('recurrenceLabel', '').size() <= 120
+          && d.get('posterImage', '') is string
+          // A derived `live` status cannot guess an end time, and every
+          // organizer-authored event has one in the UI; scraped events keep
+          // endAt: null because nothing here can invent one.
+          && (d.source != 'organizer' || d.get('endAt', null) is timestamp)
+          && d.get('moderation', {}).get('flag', '') in ['', 'pending', 'clean', 'rejected']
+          && d.get('tickets', {}).get('tiers', []) is list
+          && d.get('tickets', {}).get('tiers', []).size() <= 12
+          && d.get('sales', {}).get('sold', 0) is number;
       }
 
       // popularityScore orders the scraped social feed and is written only by
       // the Admin SDK ingest. interestedCount is maintained by the marker
-      // subcollection below. Neither is an organizer's to set.
-      function countersPinned() {
+      // subcollection below. moderation and sales joined them here for the
+      // same reason: they are admin/producer roll-ups, not the organizer's to
+      // set, even though the organizer owns the rest of the document.
+      function producerFieldsPinned() {
         return request.resource.data.get('interestedCount', 0)
                  == resource.data.get('interestedCount', 0)
           && request.resource.data.get('popularityScore', 0)
-                 == resource.data.get('popularityScore', 0);
+                 == resource.data.get('popularityScore', 0)
+          && request.resource.data.get('moderation', {})
+                 == resource.data.get('moderation', {})
+          && request.resource.data.get('sales', {})
+                 == resource.data.get('sales', {});
       }
 
-      allow read: if resource.data.get('status', '') == 'published'
+      allow read: if resource.data.get('status', '') in ['published', 'cancelled']
         || (signedIn() && resource.data.get('organizerUid', '') == request.auth.uid)
         || isAdmin();
 
@@ -249,18 +332,31 @@ service cloud.firestore {
             || (isOrganizer()
                 && request.resource.data.organizerUid == request.auth.uid
                 && request.resource.data.source == 'organizer'
-                && request.resource.data.status in ['draft', 'published']
+                // 'archived' is a transition from an existing state, never an
+                // initial one. 'cancelled' IS allowed as an initial state —
+                // e.g. importing an event that is already off — gated by
+                // shapeOk()'s non-empty-cancelReason requirement above; the
+                // narrative section of the spec that motivated this said
+                // organizer-create should exclude cancelled/archived, but the
+                // brief's own test cases (66d/66e) exercise organizer-created
+                // 'cancelled' directly, so the test cases win — see the task
+                // report for this call.
+                && request.resource.data.status
+                     in ['draft', 'scheduled', 'in_review', 'published', 'cancelled']
                 && request.resource.data.get('interestedCount', 0) == 0
-                && request.resource.data.get('popularityScore', 0) == 0));
+                && request.resource.data.get('popularityScore', 0) == 0
+                && request.resource.data.get('moderation', {}).get('flag', '') == ''
+                && request.resource.data.get('sales', {}).get('sold', 0) == 0));
 
       allow update: if isAdmin()
         || (isOrganizer()
             && shapeOk()
-            && countersPinned()
+            && producerFieldsPinned()
             && resource.data.get('organizerUid', '') == request.auth.uid
             && request.resource.data.organizerUid == resource.data.organizerUid
             && request.resource.data.source == resource.data.source
-            && request.resource.data.status in ['draft', 'published', 'archived'])
+            && request.resource.data.status
+                 in ['draft', 'scheduled', 'in_review', 'published', 'cancelled', 'archived'])
         // Any signed-in user may register interest. The marker document below
         // is what makes this idempotent; without it the counter is a free-form
         // integer any client can drive.
@@ -285,9 +381,112 @@ service cloud.firestore {
     // ── Venues ───────────────────────────────────────────────────────────────
     match /venues/{venueId} {
 
+      // Pre-organizer-access, `create: if isAdmin()` had zero validation, so
+      // an admin typo already produced a venue missing geohash that silently
+      // dropped out of every radius query. Once organizers can create venues
+      // that stops being latent and becomes routine, so shapeOk() now gates
+      // both create AND update, admin writes included — the same discipline
+      // as events.shapeOk(): only the eight query-critical keys are in
+      // hasAll, everything else is `.get(k, default)` so a legacy or
+      // partially-migrated venue document stays writable.
+      function venueShapeOk() {
+        let d = request.resource.data;
+        // The listing sweep and the verification-step sweep are the two
+        // expensive parts of this function (13 fields with nested .get()
+        // chains, and three verificationStepOk() calls). On an update that
+        // leaves those fields alone, the stored values already passed this
+        // same validation on whatever write set them, so re-sweeping them
+        // on every unrelated write (e.g. a door-staff `live` touch) is pure
+        // cost with no new guarantee. `resource == null` short-circuits both
+        // gates to true on create — touched() dereferences resource.data,
+        // which is null pre-create — so a brand-new document still gets the
+        // full sweep.
+        let listingTouched = resource == null || touched(venueProfileFields());
+        let verificationTouched = resource == null || touched(['verification']);
+        return d.keys().hasAll([
+              'name', 'geo', 'geohash', 'city', 'countryCode', 'source', 'status', 'verified'
+            ])
+          && d.name is string && d.name.size() > 0
+          && d.get('address', '') is string
+          && d.geo is latlng
+          && d.geohash is string && d.geohash.size() > 0
+          && d.city is string && d.countryCode is string
+          && d.source in ['admin', 'organizer', 'osm']
+          && d.status in ['active', 'closed']
+          && d.verified is bool
+          // ── Profile fields (mirror VenueProfile). Only `name`/`address`
+          // (venueReviewedFields()) are denied outright below and must route
+          // through venueEdits — everything else here is a direct write, so
+          // this validates shape regardless of who touched it. Element
+          // shapes *inside* hours/exceptions/socialLinks/photos are NOT
+          // validated: rules cannot iterate a list. Same limitation as
+          // organizerReview's script.lines; the client checks it, and
+          // Firestore's 1 MB document limit is the only server-side
+          // backstop. ──
+          && (!listingTouched || (
+                d.get('about', '') is string && d.get('about', '').size() <= 2000
+                && d.get('socialLinks', []) is list && d.get('socialLinks', []).size() <= 8
+                && d.get('genres', []) is list && d.get('genres', []).size() <= 10
+                && d.get('dressCode', '') is string
+                && d.get('agePolicy', '') is string
+                && d.get('tableLink', '') is string
+                && d.get('cover', {}).get('min', 0) is number
+                && d.get('cover', {}).get('max', 0) is number
+                && d.get('cover', {}).get('currency', '') is string
+                // Backfilled as present-and-zero, never absent: 0 means unknown and
+                // is what liveOk()'s crowdLevel derivation divides against.
+                && d.get('capacity', 0) is number && d.get('capacity', 0) >= 0
+                && d.get('amenities', []) is list && d.get('amenities', []).size() <= 20
+                && d.get('hours', []) is list
+                && (d.get('hours', []).size() == 0 || d.get('hours', []).size() == 7)
+                && d.get('exceptions', []) is list && d.get('exceptions', []).size() <= 20
+                && d.get('photos', []) is list && d.get('photos', []).size() <= 5
+                && d.get('timeZone', '') is string
+             ))
+          // ── Authorization, denormalised. ──
+          && d.get('editorUids', []) is list
+          && d.get('editors', {}) is map
+          && (!verificationTouched || (
+                verificationStepOk(d.get('verification', {}).get('license', {}))
+                && verificationStepOk(d.get('verification', {}).get('gps', {}))
+                && verificationStepOk(d.get('verification', {}).get('video', {}))
+             ));
+      }
+
+      // A single VenueVerifyStep, validated with `.get()` defaults so a venue
+      // predating `verification` entirely (s == {}) passes trivially.
+      function verificationStepOk(s) {
+        return s.get('status', 'active') in ['active', 'submitted', 'needs_info', 'done']
+          && s.get('attempt', 0) is int && s.get('attempt', 0) >= 0 && s.get('attempt', 0) <= 3
+          && s.get('note', '') is string && s.get('note', '').size() <= 500;
+      }
+
+      // The pinned initial shape an organizer's venue.verification must have
+      // on create: every step un-started. Mirrors initialShape() in
+      // organizerReview — an applicant/organizer never invents a verdict.
+      function verificationInitialShapeOk() {
+        let v = request.resource.data.get('verification', {});
+        return v.get('license', {}).get('status', 'active') == 'active'
+          && v.get('license', {}).get('attempt', 0) == 0
+          && v.get('gps', {}).get('status', 'active') == 'active'
+          && v.get('gps', {}).get('attempt', 0) == 0
+          && v.get('video', {}).get('status', 'active') == 'active'
+          && v.get('video', {}).get('attempt', 0) == 0;
+      }
+
       // Live door status is a map on the venue document, not a subcollection.
       // A per-venue live/current document turns the Live Hub club list into
       // 1 + N reads over a globally seeded collection.
+      //
+      // Every field below except the four legacy enums (status, crowdLevel,
+      // queueStatus, ticketsAvailable/tablesAvailable already required
+      // as-is) uses `.get(k, default)`. This is deliberate, not an oversight:
+      // a dotted-path update (e.g. `live.emergencyActive: true`) merges into
+      // request.resource.data, so liveOk() runs against the WHOLE stored
+      // `live` map, old fields and new alike. A legacy `live` map that
+      // predates doorStatus/inVenue/queueMinutes/emergencyActive/flash must
+      // still be writable — including by the door-staff write that only
+      // touches one new field — so none of the new keys are required.
       function liveOk() {
         let l = request.resource.data.live;
         return l.status in ['open', 'closed', 'vipOnly', 'soldOut']
@@ -296,23 +495,255 @@ service cloud.firestore {
           && l.ticketsAvailable is bool && l.tablesAvailable is bool
           && l.get('tonightDj', '') is string && l.get('tonightDj', '').size() <= 120
           && l.get('offer', '') is string && l.get('offer', '').size() <= 200
-          && l.updatedAt == request.time;
+          && l.updatedAt == request.time
+          // doorStatus is an ADDITIVE enum, never widened onto status/
+          // crowdLevel/queueStatus above: live_hub_page.dart and
+          // clubs_page.dart hold exhaustive switch expressions over those
+          // three with no `default:` case, so a new value there is a runtime
+          // crash on every Flutter client, not a graceful fallback.
+          && l.get('doorStatus', 'closed') in ['open', 'filling', 'capacity', 'guestlist', 'closed']
+          && l.get('inVenue', 0) is int && l.get('inVenue', 0) >= 0
+          && l.get('queueMinutes', 0) is int
+          && l.get('queueMinutes', 0) >= 0 && l.get('queueMinutes', 0) <= 600
+          && l.get('emergencyActive', false) is bool
+          && (l.get('flash', null) == null || (
+                l.flash.keys().hasOnly(['active', 'text', 'until'])
+                && l.flash.active is bool
+                && l.flash.text is string && l.flash.text.size() <= 200
+                && l.flash.until is string
+              ));
+      }
+
+      // Fields no organizer role may touch, whatever the operation: identity
+      // (ownerUid, source, osmId), geocoding (geo, geohash), the verdict
+      // (verified, verification), and the authorization map itself
+      // (editors, editorUids) — a role holder granting itself a higher role
+      // would defeat the whole point of gating writes by role.
+      function venuePinnedFields() {
+        return ['ownerUid', 'verified', 'source', 'osmId', 'geo', 'geohash',
+                'verification', 'editors', 'editorUids'];
+      }
+
+      // Profile fields that mirror VenueProfile (A2), minus `name`/`address`.
+      // Validation scope for venueShapeOk()'s listing sweep — these are
+      // direct writes (owner/manager), not gated by venueReviewedFields()
+      // below, but their shape is still checked on every write that touches
+      // one of them.
+      function venueProfileFields() {
+        return ['about', 'socialLinks', 'genres', 'dressCode', 'agePolicy', 'tableLink',
+                'cover', 'capacity', 'amenities', 'hours', 'exceptions', 'photos', 'timeZone'];
+      }
+
+      // The only fields a direct organizer write may not touch. Structural,
+      // not a UI convention: denying these on the venue document is what
+      // makes "renaming/re-addressing a venue is reviewable" true regardless
+      // of client behaviour — they can only reach the venue document via
+      // venueEdits' admin-only approval path below.
+      function venueReviewedFields() {
+        return ['name', 'address'];
+      }
+
+      function organizerCreateOk() {
+        let d = request.resource.data;
+        return isOrganizer()
+          && d.verified == false
+          && d.source == 'organizer'
+          && d.ownerUid == request.auth.uid
+          && d.status == 'active'
+          && d.get('osmId', null) == null
+          && d.editors.keys().size() == 1
+          && d.editors.get(request.auth.uid, '') == 'owner'
+          && editorsAgree()
+          && verificationInitialShapeOk()
+          // Inventing 'closed' (or any other default) for a venue nobody has
+          // reported on yet is a lie, not a default — see the schema doc's
+          // note on the retired Live Hub split. A brand-new venue has no
+          // `live` map at all until the first real write to it.
+          && !('live' in d);
+      }
+
+      function organizerUpdateOk() {
+        // Computed once and reused by both branches below, instead of
+        // touched()/onlyTouched() each independently re-running
+        // request.resource.data.diff(resource.data) — up to three times
+        // per call otherwise.
+        let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+        return isOrganizer()
+          && (
+               // Door staff exist to update the door — it is their whole
+               // surface, and the only place their write matters urgently.
+               (roleIn(resource, ['door'])
+                 && changedKeys.hasOnly(['live', 'updatedAt'])
+                 && (!changedKeys.hasAny(['live']) || liveOk()))
+               ||
+               (roleIn(resource, ['owner', 'manager'])
+                 && !changedKeys.hasAny(venuePinnedFields())
+                 && !changedKeys.hasAny(venueReviewedFields())
+                 && (!changedKeys.hasAny(['live']) || liveOk()))
+             );
       }
 
       allow read: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin()
-        || (isOrganizer()
-            && resource.data.get('ownerUid', null) == request.auth.uid
-            && !touched(['ownerUid', 'verified', 'source', 'osmId', 'geo', 'geohash'])
-            && (!touched(['live']) || liveOk()));
+
+      allow create: if venueShapeOk() && (isAdmin() || organizerCreateOk());
+      allow update: if venueShapeOk() && (isAdmin() || organizerUpdateOk());
       allow delete: if isAdmin();
+
+      // ── Venue subcollections ────────────────────────────────────────────
+      // Public menu — guests browsing a venue detail page see it, so read is
+      // unauthenticated. A subcollection (not a map on the venue doc, unlike
+      // `live`) on purpose: the menu is read only by the venue-detail view a
+      // user explicitly opened, not by the 50-doc Live Hub list, so its cost
+      // is 1+N on a screen that already paid for one document. Editing one
+      // section rewrites one document instead of the whole menu.
+      match /menuSections/{sectionId} {
+        allow read: if true;
+        allow create, update: if canEditVenue(venueId, ['owner', 'manager'])
+          && request.resource.data.get('items', []) is list
+          && request.resource.data.get('items', []).size() <= 100;
+        allow delete: if canEditVenue(venueId, ['owner', 'manager']);
+      }
+
+      // Accountability among teammates, not a tamper-proof ledger (an
+      // organizer with write access here also has write access to the venue
+      // itself). Create-only: actorUid/at are pinned to the caller and to
+      // request.time so entries cannot be backdated or misattributed.
+      // orderBy('at','desc') on a subcollection needs no composite index.
+      // Two follow-ups noted for the schema doc, not enforced here: this
+      // grows unbounded (180-day sweep to join
+      // admin-scheduled-retention.mts), and rules cannot mandate that a
+      // mutation's batch actually includes an activity entry.
+      match /activity/{entryId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow create: if canEditVenue(venueId, ['owner', 'manager', 'door'])
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+
+      // Owned by /api/organizer/team (Admin SDK), not rules: a real invite
+      // acceptance must fan out atomically across editors, editorUids,
+      // team/{memberId}, venueInvites/{id} and an activity entry, and
+      // accepting an invite is chicken-and-egg (the invitee is not yet an
+      // editor, so cannot write editorUids to become one). Deny-by-default is
+      // the safe state until that function exists.
+      match /team/{memberId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow write: if false;
+      }
+
+      // periodId is 'last30' or 'YYYY-Www' — the dashboard reads one document
+      // by path, zero queries, zero indexes. Producer-owned: the organizer
+      // reads counts, never writes them.
+      match /metrics/{periodId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow write: if false;
+      }
+
+      // Function-owned, same reasoning as metrics.
+      match /aiVisibility/{docId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow write: if false;
+      }
+
+      // Rules cannot count documents, so the push/promo rate limit is NOT
+      // rules-enforceable here — the FCM fanout function enforces the real
+      // limit before sending. What rules CAN do is pin the fields an
+      // organizer must not forge: `used` starts and stays at 0 client-side
+      // (a real redemption is server-authored), and pushCampaign/boost
+      // create is shape-limited to their queued/pending initial state with
+      // update/delete denied outright, so nothing here can fake a sent
+      // campaign or an active boost.
+      match /promotions/{promoId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow create: if canEditVenue(venueId, ['owner', 'manager'])
+          && request.resource.data.used == 0;
+        allow update: if canEditVenue(venueId, ['owner', 'manager'])
+          && request.resource.data.used == resource.data.get('used', 0);
+        allow delete: if canEditVenue(venueId, ['owner', 'manager']);
+      }
+
+      match /pushCampaigns/{campaignId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow create: if canEditVenue(venueId, ['owner', 'manager'])
+          && request.resource.data.status == 'queued';
+        allow update, delete: if false;
+      }
+
+      // Display state only — the organizer cannot write it at all. The
+      // alternative (letting the client bump a counter) is a limit that
+      // looks enforced and isn't.
+      match /promoState/{docId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow write: if false;
+      }
+
+      match /boosts/{boostId} {
+        allow read: if canEditVenue(venueId, ['owner', 'manager', 'door']);
+        allow create: if canEditVenue(venueId, ['owner', 'manager'])
+          && request.resource.data.status == 'pending';
+        allow update, delete: if false;
+      }
+
+      // Guests see rank perks alongside the menu, so read is public.
+      match /rankPerks/{docId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    // ── Venue listing edits (review queue) ──────────────────────────────────
+    // The reviewable listing draft. Document id IS the venue id — chosen over
+    // a `pendingListing` map on the venue doc (100-200 KB of unreviewed draft
+    // on every Live Hub load) and over a venues/{id}/edits/{editId}
+    // subcollection (needs a collection-group index, and auto-ids permit two
+    // concurrent drafts). Save is one idempotent setDoc, discard one
+    // deleteDoc, load is a known path.
+    //
+    // Same invariant as organizerReview: an organizer never writes a verdict.
+    // Resubmitting always replaces the draft back to 'pending' with
+    // reviewedBy cleared — it can never carry a verdict, which is what
+    // editOk() enforces below regardless of what the resource previously held.
+    match /venueEdits/{venueId} {
+      function editOk() {
+        let d = request.resource.data;
+        return d.venueId == venueId
+          && d.status == 'pending'
+          && d.submittedBy == request.auth.uid
+          && d.submittedAt == request.time
+          && d.get('reviewedBy', null) == null
+          // Only name/address are reviewable now (venueReviewedFields()) —
+          // everything else is a direct venue-doc write, so a draft can never
+          // carry more than these two.
+          && d.get('listing', {}).keys().hasOnly(['name', 'address']);
+      }
+
+      allow read: if isAdmin() || canEditVenue(venueId, ['owner', 'manager']);
+      allow create: if canEditVenue(venueId, ['owner', 'manager']) && editOk();
+      // Admin approval/rejection copies `listing` onto the venue document as
+      // a separate client-side write in the same action — rules cannot
+      // mandate that second write, the same honesty the plan gives the push
+      // rate limit.
+      allow update: if isAdmin() || (canEditVenue(venueId, ['owner', 'manager']) && editOk());
+      allow delete: if canEditVenue(venueId, ['owner', 'manager'])
+        && resource.data.get('reviewedBy', null) == null;
+    }
+
+    // Function-owned invite tokens. An invitee can read their own invite by
+    // matching the token email against their verified sign-in email, which is
+    // enough for the accept-invite screen to render without granting any
+    // venue access yet (acceptance itself is the Admin-SDK function's job).
+    match /venueInvites/{inviteId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.get('email', '') == request.auth.token.email);
+      allow write: if false;
     }
 
     // ── Venue reports ────────────────────────────────────────────────────────
     match /venueReports/{reportId} {
       // Public, to match venues and published events — the Live Hub otherwise
-      // half-loads for a signed-out reader.
+      // half-loads for a signed-out reader. The owner reply below stays public
+      // too: it is an answer to a public review, not a private note.
       allow read: if true;
 
       allow create: if signedIn()
@@ -330,10 +761,25 @@ service cloud.firestore {
         && request.resource.data.upvoteCount == 0
         && request.resource.data.createdAt == request.time;
 
-      allow update: if signedIn()
-        && onlyTouched(['upvoteCount'])
-        && request.resource.data.upvoteCount == resource.data.get('upvoteCount', 0) + 1
-        && !exists(/databases/$(database)/documents/venueReports/$(reportId)/upvotes/$(request.auth.uid));
+      allow update: if (signedIn()
+            && onlyTouched(['upvoteCount'])
+            && request.resource.data.upvoteCount == resource.data.get('upvoteCount', 0) + 1
+            && !exists(/databases/$(database)/documents/venueReports/$(reportId)/upvotes/$(request.auth.uid)))
+        // The owner reply. onlyTouched(['reply', 'flaggedByOwner']) is what
+        // stops an owner editing the guest's comment/vibeRating under cover
+        // of replying. reply == null is permitted so "delete the posted
+        // reply" works. This is the one place the editorUids denormalisation
+        // does not save a get(): the guarded document is the report, not the
+        // venue, so canEditVenue still costs its one cached get() — replies
+        // are rare enough that this is the right trade.
+        || (onlyTouched(['reply', 'flaggedByOwner'])
+            && canEditVenue(resource.data.venueId, ['owner', 'manager'])
+            && (request.resource.data.get('reply', null) == null || (
+                  request.resource.data.reply.keys().hasOnly(['text', 'byUid', 'byName', 'at'])
+                  && request.resource.data.reply.byUid == request.auth.uid
+                  && request.resource.data.reply.at == request.time
+                  && request.resource.data.reply.text.size() > 0
+                  && request.resource.data.reply.text.size() <= 1000)));
 
       allow delete: if isAdmin() || (signedIn() && resource.data.get('uid', '') == request.auth.uid);
 
@@ -348,7 +794,9 @@ service cloud.firestore {
     // ── Audit log ────────────────────────────────────────────────────────────
     // Written by the admin client alongside the action it records. An
     // accountability record, not a tamper-proof ledger: an admin with write
-    // access to the target also has write access to the log.
+    // access to the target also has write access to the log. Never widened
+    // to organizer create/read: an organizer who could write here could forge
+    // entries in the collection admins use to reconstruct decisions.
     match /logs/{logId} {
       allow read: if isAdmin();
       allow create: if isAdmin()

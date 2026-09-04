@@ -36,11 +36,16 @@ function iconFor(text: string): { Icon: LucideIcon; bg: string; fg: string } {
 
 /** Home tab — a timeline of recent account activity. */
 export function ActivitySection() {
-  const { activity } = useOrganizerDashboard();
+  const { activity, activityLoading, activityError } = useOrganizerDashboard();
 
   return (
     <PanelCard title="Activity" className="max-w-[820px]">
-      {activity.length === 0 ? (
+      {activityError && (
+        <p className="px-5 pb-2 text-xs text-[var(--m3-err)]">Couldn&apos;t load activity: {activityError}</p>
+      )}
+      {activityLoading ? (
+        <p className="px-5 py-5 text-xs text-[var(--m3-outline)]">Loading…</p>
+      ) : activity.length === 0 ? (
         <p className="px-5 py-5 text-xs text-[var(--m3-outline)]">No recent activity.</p>
       ) : (
         activity.map((a, i) => {

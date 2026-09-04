@@ -25,6 +25,10 @@ const MODERATION_STYLES = {
     label: "PASSED AUTO-SCAN",
     className: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30",
   },
+  rejected: {
+    label: "REJECTED BY MODERATION",
+    className: "bg-red-500/10 text-red-400 ring-red-500/30",
+  },
 } as const;
 
 /** The dialog sits on --m3-surf2, so notched field labels must mask that tone. */
@@ -52,6 +56,8 @@ export function EventEditor() {
     removeTier,
     saveDraftEvent,
     submitEvent,
+    eventBusy,
+    eventActionError,
   } = useOrganizerDashboard();
 
   if (!eventEditorOpen || !eventDraft) return null;
@@ -63,7 +69,9 @@ export function EventEditor() {
       ? MODERATION_STYLES.pending
       : eventDraft.moderationFlag === "clean"
         ? MODERATION_STYLES.clean
-        : null;
+        : eventDraft.moderationFlag === "rejected"
+          ? MODERATION_STYLES.rejected
+          : null;
 
   // Only verified venues can host a submission.
   const selectableVenues = venueOrder
@@ -223,9 +231,24 @@ export function EventEditor() {
 
           <div>
             <SectionLabel className="mb-2.5">Images</SectionLabel>
+            {/* The `eventMedia` storage rule authorizes an upload against the
+                event document existing — save the draft once before either
+                slot can accept a file. */}
             <div className="grid grid-cols-2 gap-2.5">
-              <ImageSlot slotId={slots.cover} placeholder="Cover image" className="h-[140px]" />
-              <ImageSlot slotId={slots.poster} placeholder="Poster image" className="h-[140px]" />
+              <ImageSlot
+                slotId={slots.cover}
+                placeholder="Cover image"
+                className="h-[140px]"
+                disabled={!isEditingExisting}
+                disabledHint="Save draft first"
+              />
+              <ImageSlot
+                slotId={slots.poster}
+                placeholder="Poster image"
+                className="h-[140px]"
+                disabled={!isEditingExisting}
+                disabledHint="Save draft first"
+              />
             </div>
           </div>
 
@@ -300,12 +323,20 @@ export function EventEditor() {
           )}
         </div>
 
+        {eventActionError && (
+          <p className="mt-4 text-[13px]" style={{ color: "var(--m3-err)" }}>
+            {eventActionError}
+          </p>
+        )}
+
         <div className="mt-7 flex flex-wrap items-center justify-end gap-2">
-          <TextButton onClick={closeEditor}>Cancel</TextButton>
-          <FilledButton onClick={saveDraftEvent} tonal>
+          <TextButton onClick={closeEditor} disabled={eventBusy}>
+            Cancel
+          </TextButton>
+          <FilledButton onClick={saveDraftEvent} tonal loading={eventBusy} disabled={eventBusy}>
             Save draft
           </FilledButton>
-          <FilledButton onClick={submitEvent}>
+          <FilledButton onClick={submitEvent} loading={eventBusy} disabled={eventBusy}>
             {eventDraft.scheduledPublish ? "Schedule publish" : "Submit for review"}
           </FilledButton>
         </div>

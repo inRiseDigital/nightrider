@@ -9,7 +9,12 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { ref as storageRef, uploadBytesResumable } from "firebase/storage";
-import { getBucket, getDb } from "@/lib/firebase";
+// Relative, not the "@/" alias: `data/images.test.ts` (T12) imports this
+// module transitively (for `uploadResumable`/`resizeImageFile`) and vitest
+// has no path-alias resolution configured, so an aliased import here would
+// make that pure-function test file fail to load. Identical resolution
+// either way — same file, same behavior.
+import { getBucket, getDb } from "../firebase";
 import { describeUploadError } from "./errors";
 import { validateKycVideo } from "./validation";
 import type {
@@ -397,7 +402,12 @@ function kycPath(uid: string, stepId: StepId, attempt: number, file: string): st
 
 export type UploadProgressHandler = (fraction: number) => void;
 
-async function uploadResumable(
+/**
+ * Promoted for T12 (organizer dashboard image slots) to reuse rather than
+ * reimplement — it already handles progress and cancellation, and is the one
+ * place `uploadBytesResumable` is wired up in this file.
+ */
+export async function uploadResumable(
   path: string,
   file: Blob,
   contentType: string,
@@ -412,6 +422,50 @@ async function uploadResumable(
       reject,
       resolve
     );
+  });
+}
+
+/**
+ * Downscales and recompresses an image file in-browser via canvas — no
+ * server function, same reasoning as `extractPosterFrame` below: a 12 MB
+ * phone photo should not go up raw. Always outputs `image/jpeg` regardless
+ * of the input's MIME type, matching the `.jpg` object names every image
+ * slot's Storage path ends in (T12 brief's contract table). Never upscales —
+ * `maxEdge` only ever shrinks.
+ */
+export function resizeImageFile(file: File, maxEdge = 2000, quality = 0.82): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.max(1, Math.round(img.naturalWidth * scale));
+      const height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      URL.revokeObjectURL(url);
+      if (!ctx) {
+        reject(new Error("Canvas is not supported in this browser."));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Could not process that image."));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read that image file."));
+    };
+    img.src = url;
   });
 }
 

@@ -28,6 +28,7 @@ export function DataTable<Row>({
   minWidth,
   onRowClick,
   activeRowId,
+  rowStyle,
   empty = "Nothing to show.",
 }: {
   columns: DataTableColumn<Row>[];
@@ -36,6 +37,8 @@ export function DataTable<Row>({
   minWidth?: number;
   onRowClick?: (row: Row) => void;
   activeRowId?: string | null;
+  /** Per-row style overrides (e.g. dimming a revoked/disabled row) merged onto the row's base style. */
+  rowStyle?: (row: Row) => CSSProperties;
   empty?: string;
 }) {
   const cellStyle = (col: DataTableColumn<Row>): CSSProperties => ({
@@ -87,6 +90,7 @@ export function DataTable<Row>({
               borderBottom: `1px solid ${BORDER.hairline}`,
               minWidth,
               transition: "background-color 120ms linear",
+              ...(rowStyle ? rowStyle(row) : null),
             }}
             hoverStyle={clickable ? { background: SURFACE.hover } : undefined}
           >

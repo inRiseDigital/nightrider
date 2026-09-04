@@ -223,6 +223,7 @@ export const mockAdminDataSource: AdminDataSource = {
       lastActiveLabel: a.lastActiveLabel,
       locked: a.locked,
       invitePending: a.invitePending,
+      revoked: a.revoked,
     }));
   },
 

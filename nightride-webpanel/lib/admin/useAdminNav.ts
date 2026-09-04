@@ -116,9 +116,9 @@ export function useAdminNav() {
     isUsers,
     isRoles,
     isAudit,
-    // Placeholder until each section's screen is built out — flip to false
-    // there as each lands.
-    isPlaceholder: isVenues || isEventQueue || isUsers || isRoles || isAudit,
+    // Placeholder until each section's screen is built out — drop each id
+    // from this list as its screen lands.
+    isPlaceholder: isVenues || isEventQueue || isUsers,
     openApplicant,
     backToList,
     openVenue,

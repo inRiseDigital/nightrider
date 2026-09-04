@@ -96,6 +96,14 @@ export interface AdminRosterEntry {
   lastActiveLabel: string;
   locked: boolean;
   invitePending: boolean;
+  /**
+   * Access has been revoked but the row is still listed (dimmed, restorable).
+   * Distinct from simply not being on the roster at all. Wired for real this
+   * reads `users/{uid}.isAdmin === false` on someone who was previously
+   * granted it — which is why revoking has to be an Admin-SDK write, not a
+   * client one.
+   */
+  revoked: boolean;
 }
 
 export interface AuditLogEntry {

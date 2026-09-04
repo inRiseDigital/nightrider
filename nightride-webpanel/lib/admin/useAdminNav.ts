@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NAV_GROUPS_DEF, SECTION_TITLES } from "./m3-data";
 import { getOverviewCounts } from "./firestore";
+import { dataSource } from "./data-source-instance";
 
 export type OrgScreen = "list" | "detail" | "venue";
 
@@ -12,16 +13,32 @@ export type OrgScreen = "list" | "detail" | "venue";
  * Deliberately not real Next.js routes: the design is a single-page shell
  * with in-place screen switching, same as the source design.
  */
+export type VenuesScreen = "list" | "detail";
+
 export function useAdminNav() {
   const [selected, setSelected] = useState("overview");
   const [orgScreen, setOrgScreen] = useState<OrgScreen>("list");
   const [activeUid, setActiveUid] = useState<string | null>(null);
   const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
+  // Directory > Venues, and Content review > Event queue, each keep their
+  // own "list vs. detail" screen state and deep-link target, independent of
+  // the org-apps venue drill-in above (`activeVenueId`).
+  const [venuesScreen, setVenuesScreen] = useState<VenuesScreen>("list");
+  const [activeGlobalVenueId, setActiveGlobalVenueId] = useState<string | null>(null);
+  const [activeEventId, setActiveEventId] = useState<string | null>(null);
+
+  // Sidebar badges. Organizer applications counts real pending applicants;
+  // the event queue counts what is flagged for review. Both refresh on every
+  // nav change so acting on a row updates the badge behind you.
   useEffect(() => {
     getOverviewCounts()
-      .then((c) => setPendingCount(c.pendingApplications))
+      .then((c) => setCounts((prev) => ({ ...prev, "org-apps": c.pendingApplications })))
+      .catch(() => {});
+    dataSource
+      .getDashboardCounts()
+      .then((c) => setCounts((prev) => ({ ...prev, "event-queue": c.eventsInReview })))
       .catch(() => {});
   }, [orgScreen, selected]);
 
@@ -30,6 +47,9 @@ export function useAdminNav() {
     setOrgScreen("list");
     setActiveUid(null);
     setActiveVenueId(null);
+    setVenuesScreen("list");
+    setActiveGlobalVenueId(null);
+    setActiveEventId(null);
   }
   function openApplicant(uid: string) {
     setSelected("org-apps");
@@ -49,20 +69,45 @@ export function useAdminNav() {
     setActiveVenueId(null);
   }
 
+  /** Deep-link into Directory > Venues, opening a specific venue's detail screen. */
+  function openVenueInDirectory(venueId: string) {
+    setSelected("venues");
+    setVenuesScreen("detail");
+    setActiveGlobalVenueId(venueId);
+  }
+
+  /** Deep-link into the Event review queue, opening a specific event. */
+  function openEventInQueue(eventId: string) {
+    setSelected("event-queue");
+    setActiveEventId(eventId);
+  }
+
   const navGroups = NAV_GROUPS_DEF.map((g) => ({
     label: g.label,
-    items: g.items.map((item) => ({
-      id: item.id,
-      label: item.label,
-      icon: item.icon,
-      count: item.id === "org-apps" ? pendingCount : (item as { count?: number }).count,
-      showCount: item.id === "org-apps" ? pendingCount > 0 : !!(item as { count?: number }).count,
-      active: selected === item.id,
-      select: () => select(item.id),
-    })),
+    items: g.items.map((item) => {
+      const showsPendingCount = !!(item as { showsPendingCount?: boolean }).showsPendingCount;
+      const count = showsPendingCount ? counts[item.id] ?? 0 : (item as { count?: number }).count;
+      return {
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        count,
+        showCount: showsPendingCount ? (count ?? 0) > 0 : !!count,
+        active: selected === item.id,
+        select: () => select(item.id),
+      };
+    }),
   }));
 
   const [currentTitle, currentSubtitle] = SECTION_TITLES[selected] || SECTION_TITLES.overview;
+
+  const isOverview = selected === "overview";
+  const isOrgApps = selected === "org-apps";
+  const isVenues = selected === "venues";
+  const isEventQueue = selected === "event-queue";
+  const isUsers = selected === "users";
+  const isRoles = selected === "roles";
+  const isAudit = selected === "audit";
 
   return {
     selected,
@@ -72,13 +117,26 @@ export function useAdminNav() {
     navGroups,
     currentTitle,
     currentSubtitle,
-    isOverview: selected === "overview",
-    isOrgApps: selected === "org-apps",
-    isPlaceholder: selected !== "overview" && selected !== "org-apps",
+    isOverview,
+    isOrgApps,
+    isVenues,
+    isEventQueue,
+    isUsers,
+    isRoles,
+    isAudit,
+    // Every section now has a real screen — nothing falls through to the
+    // Placeholder. Kept so an unknown id still renders something sane.
+    isPlaceholder:
+      !isOverview && !isOrgApps && !isVenues && !isEventQueue && !isUsers && !isRoles && !isAudit,
     openApplicant,
     backToList,
     openVenue,
     backToApplicant,
+    venuesScreen,
+    activeGlobalVenueId,
+    activeEventId,
+    openVenueInDirectory,
+    openEventInQueue,
   };
 }
 

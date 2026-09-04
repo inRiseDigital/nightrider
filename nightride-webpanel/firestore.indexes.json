@@ -120,6 +120,13 @@
     },
     {
       "collectionGroup": "events",
+      "fieldPath": "moderation.flag",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" }
+      ]
+    },
+    {
+      "collectionGroup": "events",
       "fieldPath": "sales",
       "indexes": []
     },

@@ -1,7 +1,8 @@
 "use client";
 
-import { Icon } from "./Icon";
 import { Hoverable } from "./Hoverable";
+import { Icon } from "./Icon";
+import { KpiCard } from "./primitives/StatTile";
 import { useOverviewData } from "@/lib/admin/useOverviewData";
 
 export function Overview() {
@@ -10,9 +11,9 @@ export function Overview() {
   const kpis = counts
     ? [
         { label: "Pending applications", value: counts.pendingApplications, icon: "how_to_reg", cardBg: "#2A1A22", iconColor: "#FFB1C4" },
+        { label: "Events in review", value: counts.eventsInReview, icon: "flag", cardBg: "#1B181B", iconColor: "#A5F2E5" },
         { label: "Active venues", value: counts.activeVenues, icon: "storefront", cardBg: "#1B181B", iconColor: "#A5F2E5" },
         { label: "Active organizers", value: counts.activeOrganizers, icon: "group", cardBg: "#1B181B", iconColor: "#A5F2E5" },
-        { label: "Total events", value: counts.totalEvents, icon: "event_available", cardBg: "#1B181B", iconColor: "#A5F2E5" },
       ]
     : [];
 
@@ -32,13 +33,14 @@ export function Overview() {
               <div key={i} style={{ background: "#1B181B", borderRadius: 16, padding: 20, height: 96 }} />
             ))
           : kpis.map((kpi) => (
-              <div key={kpi.label} style={{ background: kpi.cardBg, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, color: kpi.iconColor }}>
-                  <Icon name={kpi.icon} size={20} />
-                  <div style={{ fontSize: 13, fontWeight: 500, letterSpacing: "0.01em" }}>{kpi.label}</div>
-                </div>
-                <div style={{ fontSize: 40, fontWeight: 300, lineHeight: 1.1, letterSpacing: "-0.01em" }}>{kpi.value}</div>
-              </div>
+              <KpiCard
+                key={kpi.label}
+                icon={kpi.icon}
+                label={kpi.label}
+                value={kpi.value}
+                cardBg={kpi.cardBg}
+                iconColor={kpi.iconColor}
+              />
             ))}
       </div>
 

@@ -275,7 +275,7 @@ export function useOrganizerDashboard() {
       venuePendingReview: v.venuePendingReview,
       venueBusy: venues.busy,
       venueActionError: venues.actionError,
-      liveBusy: v.liveBusy,
+      liveBusyByVenue: v.liveBusyByVenue,
       menuLoading: v.menuLoading,
       saveVenue: venues.saveVenue,
       discardVenue: venues.discardVenue,
@@ -367,7 +367,7 @@ export function useOrganizerDashboard() {
       setCalendarVenueFilter: events.setCalendarVenueFilter,
 
       // ---- Tonight ----
-      tonight: v.tonight,
+      tonightByVenue: v.tonightByVenue,
       setDoorStatus: venues.setDoorStatus,
       setQueueMinutes: venues.setQueueMinutes,
       setFlashText: venues.setFlashText,

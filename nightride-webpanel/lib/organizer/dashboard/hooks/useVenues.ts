@@ -736,24 +736,55 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     [rawDocsRef, capacityFor]
   );
 
-  // Local echo overlaid on the snapshot-derived tonight, for both the three
-  // optimistic controls and the three debounced fields — cleared as soon as
-  // a fresh snapshot for this venue's `live` map lands, which is what
-  // confirms the write (or, on the debounced fields, just reflects the
-  // organizer's own typing until the 800ms commit lands).
-  const [localTonight, setLocalTonight] = useState<TonightState | null>(null);
-  const liveDocRef = rawDocs[editingVenue]?.live;
+  // Local echo overlaid on the snapshot-derived tonight, per venue — Home
+  // shows every venue's Tonight card at once now (not just `editingVenue`),
+  // so the optimistic/debounced overlay has to be keyed by venue id rather
+  // than a single value. Cleared for a venue as soon as a fresh snapshot for
+  // THAT venue's `live` map lands, which is what confirms the write (or, on
+  // the debounced fields, just reflects the organizer's own typing until the
+  // 800ms commit lands).
+  const [localTonightByVenue, setLocalTonightByVenue] = useState<Record<string, TonightState>>({});
+  const prevLiveByVenue = useRef<Record<string, unknown>>({});
   useEffect(() => {
-    setLocalTonight(null);
-  }, [editingVenue, liveDocRef]);
+    setLocalTonightByVenue((prev) => {
+      let next = prev;
+      for (const id of Object.keys(rawDocs)) {
+        const liveVal = rawDocs[id]?.live;
+        if (prevLiveByVenue.current[id] !== liveVal) {
+          prevLiveByVenue.current[id] = liveVal;
+          if (id in next) {
+            if (next === prev) next = { ...prev };
+            delete next[id];
+          }
+        }
+      }
+      return next;
+    });
+  }, [rawDocs]);
 
-  const [liveBusy, setLiveBusy] = useState({ door: false, flash: false, emergency: false });
-
-  const tonight = useMemo(
-    () => localTonight ?? parseTonight(rawDocs[editingVenue]?.live as Record<string, unknown> | undefined, capacityFor(editingVenue)),
-    [localTonight, rawDocs, editingVenue, capacityFor]
+  const [liveBusyByVenue, setLiveBusyByVenue] = useState<
+    Record<string, { door: boolean; flash: boolean; emergency: boolean }>
+  >({});
+  const setLiveBusyFor = useCallback(
+    (id: string, patch: Partial<{ door: boolean; flash: boolean; emergency: boolean }>) => {
+      setLiveBusyByVenue((prev) => ({
+        ...prev,
+        [id]: { ...(prev[id] ?? { door: false, flash: false, emergency: false }), ...patch },
+      }));
+    },
+    []
   );
-  const tonightRef = useLatest(tonight);
+
+  const tonightByVenue = useMemo(() => {
+    const out: Record<string, TonightState> = {};
+    for (const id of venueOrder) {
+      out[id] =
+        localTonightByVenue[id] ??
+        parseTonight(rawDocs[id]?.live as Record<string, unknown> | undefined, capacityFor(id));
+    }
+    return out;
+  }, [localTonightByVenue, rawDocs, venueOrder, capacityFor]);
+  const tonightByVenueRef = useLatest(tonightByVenue);
 
   const writeLivePatch = useCallback(
     async (id: string, patch: Record<string, unknown>, activityWhat: string) => {
@@ -769,13 +800,12 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
   );
 
   const setDoorStatus = useCallback(
-    (status: DoorStatus) => {
-      const id = editingVenue;
+    (id: string, status: DoorStatus) => {
       const capacity = capacityFor(id);
-      const current = tonightRef.current;
+      const current = tonightByVenueRef.current[id] ?? DEFAULT_TONIGHT_STATE;
       const next: TonightState = { ...current, status };
-      setLocalTonight(next);
-      setLiveBusy((b) => ({ ...b, door: true }));
+      setLocalTonightByVenue((prev) => ({ ...prev, [id]: next }));
+      setLiveBusyFor(id, { door: true });
       showSnack(`Door status set to ${status}.`);
       writeLivePatch(
         id,
@@ -789,44 +819,59 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
         `Set door status to ${status}`
       )
         .catch((err) => {
-          setLocalTonight(null);
+          setLocalTonightByVenue((prev) => {
+            const n = { ...prev };
+            delete n[id];
+            return n;
+          });
           showSnack(describeFirestoreError(err), "error");
         })
-        .finally(() => setLiveBusy((b) => ({ ...b, door: false })));
+        .finally(() => setLiveBusyFor(id, { door: false }));
     },
-    [editingVenue, capacityFor, tonightRef, showSnack, writeLivePatch]
+    [capacityFor, tonightByVenueRef, showSnack, writeLivePatch, setLiveBusyFor]
   );
 
-  const queueMinutesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueMinutesTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const flushQueueMinutes = useCallback(
     (id: string, value: number) => {
-      if (queueMinutesTimer.current) {
-        clearTimeout(queueMinutesTimer.current);
-        queueMinutesTimer.current = null;
+      const timer = queueMinutesTimers.current.get(id);
+      if (timer) {
+        clearTimeout(timer);
+        queueMinutesTimers.current.delete(id);
       }
-      const status = tonightRef.current.status;
+      const status = (tonightByVenueRef.current[id] ?? DEFAULT_TONIGHT_STATE).status;
       writeLivePatch(
         id,
         { queueMinutes: value, queueStatus: queueStatusForDoorStatus(status, value) },
         "Set queue wait"
       ).catch((err) => showSnack(describeFirestoreError(err), "error"));
     },
-    [tonightRef, writeLivePatch, showSnack]
+    [tonightByVenueRef, writeLivePatch, showSnack]
   );
   const setQueueMinutes = useCallback(
-    (v: number) => {
-      const id = editingVenue;
-      setLocalTonight({ ...tonightRef.current, queueMinutes: v });
-      if (queueMinutesTimer.current) clearTimeout(queueMinutesTimer.current);
-      queueMinutesTimer.current = setTimeout(() => flushQueueMinutes(id, v), 800);
+    (id: string, v: number) => {
+      setLocalTonightByVenue((prev) => ({
+        ...prev,
+        [id]: { ...(tonightByVenueRef.current[id] ?? DEFAULT_TONIGHT_STATE), queueMinutes: v },
+      }));
+      const existing = queueMinutesTimers.current.get(id);
+      if (existing) clearTimeout(existing);
+      queueMinutesTimers.current.set(id, setTimeout(() => flushQueueMinutes(id, v), 800));
     },
-    [editingVenue, tonightRef, flushQueueMinutes]
+    [tonightByVenueRef, flushQueueMinutes]
   );
-  const flushQueueMinutesNow = useCallback(() => {
-    if (!queueMinutesTimer.current) return;
-    flushQueueMinutes(editingVenue, tonightRef.current.queueMinutes);
-  }, [editingVenue, tonightRef, flushQueueMinutes]);
+  const flushQueueMinutesNow = useCallback(
+    (id: string) => {
+      if (!queueMinutesTimers.current.has(id)) return;
+      flushQueueMinutes(id, (tonightByVenueRef.current[id] ?? DEFAULT_TONIGHT_STATE).queueMinutes);
+    },
+    [tonightByVenueRef, flushQueueMinutes]
+  );
 
+  // Flash text/until editing has no UI anywhere in the panel today — only
+  // `toggleFlash` (below, immediate write, no debounce) is wired up. Left
+  // single-venue/`editingVenue`-scoped rather than converted: touching dead
+  // code here would just be unrelated churn.
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commitFlash = useCallback(
     (id: string, next: TonightState) => {
@@ -848,81 +893,93 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
   const scheduleFlash = useCallback(
     (next: TonightState) => {
       const id = editingVenue;
-      setLocalTonight(next);
+      setLocalTonightByVenue((prev) => ({ ...prev, [id]: next }));
       if (flashTimer.current) clearTimeout(flashTimer.current);
       flashTimer.current = setTimeout(() => commitFlash(id, next), 800);
     },
     [editingVenue, commitFlash]
   );
   const setFlashText = useCallback(
-    (v: string) => scheduleFlash({ ...tonightRef.current, flashText: v }),
-    [scheduleFlash, tonightRef]
+    (v: string) => scheduleFlash({ ...(tonightByVenueRef.current[editingVenue] ?? DEFAULT_TONIGHT_STATE), flashText: v }),
+    [scheduleFlash, tonightByVenueRef, editingVenue]
   );
   const setFlashUntil = useCallback(
-    (v: string) => scheduleFlash({ ...tonightRef.current, flashUntil: v }),
-    [scheduleFlash, tonightRef]
+    (v: string) => scheduleFlash({ ...(tonightByVenueRef.current[editingVenue] ?? DEFAULT_TONIGHT_STATE), flashUntil: v }),
+    [scheduleFlash, tonightByVenueRef, editingVenue]
   );
   const flushFlashNow = useCallback(() => {
     if (!flashTimer.current) return;
-    commitFlash(editingVenue, tonightRef.current);
-  }, [editingVenue, commitFlash, tonightRef]);
+    commitFlash(editingVenue, tonightByVenueRef.current[editingVenue] ?? DEFAULT_TONIGHT_STATE);
+  }, [editingVenue, commitFlash, tonightByVenueRef]);
 
   useEffect(
     () => () => {
-      if (queueMinutesTimer.current) flushQueueMinutesNow();
+      for (const id of queueMinutesTimers.current.keys()) flushQueueMinutesNow(id);
       if (flashTimer.current) flushFlashNow();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
-  const toggleFlash = useCallback(() => {
-    const id = editingVenue;
-    const current = tonightRef.current;
-    const nextActive = !current.flashActive;
-    const next: TonightState = { ...current, flashActive: nextActive };
-    setLocalTonight(next);
-    setLiveBusy((b) => ({ ...b, flash: true }));
-    showSnack(current.flashActive ? "Flash offer ended." : "Flash offer is live.");
-    writeLivePatch(
-      id,
-      {
-        flash: { active: nextActive, text: next.flashText.slice(0, 200), until: next.flashUntil },
-        offer: offerFor(nextActive, next.flashText),
-      },
-      nextActive ? "Turned on flash offer" : "Turned off flash offer"
-    )
-      .catch((err) => {
-        setLocalTonight(null);
-        showSnack(describeFirestoreError(err), "error");
-      })
-      .finally(() => setLiveBusy((b) => ({ ...b, flash: false })));
-  }, [editingVenue, tonightRef, showSnack, writeLivePatch]);
+  const toggleFlash = useCallback(
+    (id: string) => {
+      const current = tonightByVenueRef.current[id] ?? DEFAULT_TONIGHT_STATE;
+      const nextActive = !current.flashActive;
+      const next: TonightState = { ...current, flashActive: nextActive };
+      setLocalTonightByVenue((prev) => ({ ...prev, [id]: next }));
+      setLiveBusyFor(id, { flash: true });
+      showSnack(current.flashActive ? "Flash offer ended." : "Flash offer is live.");
+      writeLivePatch(
+        id,
+        {
+          flash: { active: nextActive, text: next.flashText.slice(0, 200), until: next.flashUntil },
+          offer: offerFor(nextActive, next.flashText),
+        },
+        nextActive ? "Turned on flash offer" : "Turned off flash offer"
+      )
+        .catch((err) => {
+          setLocalTonightByVenue((prev) => {
+            const n = { ...prev };
+            delete n[id];
+            return n;
+          });
+          showSnack(describeFirestoreError(err), "error");
+        })
+        .finally(() => setLiveBusyFor(id, { flash: false }));
+    },
+    [tonightByVenueRef, showSnack, writeLivePatch, setLiveBusyFor]
+  );
 
-  const toggleEmergency = useCallback(async () => {
-    const id = editingVenue;
-    const current = tonightRef.current;
-    const nextActive = !current.emergencyActive;
-    setLocalTonight({ ...current, emergencyActive: nextActive });
-    setLiveBusy((b) => ({ ...b, emergency: true }));
-    showSnack(nextActive ? "Venue closed on the map." : "Venue reopened — you're back on the map.");
-    try {
-      await ensureLive(id);
-      const batch = writeBatch(getDb());
-      batch.update(venueDocRef(id), {
-        "live.emergencyActive": nextActive,
-        "live.updatedAt": serverTimestamp(),
-        status: nextActive ? "closed" : "active",
-      });
-      await logActivity(batch, id, uid, nextActive ? "Emergency-closed the venue" : "Reopened the venue");
-      await batch.commit();
-    } catch (err) {
-      setLocalTonight(null);
-      showSnack(describeFirestoreError(err), "error");
-    } finally {
-      setLiveBusy((b) => ({ ...b, emergency: false }));
-    }
-  }, [editingVenue, tonightRef, showSnack, ensureLive, uid]);
+  const toggleEmergency = useCallback(
+    async (id: string) => {
+      const current = tonightByVenueRef.current[id] ?? DEFAULT_TONIGHT_STATE;
+      const nextActive = !current.emergencyActive;
+      setLocalTonightByVenue((prev) => ({ ...prev, [id]: { ...current, emergencyActive: nextActive } }));
+      setLiveBusyFor(id, { emergency: true });
+      showSnack(nextActive ? "Venue closed on the map." : "Venue reopened — you're back on the map.");
+      try {
+        await ensureLive(id);
+        const batch = writeBatch(getDb());
+        batch.update(venueDocRef(id), {
+          "live.emergencyActive": nextActive,
+          "live.updatedAt": serverTimestamp(),
+          status: nextActive ? "closed" : "active",
+        });
+        await logActivity(batch, id, uid, nextActive ? "Emergency-closed the venue" : "Reopened the venue");
+        await batch.commit();
+      } catch (err) {
+        setLocalTonightByVenue((prev) => {
+          const n = { ...prev };
+          delete n[id];
+          return n;
+        });
+        showSnack(describeFirestoreError(err), "error");
+      } finally {
+        setLiveBusyFor(id, { emergency: false });
+      }
+    },
+    [tonightByVenueRef, showSnack, ensureLive, uid, setLiveBusyFor]
+  );
 
   // ---- Derived profile: draft/published seam ----
   const savedProfile = venues[editingVenue] ?? blankVenueProfile("", "", []);
@@ -959,14 +1016,14 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       newVenueCity,
       newVenueCountry,
       approximateLocationVenues,
-      tonight,
-      liveBusy,
+      tonightByVenue,
+      liveBusyByVenue,
       menuLoading,
     }),
     [
       venueOrder, venues, meta, venuesLoading, venuesError, editingVenue, profile, savedProfile, venueDirty,
       venuePendingReview, venueTab, addingVenue, newVenueName, newVenueCity, newVenueCountry, approximateLocationVenues,
-      tonight, liveBusy, menuLoading,
+      tonightByVenue, liveBusyByVenue, menuLoading,
     ]
   );
 

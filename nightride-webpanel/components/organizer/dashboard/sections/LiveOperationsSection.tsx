@@ -12,7 +12,6 @@ import {
   Sparkles,
   Ticket,
   Wallet,
-  Eye,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -25,6 +24,7 @@ import { deriveEventChip, toISODate, venueName } from "@/lib/organizer/dashboard
 import { resolveTimeZone } from "@/lib/organizer/dashboard/data/time";
 import { Toggle } from "../ui/Primitives";
 import { StatusChip } from "../ui/StatusChip";
+import type { OrganizerEvent, TonightState, VenueProfile } from "@/lib/organizer/dashboard/types";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -43,19 +43,24 @@ const DOOR_SHORT_LABELS: Record<string, string> = {
 const KPI_ICONS: Record<string, LucideIcon> = {
   rsvp: Ticket,
   revenue: Wallet,
-  views: Eye,
-  ai: Sparkles,
 };
 
 /**
- * Trend deltas have no backing document in this task's four shapes (metrics,
- * aiVisibility, promotion, activity) — nothing here stores a week-over-week
- * comparison to derive them from, so they stay illustrative placeholders
- * rather than a number invented to look real. `value` is filled in for real
- * below, from `tonightEvent`, the performance funnel, and the AI score.
+ * Only two KPI tiles now — "Profile views" and "AI recommendation score" were
+ * dropped when this became a portfolio view (see `buildAttention`'s sibling
+ * change, same task): both are per-venue derived/percentage figures with no
+ * meaningful way to combine across venues (the exact reasoning
+ * `usePerformance.ts` already documents for why the funnel itself never sums
+ * across venues). They stay on the Performance / AI Visibility pages, scoped
+ * to one venue at a time, rather than a fabricated portfolio number here.
+ *
+ * Trend deltas have no backing document — nothing here stores a
+ * week-over-week comparison to derive them from — so they stay illustrative
+ * placeholders. `value` is filled in for real below, summed across every
+ * venue's tonight event.
  */
 const KPI_META: {
-  icon: "rsvp" | "revenue" | "views" | "ai";
+  icon: "rsvp" | "revenue";
   label: string;
   delta: string;
   tone: "primary" | "tertiary";
@@ -63,61 +68,47 @@ const KPI_META: {
 }[] = [
   { icon: "rsvp", label: "RSVPs tonight", delta: "+18%", tone: "primary", deltaTone: "up" },
   { icon: "revenue", label: "Ticket revenue (AED)", delta: "+7%", tone: "tertiary", deltaTone: "up" },
-  { icon: "views", label: "Profile views, 7d", delta: "−4%", tone: "primary", deltaTone: "down" },
-  { icon: "ai", label: "AI recommendation score", delta: "+6", tone: "tertiary", deltaTone: "up" },
 ];
 
+/** This venue's event happening tonight, else the soonest one still to come. */
+function tonightEventFor(venueId: string, events: OrganizerEvent[], todayISO: string): OrganizerEvent | undefined {
+  const venueEvents = events
+    .filter((e) => e.venue === venueId && e.status !== "cancelled")
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return venueEvents.find((e) => e.date === todayISO) ?? venueEvents[0];
+}
+
 /**
- * Home → Live operations: the mockup's single combined control screen — one
- * live-ops card for tonight's door, then the KPI row, then the two review
+ * Home → Live operations: one Tonight card per venue the organizer manages
+ * (a multi-venue organizer sees all of them, not just whichever one
+ * `editingVenue` happens to point at — that selection is for the Venues
+ * editor, a different screen), then the KPI row, then the two portfolio-wide
  * panels. Everything reads the shared dashboard store, so edits here show up
  * on the venue's tonight screen too.
  */
 export function LiveOperationsSection() {
   const {
-    profile,
-    editingVenue,
     venues,
     venueMeta,
     venueOrder,
     events,
     images,
-    tonight,
-    liveBusy,
-    setDoorStatus,
-    setQueueMinutes,
-    toggleFlash,
-    toggleEmergency,
     setEventsTab,
     setVenueTab,
     openAddVenue,
-    perfMetrics,
-    aiVisibility,
   } = useOrganizerDashboard();
   const now = useNow();
-
-  const doorsOpen = tonight.status === "open" || tonight.status === "filling";
-  const occupancyPct = profile.capacity
-    ? Math.min(100, Math.round((tonight.inVenue / profile.capacity) * 100))
-    : 0;
-
-  // Tonight's event at this venue, else the soonest one still to come.
-  const venueEvents = events
-    .filter((e) => e.venue === editingVenue && e.status !== "cancelled")
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date));
   const todayISO = now ? toISODate(now) : "";
-  const tonightEvent = venueEvents.find((e) => e.date === todayISO) ?? venueEvents[0];
 
-  // "Profile views" reuses the discovery funnel's "Profile opened" count —
-  // the same absolute number the Performance tab derives its bar chart from,
-  // not a second, independently-maintained figure.
-  const profileViews = perfMetrics?.funnel.find((f) => f.label === "Profile opened")?.value ?? "—";
+  const tonightEvents = venueOrder
+    .map((id) => tonightEventFor(id, events, todayISO))
+    .filter((e): e is OrganizerEvent => !!e);
   const kpiValues: Record<string, string> = {
-    rsvp: tonightEvent ? String(tonightEvent.sold) : "—",
-    revenue: tonightEvent ? `${(tonightEvent.revenue / 1000).toFixed(1)}k` : "—",
-    views: profileViews,
-    ai: aiVisibility ? String(aiVisibility.score) : "—",
+    rsvp: tonightEvents.length ? String(tonightEvents.reduce((sum, e) => sum + e.sold, 0)) : "—",
+    revenue: tonightEvents.length
+      ? `${(tonightEvents.reduce((sum, e) => sum + e.revenue, 0) / 1000).toFixed(1)}k`
+      : "—",
   };
 
   const attention = buildAttention();
@@ -203,156 +194,15 @@ export function LiveOperationsSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Live operations control */}
-      <div className="rounded-2xl bg-[var(--m3-surf2)] p-6">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="min-w-[260px] flex-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Martini size={19} color="var(--m3-pri)" />
-              <p className="text-base font-medium text-[var(--m3-on)]">
-                Tonight — {profile.name}
-              </p>
-              <span
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-wide"
-                style={
-                  doorsOpen
-                    ? { background: "var(--m3-succ)", color: "var(--m3-onsucc)" }
-                    : { background: "var(--m3-errc)", color: "var(--m3-onerrc)" }
-                }
-              >
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: doorsOpen ? "var(--m3-suc)" : "var(--m3-err)" }}
-                />
-                {doorsOpen ? "DOORS OPEN" : "DOORS CLOSED"}
-              </span>
-            </div>
-            <p className="mt-1.5 text-sm text-[var(--m3-onv)]">
-              {tonightEvent
-                ? `${tonightEvent.name} · ${tonightEvent.startTime}–${tonightEvent.endTime} · `
-                : ""}
-              Live operations control
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleEmergency}
-              disabled={liveBusy.emergency}
-              className="flex h-10 items-center gap-2 rounded-full border px-5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                borderColor: "var(--m3-err)",
-                color: tonight.emergencyActive ? "var(--m3-onerrc)" : "var(--m3-err)",
-                background: tonight.emergencyActive ? "var(--m3-errc)" : "transparent",
-              }}
-            >
-              <OctagonAlert size={17} />
-              {tonight.emergencyActive ? "Reopen venue" : "Emergency close"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {/* Door status */}
-          <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
-            <p className="text-xs text-[var(--m3-onv)]">Door status</p>
-            <div
-              className="mt-3 flex overflow-hidden rounded-full border"
-              style={{ borderColor: "var(--m3-outline)" }}
-            >
-              {DOOR_STATUSES.map((s, i) => {
-                const active = tonight.status === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setDoorStatus(s.id)}
-                    disabled={liveBusy.door}
-                    aria-pressed={active}
-                    title={s.label}
-                    className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1 px-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                    style={{
-                      borderLeft: `1px solid ${i === 0 ? "transparent" : "var(--m3-outline)"}`,
-                      background: active ? "var(--m3-pric)" : "transparent",
-                      color: active ? "var(--m3-onpric)" : "var(--m3-onv)",
-                    }}
-                  >
-                    {active && <Check size={13} className="shrink-0" />}
-                    <span className="truncate">{DOOR_SHORT_LABELS[s.id] ?? s.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* In venue */}
-          <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
-            <p className="text-xs text-[var(--m3-onv)]">In venue</p>
-            <div className="mt-1.5 flex items-baseline gap-1.5">
-              <span className="font-mono text-[28px] font-medium text-[var(--m3-on)]">
-                {tonight.inVenue}
-              </span>
-              <span className="text-[13px] text-[var(--m3-onv)]">/ {profile.capacity}</span>
-            </div>
-            <div
-              className="mt-3 h-1 overflow-hidden rounded-full"
-              style={{ background: "var(--m3-track)" }}
-            >
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${occupancyPct}%`, background: "var(--m3-pri)" }}
-              />
-            </div>
-          </div>
-
-          {/* Queue wait */}
-          <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
-            <p className="text-xs text-[var(--m3-onv)]">Queue wait</p>
-            <div className="mt-2 flex items-center gap-2">
-              <button
-                onClick={() => setQueueMinutes(Math.max(0, tonight.queueMinutes - 5))}
-                aria-label="Decrease queue wait"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[var(--m3-onv)] transition-colors hover:bg-[var(--m3-surf3)]"
-                style={{ borderColor: "var(--m3-outline)" }}
-              >
-                <Minus size={16} />
-              </button>
-              <p className="flex-1 text-center font-mono text-2xl font-medium text-[var(--m3-on)]">
-                {tonight.queueMinutes}
-                <span className="font-sans text-xs text-[var(--m3-onv)]"> min</span>
-              </p>
-              <button
-                onClick={() => setQueueMinutes(tonight.queueMinutes + 5)}
-                aria-label="Increase queue wait"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[var(--m3-onv)] transition-colors hover:bg-[var(--m3-surf3)]"
-                style={{ borderColor: "var(--m3-outline)" }}
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Flash offer */}
-          <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs text-[var(--m3-onv)]">Flash offer</p>
-                <p className="mt-1.5 text-[13px] text-[var(--m3-on)]">
-                  {tonight.flashText || "No offer set"}
-                </p>
-              </div>
-              <Toggle
-                checked={tonight.flashActive}
-                onChange={toggleFlash}
-                label="Flash offer"
-                disabled={liveBusy.flash}
-              />
-            </div>
-          </div>
-        </div>
+      {/* One live-ops card per venue */}
+      <div className="flex flex-col gap-4">
+        {venueOrder.map((id) => (
+          <VenueTonightCard key={id} venueId={id} todayISO={todayISO} />
+        ))}
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {KPI_META.map((kpi) => {
           const Icon = KPI_ICONS[kpi.icon] ?? Sparkles;
           return (
@@ -460,6 +310,157 @@ export function LiveOperationsSection() {
               );
             })
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One venue's live-ops control card — door status, occupancy, queue wait,
+ * flash offer, emergency close. `todayISO` is threaded from the parent (a
+ * single `useNow()` subscription, not one per card) purely to compute this
+ * venue's own tonight-event subtitle.
+ */
+function VenueTonightCard({ venueId, todayISO }: { venueId: string; todayISO: string }) {
+  const { venues, events, tonightByVenue, liveBusyByVenue, setDoorStatus, setQueueMinutes, toggleFlash, toggleEmergency } =
+    useOrganizerDashboard();
+  const venue: VenueProfile | undefined = venues[venueId];
+  const tonight: TonightState = tonightByVenue[venueId];
+  const liveBusy = liveBusyByVenue[venueId] ?? { door: false, flash: false, emergency: false };
+  if (!venue || !tonight) return null;
+
+  const doorsOpen = tonight.status === "open" || tonight.status === "filling";
+  const occupancyPct = venue.capacity ? Math.min(100, Math.round((tonight.inVenue / venue.capacity) * 100)) : 0;
+  const tonightEvent = tonightEventFor(venueId, events, todayISO);
+
+  return (
+    <div className="rounded-2xl bg-[var(--m3-surf2)] p-6">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-[260px] flex-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Martini size={19} color="var(--m3-pri)" />
+            <p className="text-base font-medium text-[var(--m3-on)]">Tonight — {venue.name}</p>
+            <span
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium tracking-wide"
+              style={
+                doorsOpen
+                  ? { background: "var(--m3-succ)", color: "var(--m3-onsucc)" }
+                  : { background: "var(--m3-errc)", color: "var(--m3-onerrc)" }
+              }
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: doorsOpen ? "var(--m3-suc)" : "var(--m3-err)" }}
+              />
+              {doorsOpen ? "DOORS OPEN" : "DOORS CLOSED"}
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm text-[var(--m3-onv)]">
+            {tonightEvent ? `${tonightEvent.name} · ${tonightEvent.startTime}–${tonightEvent.endTime} · ` : ""}
+            Live operations control
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => toggleEmergency(venueId)}
+            disabled={liveBusy.emergency}
+            className="flex h-10 items-center gap-2 rounded-full border px-5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            style={{
+              borderColor: "var(--m3-err)",
+              color: tonight.emergencyActive ? "var(--m3-onerrc)" : "var(--m3-err)",
+              background: tonight.emergencyActive ? "var(--m3-errc)" : "transparent",
+            }}
+          >
+            <OctagonAlert size={17} />
+            {tonight.emergencyActive ? "Reopen venue" : "Emergency close"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Door status */}
+        <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
+          <p className="text-xs text-[var(--m3-onv)]">Door status</p>
+          <div className="mt-3 flex overflow-hidden rounded-full border" style={{ borderColor: "var(--m3-outline)" }}>
+            {DOOR_STATUSES.map((s, i) => {
+              const active = tonight.status === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setDoorStatus(venueId, s.id)}
+                  disabled={liveBusy.door}
+                  aria-pressed={active}
+                  title={s.label}
+                  className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1 px-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    borderLeft: `1px solid ${i === 0 ? "transparent" : "var(--m3-outline)"}`,
+                    background: active ? "var(--m3-pric)" : "transparent",
+                    color: active ? "var(--m3-onpric)" : "var(--m3-onv)",
+                  }}
+                >
+                  {active && <Check size={13} className="shrink-0" />}
+                  <span className="truncate">{DOOR_SHORT_LABELS[s.id] ?? s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* In venue */}
+        <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
+          <p className="text-xs text-[var(--m3-onv)]">In venue</p>
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="font-mono text-[28px] font-medium text-[var(--m3-on)]">{tonight.inVenue}</span>
+            <span className="text-[13px] text-[var(--m3-onv)]">/ {venue.capacity}</span>
+          </div>
+          <div className="mt-3 h-1 overflow-hidden rounded-full" style={{ background: "var(--m3-track)" }}>
+            <div className="h-full rounded-full" style={{ width: `${occupancyPct}%`, background: "var(--m3-pri)" }} />
+          </div>
+        </div>
+
+        {/* Queue wait */}
+        <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
+          <p className="text-xs text-[var(--m3-onv)]">Queue wait</p>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => setQueueMinutes(venueId, Math.max(0, tonight.queueMinutes - 5))}
+              aria-label="Decrease queue wait"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[var(--m3-onv)] transition-colors hover:bg-[var(--m3-surf3)]"
+              style={{ borderColor: "var(--m3-outline)" }}
+            >
+              <Minus size={16} />
+            </button>
+            <p className="flex-1 text-center font-mono text-2xl font-medium text-[var(--m3-on)]">
+              {tonight.queueMinutes}
+              <span className="font-sans text-xs text-[var(--m3-onv)]"> min</span>
+            </p>
+            <button
+              onClick={() => setQueueMinutes(venueId, tonight.queueMinutes + 5)}
+              aria-label="Increase queue wait"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[var(--m3-onv)] transition-colors hover:bg-[var(--m3-surf3)]"
+              style={{ borderColor: "var(--m3-outline)" }}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Flash offer */}
+        <div className="rounded-xl bg-[var(--m3-surf1)] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-[var(--m3-onv)]">Flash offer</p>
+              <p className="mt-1.5 text-[13px] text-[var(--m3-on)]">{tonight.flashText || "No offer set"}</p>
+            </div>
+            <Toggle
+              checked={tonight.flashActive}
+              onChange={() => toggleFlash(venueId)}
+              label="Flash offer"
+              disabled={liveBusy.flash}
+            />
+          </div>
         </div>
       </div>
     </div>

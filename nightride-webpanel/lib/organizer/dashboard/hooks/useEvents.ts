@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { doc, getDocs, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { eventDocRef, eventsCol } from "../data/refs";
 import { describeFirestoreError } from "../data/errors";
@@ -128,6 +129,7 @@ export function useEvents(
 
   const editor = useEventEditor();
   const { busy, actionError, run } = useAsyncAction(loadEvents);
+  const router = useRouter();
 
   const openNewEvent = useCallback(
     (date?: string) => {
@@ -263,21 +265,38 @@ export function useEvents(
     [run, rawDocsRef]
   );
 
+  /**
+   * The "New event" FAB (`Sidebar.tsx`) opens this editor from any dashboard
+   * route, not just `/organizer/events` — so on a brand-new event (no
+   * `editingId`) both save paths route to the events list after the write
+   * lands. Otherwise the organizer's new event sits in Firestore with no
+   * visible confirmation unless they happen to already be on that tab.
+   */
   const saveDraftEvent = useCallback(async () => {
+    const isNew = !editor.editingId;
     if (await commitEvent("draft")) {
       editor.close();
       showSnack("Draft saved.");
+      if (isNew) {
+        setEventsTab("list");
+        router.push("/organizer/events");
+      }
     }
-  }, [commitEvent, editor, showSnack]);
+  }, [commitEvent, editor, showSnack, router]);
 
   const submitEvent = useCallback(async () => {
+    const isNew = !editor.editingId;
     const scheduled = !!editor.draft?.scheduledPublish;
     const ok = await commitEvent(scheduled ? "scheduled" : "in_review");
     if (ok) {
       editor.close();
       showSnack(scheduled ? "Event scheduled to publish." : "Event submitted for review — usually under 2h.");
+      if (isNew) {
+        setEventsTab("list");
+        router.push("/organizer/events");
+      }
     }
-  }, [editor, commitEvent, showSnack]);
+  }, [editor, commitEvent, showSnack, router]);
 
   /**
    * A fresh `draft` with a new id — never carries `moderation`/`sales`

@@ -200,24 +200,24 @@ export async function listRecentLogs(max = 8): Promise<LogEntry[]> {
 
 export interface OverviewCounts {
   pendingApplications: number;
+  eventsInReview: number;
   activeVenues: number;
   activeOrganizers: number;
-  totalEvents: number;
 }
 
 export async function getOverviewCounts(): Promise<OverviewCounts> {
   const db = getDb();
-  const [pending, venues, organizers, events] = await Promise.all([
+  const [pending, eventsInReview, venues, organizers] = await Promise.all([
     getCountFromServer(query(collection(db, "users"), where("organizerStatus", "==", "none"), where("organizerApplication.submitted", "==", true))),
+    getCountFromServer(query(collection(db, "events"), where("moderation.flag", "==", "pending"))),
     getCountFromServer(query(collection(db, "venues"), where("status", "==", "active"))),
     getCountFromServer(query(collection(db, "users"), where("organizerStatus", "==", "approved"))),
-    getCountFromServer(collection(db, "events")),
   ]);
   return {
     pendingApplications: pending.data().count,
+    eventsInReview: eventsInReview.data().count,
     activeVenues: venues.data().count,
     activeOrganizers: organizers.data().count,
-    totalEvents: events.data().count,
   };
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, type ReactNode } from "react";
 import { Icon } from "../Icon";
 import { Hoverable } from "../Hoverable";
 import { SimulatedBadge } from "../SimulatedBadge";
@@ -9,6 +10,39 @@ import { osmTileUrl } from "@/lib/admin/geo";
 import { deriveDisplayStepStatus, type StepId, type UserRecord } from "@/lib/admin/schema";
 import { stepApplicantClaim, videoScriptReady, type ApplicantDetail, type StepEvidence } from "@/lib/admin/useApplicantDetail";
 import { VIDEO_SCRIPT_MAX_LINES, VIDEO_SCRIPT_TEMPLATES } from "@/lib/organizer/constants";
+
+// ---------------------------------------------------------------------------
+// Extra (addable) verification steps — `users/{uid}/private/organizerReview`'s
+// `steps` map is a fixed five-key shape firestore.rules enforces, so these two
+// steps have nowhere real to live. They're session-only UI state on this
+// component: added, viewed, and noted here, gone on refresh/unmount. Always
+// rendered with <SimulatedBadge/> so nobody mistakes them for persisted state.
+// ---------------------------------------------------------------------------
+
+type ExtraStepId = "code" | "call";
+
+const EXTRA_STEP_ORDER: ExtraStepId[] = ["code", "call"];
+
+const EXTRA_STEP_DEFS: Record<ExtraStepId, { tabLabel: string; icon: string; title: string; menuLabel: string; meta: string }> = {
+  code: { tabLabel: "Posted code", icon: "local_post_office", title: "Posted code to address", menuLabel: "Post a code to their address", meta: "Letter with a one-time code to the address they provided" },
+  call: { tabLabel: "Video call", icon: "video_call", title: "Verification live video call", menuLabel: "Verification live video call", meta: "Live video call with the applicant" },
+};
+
+function extraStepEvidence(type: ExtraStepId, user: UserRecord): { label: string; value: string }[] {
+  if (type === "code") {
+    const address = user.organizerApplication?.steps.venueAddress?.address || "—";
+    return [
+      { label: "Posted to", value: address },
+      { label: "Letter status", value: "Not posted yet" },
+      { label: "Code state", value: "Not entered yet" },
+    ];
+  }
+  return [
+    { label: "Scheduled", value: "Not scheduled" },
+    { label: "Assigned to", value: "Unassigned" },
+    { label: "Checks on call", value: "Face vs. NIC, venue in frame" },
+  ];
+}
 
 function stepMeta(stepId: StepId, user: UserRecord): string {
   const app = user.organizerApplication;
@@ -367,28 +401,168 @@ function VideoScriptPanel({ detail }: { detail: ApplicantDetail }) {
   );
 }
 
+/**
+ * Internal-only note on one verification step (real or extra). Neither the
+ * five real steps nor the two extra ones have a Firestore field for this —
+ * `ReviewStep.note` is already spoken for by the ask-again flow (shown above
+ * as "You asked: …") — so this is session-only state on the component, same
+ * as the extra steps themselves.
+ */
+function StepNoteSection({
+  savedNote,
+  open,
+  draft,
+  onToggle,
+  onDraftChange,
+  onSave,
+}: {
+  savedNote: string;
+  open: boolean;
+  draft: string;
+  onToggle: () => void;
+  onDraftChange: (value: string) => void;
+  onSave: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {savedNote ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "12px 14px", borderRadius: 12, background: "#2A252A" }}>
+          <div style={{ display: "flex", gap: 10, fontSize: 13, color: "#CFC0C5" }}>
+            <Icon name="sticky_note_2" size={18} color="#9A8C91" />
+            <div style={{ minWidth: 0 }}>{savedNote}</div>
+          </div>
+          {/*
+            There is no field behind this yet — organizerReview's per-step
+            `note` is already the ask-again message the applicant sees. Say so
+            on the note itself: a reviewer who thinks they have recorded a
+            concern, and has not, is worse off than one who never typed it.
+          */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#F5C452" }}>
+            <Icon name="warning" size={14} />
+            Kept on this screen only — not saved to the applicant&apos;s record.
+          </div>
+        </div>
+      ) : null}
+      {open ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input
+            value={draft}
+            onChange={(e) => onDraftChange(e.target.value)}
+            placeholder="Internal note — the organizer never sees this"
+            style={{ flex: 1, minWidth: 200, height: 48, background: "#2A252A", border: "none", borderRadius: 12, padding: "0 16px", fontSize: 14, color: "#EDE0E4" }}
+          />
+          <button
+            onClick={onSave}
+            style={{ height: 48, padding: "0 22px", borderRadius: 24, fontSize: 14, fontWeight: 500, background: "#1F4F49", color: "#A5F2E5", border: "none", cursor: "pointer" }}
+          >
+            Save note
+          </button>
+        </div>
+      ) : (
+        <Hoverable
+          as="button"
+          onClick={onToggle}
+          style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 8, height: 36, padding: "0 14px", borderRadius: 18, fontSize: 13, fontWeight: 500, background: "transparent", color: "#CFC0C5", border: "none", cursor: "pointer" }}
+          hoverStyle={{ background: "#FFFFFF14", color: "#EDE0E4" }}
+        >
+          <Icon name="edit_note" size={18} />
+          Add note
+        </Hoverable>
+      )}
+    </div>
+  );
+}
+
+function ExtraStepPanel({ type, user, note }: { type: ExtraStepId; user: UserRecord; note: ReactNode }) {
+  const def = EXTRA_STEP_DEFS[type];
+  const evidence = extraStepEvidence(type, user);
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 400 }}>{def.title}</div>
+          <div style={{ fontSize: 13, color: "#9A8C91", marginTop: 3 }}>{def.meta}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#332B30", color: "#CFC0C5" }}>
+            <Icon name="schedule" size={16} />
+            Not started
+          </div>
+          <SimulatedBadge />
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {evidence.map((row) => (
+          <DetailRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </div>
+      {note}
+    </>
+  );
+}
+
 export function VerificationFlow({ detail }: { detail: ApplicantDetail }) {
   const { user, review, evidence, openStepId, setOpenStepId, askAgainOpenFor, askAgainDraft, setAskAgainDraft, openAskAgain, cancelAskAgain, submitAskAgain, verifyStep, busy, actionError } = detail;
+
+  const [extraSteps, setExtraSteps] = useState<ExtraStepId[]>([]);
+  const [extraOpenId, setExtraOpenId] = useState<ExtraStepId | null>(null);
+  const [addStepMenuOpen, setAddStepMenuOpen] = useState(false);
+  const [stepNotes, setStepNotes] = useState<Record<string, string>>({});
+  const [stepNoteOpen, setStepNoteOpen] = useState<Record<string, boolean>>({});
+  const [stepNoteDraft, setStepNoteDraft] = useState<Record<string, string>>({});
+  const [notedUid, setNotedUid] = useState<string | null>(null);
+
+  // Session-only state (extra steps, notes) is per-applicant — switching to a
+  // different application must not leak one applicant's added steps/notes
+  // into another's view, even though this component itself doesn't remount.
+  // Adjusting state during render (rather than in an effect) per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  if (user && user.uid !== notedUid) {
+    setNotedUid(user.uid);
+    setExtraSteps([]);
+    setExtraOpenId(null);
+    setAddStepMenuOpen(false);
+    setStepNotes({});
+    setStepNoteOpen({});
+    setStepNoteDraft({});
+  }
+
   if (!user || !review || !evidence) return null;
+
+  function toggleStepNote(key: string) {
+    setStepNoteOpen((s) => ({ ...s, [key]: !s[key] }));
+    setStepNoteDraft((s) => ({ ...s, [key]: s[key] ?? stepNotes[key] ?? "" }));
+  }
+  function saveStepNote(key: string) {
+    setStepNotes((s) => ({ ...s, [key]: (stepNoteDraft[key] ?? "").trim() }));
+    setStepNoteOpen((s) => ({ ...s, [key]: false }));
+  }
+  function addExtraStep(type: ExtraStepId) {
+    setExtraSteps((s) => (s.includes(type) ? s : [...s, type]));
+    setExtraOpenId(type);
+    setAddStepMenuOpen(false);
+  }
 
   const steps = STEP_ORDER.map((id) => {
     const raw = review.steps[id];
     const status = deriveDisplayStepStatus(raw.status, stepApplicantClaim(user, id));
     return { id, raw, status, chrome: stepStatusChrome(status), def: STEP_DEFS[id] };
   });
-  const activeStep = steps.find((s) => s.id === openStepId) ?? steps[0];
+  const activeStep = extraOpenId ? null : steps.find((s) => s.id === openStepId) ?? steps[0];
   const doneCount = steps.filter((s) => s.raw.status === "accepted").length;
-  const attemptCapped = activeStep.id !== "venueAddress" && activeStep.raw.attempt >= 3;
+  const attemptCapped = activeStep !== null && activeStep.id !== "venueAddress" && activeStep.raw.attempt >= 3;
 
   const face = mockFaceMatch(user.uid);
   const ocr = mockNicOcr(user.uid, face.mismatch);
   const signals = mockSignupSignals(user.uid, user.email);
   const duplicates = mockDuplicateChecks(user.uid, face.mismatch);
 
+  const activeKey = extraOpenId ?? activeStep?.id ?? "";
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-        <div style={{ background: "#1B181B", borderRadius: 16 }}>
+        <div style={{ background: "#1B181B", borderRadius: 16, position: "relative" }}>
           <div style={{ padding: "20px 24px 14px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontSize: 16, fontWeight: 500 }}>Verification flow</div>
@@ -404,150 +578,261 @@ export function VerificationFlow({ detail }: { detail: ApplicantDetail }) {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "stretch", gap: 0, padding: "0 12px", borderBottom: "1px solid #332B30", overflowX: "auto" }}>
-            {steps.map((s) => (
+          <div style={{ display: "flex", alignItems: "stretch", gap: 0, padding: "0 12px", borderBottom: "1px solid #332B30" }}>
+            <div style={{ display: "flex", alignItems: "stretch", flex: 1, minWidth: 0, overflowX: "auto" }}>
+              {steps.map((s) => (
+                <Hoverable
+                  key={s.id}
+                  onClick={() => {
+                    setOpenStepId(s.id);
+                    setExtraOpenId(null);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    height: 52,
+                    padding: "0 14px",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    borderBottom: `3px solid ${s.id === activeKey ? "#FFB1C4" : "transparent"}`,
+                    borderRadius: "8px 8px 0 0",
+                    color: s.id === activeKey ? "#FFB1C4" : "#CFC0C5",
+                    transition: "color 120ms linear",
+                  }}
+                  hoverStyle={{ background: "#FFFFFF0A", color: "#EDE0E4" }}
+                >
+                  <Icon name={s.def.icon} size={20} color={s.chrome.fg} />
+                  <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: "nowrap" }}>{s.def.tabLabel}</div>
+                </Hoverable>
+              ))}
+              {extraSteps.map((type) => {
+                const def = EXTRA_STEP_DEFS[type];
+                const active = type === activeKey;
+                return (
+                  <Hoverable
+                    key={type}
+                    onClick={() => setExtraOpenId(type)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      height: 52,
+                      padding: "0 14px",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      borderBottom: `3px solid ${active ? "#FFB1C4" : "transparent"}`,
+                      borderRadius: "8px 8px 0 0",
+                      color: active ? "#FFB1C4" : "#CFC0C5",
+                      transition: "color 120ms linear",
+                    }}
+                    hoverStyle={{ background: "#FFFFFF0A", color: "#EDE0E4" }}
+                  >
+                    <Icon name={def.icon} size={20} color="#CFC0C5" />
+                    <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: "nowrap" }}>{def.tabLabel}</div>
+                  </Hoverable>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", paddingLeft: 8, flexShrink: 0 }}>
               <Hoverable
-                key={s.id}
-                onClick={() => setOpenStepId(s.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  height: 52,
-                  padding: "0 14px",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  borderBottom: `3px solid ${s.id === activeStep.id ? "#FFB1C4" : "transparent"}`,
-                  borderRadius: "8px 8px 0 0",
-                  color: s.id === activeStep.id ? "#FFB1C4" : "#CFC0C5",
-                  transition: "color 120ms linear",
-                }}
-                hoverStyle={{ background: "#FFFFFF0A", color: "#EDE0E4" }}
+                as="button"
+                onClick={() => setAddStepMenuOpen(true)}
+                title="Add a verification step"
+                style={{ width: 36, height: 36, borderRadius: "50%", background: "#2A252A", color: "#CFC0C5", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                hoverStyle={{ background: "#3A333A", color: "#EDE0E4" }}
               >
-                <Icon name={s.def.icon} size={20} color={s.chrome.fg} />
-                <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: "nowrap" }}>{s.def.tabLabel}</div>
+                <Icon name="add" size={20} />
               </Hoverable>
-            ))}
+            </div>
           </div>
 
           <div className="m3-rise" style={{ minHeight: 340, padding: "20px 24px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 18, fontWeight: 400 }}>{activeStep.def.title}</div>
-                <div style={{ fontSize: 13, color: "#9A8C91", marginTop: 3 }}>{stepMeta(activeStep.id, user)}</div>
-              </div>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  height: 32,
-                  padding: "0 12px",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  flexShrink: 0,
-                  background: activeStep.chrome.bg,
-                  color: activeStep.chrome.fg,
-                }}
-              >
-                <Icon name={activeStep.chrome.icon} size={16} />
-                {activeStep.chrome.label}
-              </div>
-            </div>
-
-            <StepEvidenceView stepId={activeStep.id} user={user} evidence={evidence} />
-
-            {activeStep.id === "video" ? <VideoScriptPanel detail={detail} /> : null}
-
-            {activeStep.raw.note ? (
-              <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 12, background: "#2A252A", fontSize: 13, color: "#CFC0C5" }}>
-                <Icon name="sticky_note_2" size={18} color="#9A8C91" />
-                <div style={{ minWidth: 0 }}>You asked: {activeStep.raw.note}</div>
-              </div>
-            ) : null}
-
-            {askAgainOpenFor === activeStep.id ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <textarea
-                  rows={2}
-                  value={askAgainDraft}
-                  onChange={(e) => setAskAgainDraft(e.target.value)}
-                  placeholder="What should they fix or resubmit?"
-                  style={{ width: "100%", background: "#2A252A", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 14, color: "#EDE0E4", resize: "vertical" }}
-                />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    onClick={() => void submitAskAgain()}
-                    disabled={busy || !askAgainDraft.trim()}
-                    style={{ height: 40, padding: "0 20px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "#1F4F49", color: "#A5F2E5", border: "none", cursor: "pointer", opacity: busy || !askAgainDraft.trim() ? 0.5 : 1 }}
+            {extraOpenId ? (
+              <ExtraStepPanel
+                type={extraOpenId}
+                user={user}
+                note={
+                  <StepNoteSection
+                    savedNote={stepNotes[extraOpenId] ?? ""}
+                    open={!!stepNoteOpen[extraOpenId]}
+                    draft={stepNoteDraft[extraOpenId] ?? ""}
+                    onToggle={() => toggleStepNote(extraOpenId)}
+                    onDraftChange={(v) => setStepNoteDraft((s) => ({ ...s, [extraOpenId]: v }))}
+                    onSave={() => saveStepNote(extraOpenId)}
+                  />
+                }
+              />
+            ) : activeStep ? (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 18, fontWeight: 400 }}>{activeStep.def.title}</div>
+                    <div style={{ fontSize: 13, color: "#9A8C91", marginTop: 3 }}>{stepMeta(activeStep.id, user)}</div>
+                  </div>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      height: 32,
+                      padding: "0 12px",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      flexShrink: 0,
+                      background: activeStep.chrome.bg,
+                      color: activeStep.chrome.fg,
+                    }}
                   >
-                    Send
-                  </button>
+                    <Icon name={activeStep.chrome.icon} size={16} />
+                    {activeStep.chrome.label}
+                  </div>
+                </div>
+
+                <StepEvidenceView stepId={activeStep.id} user={user} evidence={evidence} />
+
+                {activeStep.id === "video" ? <VideoScriptPanel detail={detail} /> : null}
+
+                {activeStep.raw.note ? (
+                  <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 12, background: "#2A252A", fontSize: 13, color: "#CFC0C5" }}>
+                    <Icon name="sticky_note_2" size={18} color="#9A8C91" />
+                    <div style={{ minWidth: 0 }}>You asked: {activeStep.raw.note}</div>
+                  </div>
+                ) : null}
+
+                <StepNoteSection
+                  savedNote={stepNotes[activeStep.id] ?? ""}
+                  open={!!stepNoteOpen[activeStep.id]}
+                  draft={stepNoteDraft[activeStep.id] ?? ""}
+                  onToggle={() => toggleStepNote(activeStep.id)}
+                  onDraftChange={(v) => setStepNoteDraft((s) => ({ ...s, [activeStep.id]: v }))}
+                  onSave={() => saveStepNote(activeStep.id)}
+                />
+
+                {askAgainOpenFor === activeStep.id ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <textarea
+                      rows={2}
+                      value={askAgainDraft}
+                      onChange={(e) => setAskAgainDraft(e.target.value)}
+                      placeholder="What should they fix or resubmit?"
+                      style={{ width: "100%", background: "#2A252A", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 14, color: "#EDE0E4", resize: "vertical" }}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => void submitAskAgain()}
+                        disabled={busy || !askAgainDraft.trim()}
+                        style={{ height: 40, padding: "0 20px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "#1F4F49", color: "#A5F2E5", border: "none", cursor: "pointer", opacity: busy || !askAgainDraft.trim() ? 0.5 : 1 }}
+                      >
+                        Send
+                      </button>
+                      <Hoverable
+                        as="button"
+                        onClick={cancelAskAgain}
+                        style={{ height: 40, padding: "0 18px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "transparent", color: "#CFC0C5", border: "none", cursor: "pointer" }}
+                        hoverStyle={{ background: "#FFFFFF14" }}
+                      >
+                        Cancel
+                      </Hoverable>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: "auto", paddingTop: 4 }}>
+                    <Hoverable
+                      as="button"
+                      onClick={() => void verifyStep(activeStep.id)}
+                      disabled={busy || activeStep.raw.status === "accepted"}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        height: 40,
+                        padding: "0 20px 0 16px",
+                        borderRadius: 20,
+                        fontSize: 14,
+                        fontWeight: 500,
+                        background: "#0F3D28",
+                        color: "#7BE0A8",
+                        border: "none",
+                        cursor: "pointer",
+                        opacity: busy || activeStep.raw.status === "accepted" ? 0.5 : 1,
+                      }}
+                      hoverStyle={{ background: "#175236" }}
+                    >
+                      <Icon name="check" size={18} />
+                      {activeStep.raw.status === "accepted" ? "Verified" : "Verify"}
+                    </Hoverable>
+                    <Hoverable
+                      as="button"
+                      onClick={() => openAskAgain(activeStep.id)}
+                      disabled={busy || attemptCapped}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        height: 40,
+                        padding: "0 20px 0 16px",
+                        borderRadius: 20,
+                        fontSize: 14,
+                        fontWeight: 500,
+                        background: "transparent",
+                        color: "#A5F2E5",
+                        border: "1px solid #3E5F5A",
+                        cursor: "pointer",
+                        opacity: busy || attemptCapped ? 0.5 : 1,
+                      }}
+                      hoverStyle={{ background: "#FFFFFF0A" }}
+                    >
+                      <Icon name="refresh" size={18} />
+                      {attemptCapped ? "Max attempts reached" : "Ask again"}
+                    </Hoverable>
+                  </div>
+                )}
+              </>
+            ) : null}
+            {actionError ? <div style={{ color: "#FFB4AB", fontSize: 13 }}>{actionError}</div> : null}
+          </div>
+
+          {addStepMenuOpen ? (
+            <div
+              onClick={() => setAddStepMenuOpen(false)}
+              style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+            >
+              <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 360, background: "#2A252A", borderRadius: 28, padding: "24px 0 12px" }}>
+                <div style={{ padding: "0 24px 8px" }}>
+                  <div style={{ fontSize: 20, fontWeight: 400 }}>Add a verification step</div>
+                  <div style={{ fontSize: 13, color: "#CFC0C5", marginTop: 6 }}>The step is added to this application only.</div>
+                </div>
+                {EXTRA_STEP_ORDER.map((type) => {
+                  const def = EXTRA_STEP_DEFS[type];
+                  const added = extraSteps.includes(type);
+                  return (
+                    <Hoverable
+                      key={type}
+                      onClick={() => addExtraStep(type)}
+                      style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 24px", fontSize: 15, cursor: "pointer", color: added ? "#9A8C91" : "#EDE0E4" }}
+                      hoverStyle={{ background: "#FFFFFF14" }}
+                    >
+                      <Icon name={def.icon} size={22} />
+                      {def.menuLabel}
+                      {added ? " · added" : ""}
+                    </Hoverable>
+                  );
+                })}
+                <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 16px 4px" }}>
                   <Hoverable
                     as="button"
-                    onClick={cancelAskAgain}
-                    style={{ height: 40, padding: "0 18px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "transparent", color: "#CFC0C5", border: "none", cursor: "pointer" }}
+                    onClick={() => setAddStepMenuOpen(false)}
+                    style={{ height: 40, padding: "0 18px", borderRadius: 20, fontSize: 14, fontWeight: 500, background: "transparent", color: "#FFB1C4", border: "none", cursor: "pointer" }}
                     hoverStyle={{ background: "#FFFFFF14" }}
                   >
                     Cancel
                   </Hoverable>
                 </div>
               </div>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: "auto", paddingTop: 4 }}>
-                <Hoverable
-                  as="button"
-                  onClick={() => void verifyStep(activeStep.id)}
-                  disabled={busy || activeStep.raw.status === "accepted"}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    height: 40,
-                    padding: "0 20px 0 16px",
-                    borderRadius: 20,
-                    fontSize: 14,
-                    fontWeight: 500,
-                    background: "#0F3D28",
-                    color: "#7BE0A8",
-                    border: "none",
-                    cursor: "pointer",
-                    opacity: busy || activeStep.raw.status === "accepted" ? 0.5 : 1,
-                  }}
-                  hoverStyle={{ background: "#175236" }}
-                >
-                  <Icon name="check" size={18} />
-                  {activeStep.raw.status === "accepted" ? "Verified" : "Verify"}
-                </Hoverable>
-                <Hoverable
-                  as="button"
-                  onClick={() => openAskAgain(activeStep.id)}
-                  disabled={busy || attemptCapped}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    height: 40,
-                    padding: "0 20px 0 16px",
-                    borderRadius: 20,
-                    fontSize: 14,
-                    fontWeight: 500,
-                    background: "transparent",
-                    color: "#A5F2E5",
-                    border: "1px solid #3E5F5A",
-                    cursor: "pointer",
-                    opacity: busy || attemptCapped ? 0.5 : 1,
-                  }}
-                  hoverStyle={{ background: "#FFFFFF0A" }}
-                >
-                  <Icon name="refresh" size={18} />
-                  {attemptCapped ? "Max attempts reached" : "Ask again"}
-                </Hoverable>
-              </div>
-            )}
-            {actionError ? <div style={{ color: "#FFB4AB", fontSize: 13 }}>{actionError}</div> : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

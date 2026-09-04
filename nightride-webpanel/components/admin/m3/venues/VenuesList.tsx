@@ -17,6 +17,9 @@ function statColor(tone: BadgeType): string {
 function verifyChip(row: VenueRow): { label: string; tone: BadgeType; icon: string } {
   if (row.verifyState === "failed") return { label: "Check failed", tone: "danger", icon: "error" };
   if (row.verifyState === "verified") return { label: "Verified", tone: "success", icon: "verified" };
+  // A venue predating `verification` has no checks to count — "0 checks open"
+  // would read as nothing outstanding, which is the opposite of the truth.
+  if (row.openChecksCount === 0) return { label: "Not checked", tone: "warning", icon: "hourglass_top" };
   return { label: `${row.openChecksCount} check${row.openChecksCount === 1 ? "" : "s"} open`, tone: "warning", icon: "hourglass_top" };
 }
 

@@ -6,6 +6,11 @@ import type { VenueCheckState, VenueVerifyState } from "../view-models";
 
 export function deriveVenueVerifyState(checks: VenueCheckState[]): VenueVerifyState {
   if (checks.includes("failed")) return "failed";
+  // No checks is not the same as every check passing. firestore.rules
+  // deliberately lets a venue predating `verification` through with an empty
+  // map (see verificationStepOk's `.get()` defaults), so a plain `every()`
+  // would call those venues fully verified on vacuous truth alone.
+  if (checks.length === 0) return "checksOpen";
   if (checks.every((s) => s === "verified")) return "verified";
   return "checksOpen";
 }

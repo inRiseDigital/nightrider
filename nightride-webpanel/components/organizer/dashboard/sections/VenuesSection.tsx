@@ -274,10 +274,10 @@ function SaveBar() {
       >
         {venueActionError ||
           (venuePendingReview
-            ? "Name/address change submitted for review — everything else saves immediately."
+            ? "Name/address change submitted for review — everything else can still be saved normally."
             : venueDirty
               ? "Unsaved edits are only visible to you until you save."
-              : "Menu, hours, links, and photos save immediately. Renaming or re-addressing a venue is reviewed before going live.")}
+              : "The Menu tab saves as you type. Renaming or re-addressing a venue is reviewed before going live — everything else here saves immediately once you click Save.")}
       </p>
     </div>
   );

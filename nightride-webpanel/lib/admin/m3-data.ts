@@ -22,7 +22,7 @@ export const NAV_GROUPS_DEF = [
     label: "Content review",
     items: [
       { id: "org-apps", label: "Organizer applications", icon: "how_to_reg", showsPendingCount: true },
-      { id: "event-queue", label: "Event review queue", icon: "event_available" },
+      { id: "event-queue", label: "Event review queue", icon: "event_available", showsPendingCount: true },
     ],
   },
   {
@@ -37,7 +37,6 @@ export const NAV_GROUPS_DEF = [
     items: [
       { id: "roles", label: "Roles & access", icon: "admin_panel_settings" },
       { id: "audit", label: "Audit log", icon: "history" },
-      { id: "settings", label: "Settings", icon: "settings" },
     ],
   },
 ];
@@ -48,7 +47,6 @@ export const SECTION_TITLES: Record<string, [string, string]> = {
   "event-queue": ["Event review queue", "Approve or reject submitted events"],
   venues: ["Venues", "All clubs and venues on the platform"],
   users: ["Users & organizers", "Party-goers and approved organizers"],
-  roles: ["Roles & access", "Admin permissions and scopes"],
+  roles: ["Roles & access", "Who holds admin access to the console"],
   audit: ["Audit log", "Who did what, and when"],
-  settings: ["Settings", "Platform configuration"],
 };

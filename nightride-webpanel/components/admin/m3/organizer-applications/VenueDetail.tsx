@@ -2,7 +2,8 @@
 
 import { Icon } from "../Icon";
 import { Hoverable } from "../Hoverable";
-import { osmTileUrl } from "@/lib/admin/geo";
+import { MapTile } from "../primitives/MapTile";
+import { FieldRowList } from "../primitives/FieldRowList";
 import { initialsFor } from "@/lib/admin/present";
 import { useVenueDetail } from "@/lib/admin/useVenueDetail";
 
@@ -114,20 +115,13 @@ export function VenueDetail({ venueId, onBack }: { venueId: string; onBack: () =
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16, alignItems: "start" }}>
         <div style={{ background: "#1B181B", borderRadius: 16, overflow: "hidden" }}>
-          {venue.geo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={osmTileUrl(venue.geo.latitude, venue.geo.longitude)} alt={venue.name} style={{ width: "100%", height: 220, objectFit: "cover" }} />
-          ) : (
-            <div style={{ width: "100%", height: 220, background: "#2A252A", display: "flex", alignItems: "center", justifyContent: "center", color: "#9A8C91" }}>
-              <Icon name="location_off" size={32} />
-            </div>
-          )}
+          <MapTile geo={venue.geo} city={venue.city} height={220} />
         </div>
 
         <div style={{ background: "#1B181B", borderRadius: 16, padding: 20 }}>
           <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 12 }}>Venue record</div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {[
+          <FieldRowList
+            rows={[
               { label: "City", value: venue.city },
               { label: "Country", value: venue.countryCode },
               { label: "Address", value: venue.address },
@@ -136,13 +130,8 @@ export function VenueDetail({ venueId, onBack }: { venueId: string; onBack: () =
               { label: "Website", value: venue.website || "—" },
               { label: "Source", value: venue.source },
               { label: "Verified", value: venue.verified ? "Yes" : "No" },
-            ].map((r) => (
-              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "9px 0", borderBottom: "1px solid #241F23", fontSize: 14 }}>
-                <span style={{ color: "#9A8C91", flexShrink: 0 }}>{r.label}</span>
-                <span style={{ textAlign: "right", fontFamily: r.mono ? "'Roboto Mono', monospace" : "inherit", minWidth: 0, wordBreak: "break-word" }}>{r.value}</span>
-              </div>
-            ))}
-          </div>
+            ]}
+          />
         </div>
       </div>
     </>

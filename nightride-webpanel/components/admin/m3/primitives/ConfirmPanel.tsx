@@ -26,7 +26,8 @@ export function ConfirmPanel({
   children,
 }: {
   tone: "danger" | "warning";
-  title: string;
+  /** Omit when the mockup has no heading above the body — e.g. the user drawer's delete confirm. */
+  title?: string;
   body?: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
@@ -38,7 +39,7 @@ export function ConfirmPanel({
   const chrome = TONE_CHROME[tone];
   return (
     <div style={{ background: SURFACE.overlay, borderRadius: 16, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: chrome.titleColor }}>{title}</div>
+      {title ? <div style={{ fontSize: 14, fontWeight: 500, color: chrome.titleColor }}>{title}</div> : null}
       {body ? <div style={{ fontSize: 13, color: TEXT.secondary, lineHeight: 1.5 }}>{body}</div> : null}
       {children}
       <div style={{ display: "flex", gap: 8 }}>

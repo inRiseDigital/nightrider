@@ -55,3 +55,14 @@ export function minutesBeforeNow(minutes: number): Timestamp {
 export function daysBeforeNow(days: number): Timestamp {
   return Timestamp.fromDate(new Date(MOCK_NOW.getTime() - days * 86_400_000));
 }
+
+/**
+ * The moment a mutation happens during a session, on the real clock — unlike
+ * the seed data above, which is anchored to the fixed MOCK_NOW so fixtures
+ * read consistently. A decision taken now has to land inside the real
+ * this-week windows the sections compute, or acting on a row wouldn't move
+ * the stat that counts it.
+ */
+export function nowTimestamp(): Timestamp {
+  return Timestamp.fromDate(new Date());
+}

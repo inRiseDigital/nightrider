@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NAV_GROUPS_DEF, SECTION_TITLES } from "./m3-data";
 import { getOverviewCounts } from "./firestore";
+import { dataSource } from "./data-source-instance";
 
 export type OrgScreen = "list" | "detail" | "venue";
 
@@ -28,9 +29,16 @@ export function useAdminNav() {
   const [activeGlobalVenueId, setActiveGlobalVenueId] = useState<string | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
 
+  // Sidebar badges. Organizer applications counts real pending applicants;
+  // the event queue counts what is flagged for review. Both refresh on every
+  // nav change so acting on a row updates the badge behind you.
   useEffect(() => {
     getOverviewCounts()
       .then((c) => setCounts((prev) => ({ ...prev, "org-apps": c.pendingApplications })))
+      .catch(() => {});
+    dataSource
+      .getDashboardCounts()
+      .then((c) => setCounts((prev) => ({ ...prev, "event-queue": c.eventsInReview })))
       .catch(() => {});
   }, [orgScreen, selected]);
 
@@ -116,9 +124,10 @@ export function useAdminNav() {
     isUsers,
     isRoles,
     isAudit,
-    // Placeholder until each section's screen is built out — drop each id
-    // from this list as its screen lands.
-    isPlaceholder: isVenues || isEventQueue || isUsers,
+    // Every section now has a real screen — nothing falls through to the
+    // Placeholder. Kept so an unknown id still renders something sane.
+    isPlaceholder:
+      !isOverview && !isOrgApps && !isVenues && !isEventQueue && !isUsers && !isRoles && !isAudit,
     openApplicant,
     backToList,
     openVenue,

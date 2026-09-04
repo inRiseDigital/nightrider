@@ -19,13 +19,13 @@ import type {
   VenueVerification,
 } from "../data-source";
 import { deriveEventQueueStatus, matchesEventQueueSearch, matchesEventQueueStatus } from "../filters/event-queue";
-import { matchesUserAccountState, matchesUserRole, matchesUserSearch, deriveUserRole } from "../filters/users";
+import { matchesUserModerationState, matchesUserRole, matchesUserSearch, deriveUserRole } from "../filters/users";
 import { deriveVenueVerifyState, matchesVenueCity, matchesVenueSearch, matchesVenueVerifyFilter } from "../filters/venues";
 import { auditActionType, matchesAuditActor, matchesAuditSearch, matchesAuditType, withinAuditRange } from "../filters/audit";
 import { allMockAdmins, addMockAdmin, setMockAdminRevoked } from "./roles";
 import { allMockAudit } from "./audit";
 import { allMockEvents, decideMockEvent, getMockEvent, reopenMockEvent } from "./events";
-import { allMockUsers, getMockUser, setMockUserAccountState } from "./users";
+import { allMockUsers, getMockUser, setMockUserModerationState } from "./users";
 import { allMockVenues, getMockVenue, setMockVenueCheck, setMockVenueSuspended } from "./venues";
 
 // logs/{id}.action's closed enum per firestore.rules — see schema.ts's LogAction.
@@ -83,6 +83,7 @@ function toUserDirectoryEntry(uid: string): UserDirectoryEntry | null {
   return {
     user: u.record,
     accountState: u.accountState,
+    moderationState: u.moderationState,
     disabledReason: u.disabledReason,
     lastActiveLabel: u.lastActiveLabel,
     nightsOut: u.nightsOut,
@@ -90,6 +91,7 @@ function toUserDirectoryEntry(uid: string): UserDirectoryEntry | null {
     device: u.device,
     note: u.note,
     organizerVenueName: u.organizerVenueName,
+    adminScopeLabel: u.adminScopeLabel,
   };
 }
 
@@ -198,7 +200,7 @@ export const mockAdminDataSource: AdminDataSource = {
         return (
           matchesUserSearch({ name: u.record.displayName, email: u.record.email, phone: u.record.phone }, filter.search) &&
           matchesUserRole(role, filter.role) &&
-          matchesUserAccountState(u.accountState, filter.accountState)
+          matchesUserModerationState(u.moderationState, filter.moderationState)
         );
       })
       .map((u) => toUserDirectoryEntry(u.record.uid))
@@ -209,8 +211,8 @@ export const mockAdminDataSource: AdminDataSource = {
     return toUserDirectoryEntry(uid);
   },
 
-  async setUserAccountState(uid, state): Promise<void> {
-    setMockUserAccountState(uid, state);
+  async setUserModerationState(uid, state): Promise<void> {
+    setMockUserModerationState(uid, state);
   },
 
   // Roles & access -------------------------------------------------------------

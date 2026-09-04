@@ -9,6 +9,9 @@ import { Placeholder } from "./Placeholder";
 import { OrganizerApplications } from "./organizer-applications/OrganizerApplications";
 import { RolesAccess } from "./roles/RolesAccess";
 import { AuditLog } from "./audit/AuditLog";
+import { VenuesDirectory } from "./venues/VenuesDirectory";
+import { EventQueue } from "./event-queue/EventQueue";
+import { UsersDirectory } from "./users/UsersDirectory";
 
 export function AdminConsole() {
   const nav = useAdminNav();
@@ -26,6 +29,9 @@ export function AdminConsole() {
         ) : (
           <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 32px" }}>
             {nav.isOverview ? <Overview /> : null}
+            {nav.isEventQueue ? <EventQueue activeEventId={nav.activeEventId} /> : null}
+            {nav.isVenues ? <VenuesDirectory nav={nav} /> : null}
+            {nav.isUsers ? <UsersDirectory nav={nav} /> : null}
             {nav.isRoles ? <RolesAccess /> : null}
             {nav.isAudit ? <AuditLog /> : null}
             {nav.isPlaceholder ? <Placeholder title={nav.currentTitle} /> : null}

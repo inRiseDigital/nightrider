@@ -12,7 +12,7 @@
 
 import type { EventDoc } from "../schema";
 import type { EventQueueFlag } from "../view-models";
-import { dateAt } from "./seed";
+import { dateAt, nowTimestamp } from "./seed";
 
 export interface MockEvent {
   event: EventDoc;
@@ -196,11 +196,12 @@ export function getMockEvent(id: string): MockEvent | null {
 export function decideMockEvent(id: string, decision: "approved" | "rejected", adminName: string, reason?: string): void {
   const e = store.get(id);
   if (!e) return;
+  const at = nowTimestamp();
   if (decision === "approved") {
-    e.event = { ...e.event, status: "published", moderation: { ...e.event.moderation, flag: "clean", reviewedBy: adminName, note: "" } };
+    e.event = { ...e.event, status: "published", updatedAt: at, moderation: { ...e.event.moderation, flag: "clean", reviewedBy: adminName, note: "" } };
     e.rejectReason = null;
   } else {
-    e.event = { ...e.event, status: "archived", moderation: { ...e.event.moderation, flag: "rejected", reviewedBy: adminName, note: reason ?? "" } };
+    e.event = { ...e.event, status: "archived", updatedAt: at, moderation: { ...e.event.moderation, flag: "rejected", reviewedBy: adminName, note: reason ?? "" } };
     e.rejectReason = reason ?? "";
   }
   e.reviewedByLabel = adminName;
@@ -209,7 +210,7 @@ export function decideMockEvent(id: string, decision: "approved" | "rejected", a
 export function reopenMockEvent(id: string): void {
   const e = store.get(id);
   if (!e) return;
-  e.event = { ...e.event, status: "in_review", moderation: { ...e.event.moderation, flag: "pending", reviewedBy: null, note: "" } };
+  e.event = { ...e.event, status: "in_review", updatedAt: nowTimestamp(), moderation: { ...e.event.moderation, flag: "pending", reviewedBy: null, note: "" } };
   e.reviewedByLabel = null;
   e.rejectReason = null;
 }

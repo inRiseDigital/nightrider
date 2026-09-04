@@ -3,7 +3,7 @@
 // and exercised directly by tests — no React, no side effects.
 
 import type { OrganizerStatus } from "../schema";
-import type { UserAccountState, UserRoleLabel } from "../view-models";
+import type { UserModerationState, UserRoleLabel } from "../view-models";
 
 export function deriveUserRole(isAdmin: boolean, organizerStatus: OrganizerStatus): UserRoleLabel {
   if (isAdmin) return "Admin";
@@ -36,7 +36,10 @@ export function matchesUserRole(role: UserRoleLabel, filter: UserRoleLabel | "al
   return filter === "all" || role === filter;
 }
 
-export function matchesUserAccountState(state: UserAccountState, filter: UserAccountState | "all"): boolean {
+export function matchesUserModerationState(
+  state: UserModerationState,
+  filter: UserModerationState | "all",
+): boolean {
   return filter === "all" || state === filter;
 }
 
@@ -44,6 +47,6 @@ export function countByRole(roles: UserRoleLabel[], target: UserRoleLabel): numb
   return roles.filter((r) => r === target).length;
 }
 
-export function countByAccountState(states: UserAccountState[], target: UserAccountState): number {
+export function countByModerationState(states: UserModerationState[], target: UserModerationState): number {
   return states.filter((s) => s === target).length;
 }

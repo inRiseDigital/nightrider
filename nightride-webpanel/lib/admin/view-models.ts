@@ -141,6 +141,13 @@ export interface EventQueueDetail extends EventQueueRow {
   /** e.g. "Approved by Aisha Darwish · just now" — real once moderation.reviewedBy/updatedAt are resolved to a name. */
   decidedLine: string | null;
   rejectReason: string | null;
+  /**
+   * Recurring series, from the real `events.recurring` / `recurrenceLabel`
+   * fields. One decision covers every date in the series, which is why the
+   * detail screen banners it.
+   */
+  hasSeries: boolean;
+  series: string | null;
 }
 
 export interface EventQueueStats {
@@ -209,6 +216,8 @@ export interface VenueRow {
   id: string;
   name: string;
   city: string;
+  /** venues/{id}.address — real. Shown as its own column in the directory table. */
+  address: string;
   organizer: string;
   organizerUid: string | null;
   /** derived from `checks` — see filters/venues.ts. */
@@ -223,8 +232,8 @@ export interface VenueRow {
    * either a new `suspended: boolean` field or reusing `status`.
    */
   suspended: boolean;
-  /** no capacity field on venues/{id} — fabricated. */
-  capacity: SimulatedValue<number>;
+  /** venues/{id}.capacity — real, where 0 means unknown rather than empty. */
+  capacity: number;
   /** derived: count of events/{id} where venueId == this venue's id. */
   eventCount: number;
 }
@@ -311,6 +320,16 @@ export type UserRoleLabel = "Party-goer" | "Organizer" | "Admin";
  */
 export type UserAccountState = "active" | "disabled";
 
+/**
+ * The four states the console offers, which is what an admin actually reasons
+ * about. Only the active/not-active split is real today — everything else is
+ * display dressing over Auth's one boolean, which is why it is carried as a
+ * SimulatedValue on the row. Wiring this for real means the `accountStatus`
+ * field described in the plan's appendix; until then the mock stores it so the
+ * screen doesn't have to re-derive intent by reading reason text.
+ */
+export type UserModerationState = "active" | "suspended" | "banned" | "deactivated";
+
 export interface UserRow {
   uid: string;
   name: string;
@@ -321,6 +340,8 @@ export interface UserRow {
   /** organizers-only per product decision; party-goers carry no identity state — "n/a" is not a status, it's the absence of one. */
   identity: OrganizerStatus | "n/a";
   accountState: UserAccountState;
+  /** which of the four console states this account is in — see UserModerationState. */
+  moderationState: SimulatedValue<UserModerationState>;
   /**
    * Auth's `disabled` flag carries no reason text. The mockup's
    * Suspended/Banned/Deactivated distinction and its free-text note are
@@ -358,7 +379,8 @@ export interface UserDetail extends UserRow {
 export interface UserFilterState {
   search: string;
   role: UserRoleLabel | "all";
-  accountState: UserAccountState | "all";
+  /** the status select offers the four console states, plus "all". */
+  moderationState: UserModerationState | "all";
 }
 
 export interface UsersViewModel {
@@ -369,12 +391,17 @@ export interface UsersViewModel {
   filter: UserFilterState;
   setSearch: (v: string) => void;
   setRole: (v: UserFilterState["role"]) => void;
-  setAccountStateFilter: (v: UserFilterState["accountState"]) => void;
+  setModerationStateFilter: (v: UserFilterState["moderationState"]) => void;
   selectedId: string | null;
   select: (id: string | null) => void;
   detail: UserDetail | null;
-  /** flips Firebase Auth's `disabled` flag via the Admin SDK — mirrors banOrganizerAccount()'s wiring style. */
-  setAccountState: (uid: string, state: UserAccountState) => Promise<ActionResult>;
+  /**
+   * Moves an account between the four console states. Wired for real this
+   * flips Firebase Auth's `disabled` flag via the Admin SDK (mirroring
+   * banOrganizerAccount()'s wiring) and records which of the four states was
+   * intended, which Auth alone cannot express.
+   */
+  setModerationState: (uid: string, state: UserModerationState) => Promise<ActionResult>;
   actionBusy: boolean;
   actionError: string | null;
   refresh: () => void;

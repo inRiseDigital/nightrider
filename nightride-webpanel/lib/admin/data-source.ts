@@ -12,6 +12,7 @@ import type {
   AuditRange,
   EventQueueFlag,
   UserAccountState,
+  UserModerationState,
   VenueCheckKey,
   VenueCheckState,
 } from "./view-models";
@@ -34,7 +35,7 @@ export interface VenueDirectoryFilter {
 export interface UserDirectoryFilter {
   search: string;
   role: "all" | "Party-goer" | "Organizer" | "Admin";
-  accountState: "all" | UserAccountState;
+  moderationState: "all" | UserModerationState;
 }
 
 export interface AuditFilter {
@@ -79,6 +80,8 @@ export interface VenueVerification {
 export interface UserDirectoryEntry {
   user: UserRecord;
   accountState: UserAccountState;
+  /** which of the four console states — see UserModerationState in ./view-models. */
+  moderationState: UserModerationState;
   disabledReason: string | null;
   lastActiveLabel: string;
   nightsOut: number;
@@ -86,6 +89,8 @@ export interface UserDirectoryEntry {
   device: string;
   note: string | null;
   organizerVenueName: string | null;
+  /** e.g. "Content moderation · London" — display-only, admins have no real scope. */
+  adminScopeLabel: string | null;
 }
 
 export interface AdminRosterEntry {
@@ -138,7 +143,7 @@ export interface AdminDataSource {
   // Users & organizers -----------------------------------------------------
   listUserDirectory(filter: UserDirectoryFilter): Promise<UserDirectoryEntry[]>;
   getUserDirectoryEntry(uid: string): Promise<UserDirectoryEntry | null>;
-  setUserAccountState(uid: string, state: UserAccountState, adminUid: string): Promise<void>;
+  setUserModerationState(uid: string, state: UserModerationState, adminUid: string): Promise<void>;
 
   // Roles & access -----------------------------------------------------------
   listAdminRoster(): Promise<AdminRosterEntry[]>;

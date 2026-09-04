@@ -7,11 +7,9 @@ import {
   Gavel,
   Image as ImageIcon,
   Martini,
-  Megaphone,
   Minus,
   Plus,
   Sparkles,
-  Star,
   Ticket,
   Wallet,
   Eye,
@@ -83,7 +81,6 @@ export function LiveOperationsSection() {
     venueMeta,
     venueOrder,
     events,
-    reviews,
     images,
     tonight,
     liveBusy,
@@ -92,8 +89,6 @@ export function LiveOperationsSection() {
     toggleFlash,
     toggleEmergency,
     setEventsTab,
-    setAudienceTab,
-    setAccountTab,
     setVenueTab,
     openAddVenue,
     perfMetrics,
@@ -183,21 +178,6 @@ export function LiveOperationsSection() {
       });
     }
 
-    const flagged = reviews.filter((r) => r.flagged);
-    if (flagged.length) {
-      rows.push({
-        key: "flagged-reviews",
-        Icon: Star,
-        iconBg: "var(--m3-errc)",
-        iconFg: "var(--m3-onerrc)",
-        title: `${flagged.length} review${flagged.length > 1 ? "s" : ""} flagged for moderation`,
-        body: flagged.map((r) => r.author).join(", "),
-        action: "Open",
-        href: "/organizer/performance",
-        onClick: () => setAudienceTab("reviews"),
-      });
-    }
-
     return rows;
   }
 
@@ -256,15 +236,6 @@ export function LiveOperationsSection() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/organizer/account"
-              onClick={() => setAccountTab("promotion")}
-              className="flex h-10 items-center gap-2 rounded-full px-5 text-sm font-medium transition-opacity hover:opacity-90"
-              style={{ background: "var(--m3-pri)", color: "var(--m3-onpri)" }}
-            >
-              <Megaphone size={17} />
-              Send update
-            </Link>
             <button
               onClick={toggleEmergency}
               disabled={liveBusy.emergency}

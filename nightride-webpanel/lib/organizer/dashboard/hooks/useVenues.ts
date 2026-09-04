@@ -21,6 +21,7 @@ import {
   computeVenueProfile,
   DEFAULT_TONIGHT_STATE,
   isVenueDirty,
+  isVenueIdentityDirty,
   LAUNCH_MARKETS,
   parseMenuSection,
   parseTonight,
@@ -28,6 +29,7 @@ import {
   parseVenueProfile,
   toLiveFields,
   toMenuSectionFields,
+  toVenueDirectFields,
   toVenueDocFields,
   toVenueEditListing,
 } from "../data/venues";
@@ -607,7 +609,10 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     [updateMenuLocal, scheduleMenuWrite]
   );
 
-  // ---- Save / discard: the listing draft -> `venueEdits/{id}` ----
+  // ---- Save: profile fields write straight to the venue doc; a name/address
+  // change additionally goes through `venueEdits/{id}` for review. Both in
+  // one batch so a rename can never land without its accompanying
+  // venueEdits submission, or vice versa.
   const saveVenue = useCallback(
     async (id: string) => {
       const draft = venueDrafts[id];
@@ -615,25 +620,38 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
         showSnack("No changes to save.");
         return;
       }
+      const saved = venues[id];
+      const identityDirty = saved ? isVenueIdentityDirty(draft, saved) : false;
       const ok = await run(async () => {
         const batch = writeBatch(getDb());
-        batch.set(venueEditsDocRef(id), {
-          venueId: id,
-          status: "pending",
-          listing: toVenueEditListing(draft, { timeZone: meta[id]?.timeZone ?? "" }),
-          submittedBy: uid,
-          submittedAt: serverTimestamp(),
-          reviewedBy: null,
-          reviewedAt: null,
-          note: "",
-        });
-        await logActivity(batch, id, uid, "Submitted listing changes for review");
+        batch.update(venueDocRef(id), toVenueDirectFields(draft, { timeZone: meta[id]?.timeZone ?? "" }));
+        if (identityDirty) {
+          batch.set(venueEditsDocRef(id), {
+            venueId: id,
+            status: "pending",
+            listing: toVenueEditListing(draft),
+            submittedBy: uid,
+            submittedAt: serverTimestamp(),
+            reviewedBy: null,
+            reviewedAt: null,
+            note: "",
+          });
+          await logActivity(batch, id, uid, "Submitted a name/address change for review");
+        } else {
+          await logActivity(batch, id, uid, "Updated venue profile");
+        }
         await batch.commit();
         discard(id);
       });
-      if (ok) showSnack("Changes submitted for review.");
+      if (ok) {
+        showSnack(
+          identityDirty
+            ? "Saved — the name/address change was submitted for review."
+            : "Saved."
+        );
+      }
     },
-    [venueDrafts, run, discard, showSnack, uid, meta]
+    [venueDrafts, venues, run, discard, showSnack, uid, meta]
   );
 
   const discardVenue = useCallback(
@@ -646,10 +664,16 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
           await deleteDoc(venueEditsDocRef(id));
         });
         if (ok) {
-          // Clear any local draft alongside the withdraw — leaving one
-          // behind would immediately re-dirty the venue with edits the
-          // organizer never asked to keep.
-          if (action.clearDraft) discard(id);
+          // Only name/address were ever part of the submission — revert just
+          // those two on the local draft rather than discarding it outright,
+          // so an unrelated in-progress hours/photos edit survives a
+          // withdraw (identity edits require review; everything else never
+          // did, and the two can now be dirty at the same time).
+          if (action.clearDraft) {
+            const saved = venues[id];
+            if (saved) updateVenueListing(id, (p) => ({ ...p, name: saved.name, address: saved.address }));
+            else discard(id);
+          }
           showSnack("Submission withdrawn.");
         }
         return;
@@ -659,7 +683,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
         showSnack("Changes discarded.");
       }
     },
-    [venueDrafts, discard, showSnack, pendingEditByVenue, run]
+    [venueDrafts, venues, discard, updateVenueListing, showSnack, pendingEditByVenue, run]
   );
 
   // ---- Add venue ----
@@ -950,15 +974,14 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
   // ---- Derived profile: draft/published seam ----
   const savedProfile = venues[editingVenue] ?? blankVenueProfile("", "", []);
   const draft = venueDrafts[editingVenue];
-  // A pending `venueEdits` submission takes precedence over both the saved
-  // snapshot and any (post-submit, unlikely) local draft: the organizer's
-  // most recent action was Save, so what they should see is what they
-  // submitted, read-only, until an admin resolves it — not silently reverted
-  // to the pre-edit snapshot (finding 4).
-  const profile = venuePendingReview
-    ? applyPendingListing(savedProfile, pendingEdit?.listing)
-    : computeVenueProfile(draft, savedProfile);
-  const venueDirty = !venuePendingReview && isVenueDirty(draft, savedProfile);
+  // Only `name`/`address` are ever pending review now — everything else the
+  // organizer edits is live/draft as usual. A pending submission locks just
+  // those two fields to what was submitted (read-only until an admin
+  // resolves it, finding 4), overlaid on top of the normal draft/saved view
+  // rather than replacing it wholesale.
+  const baseProfile = computeVenueProfile(draft, savedProfile);
+  const profile = venuePendingReview ? applyPendingListing(baseProfile, pendingEdit?.listing) : baseProfile;
+  const venueDirty = isVenueDirty(draft, savedProfile);
   const menuLoading = menuLoadingIds.has(editingVenue);
 
   const data = useMemo(

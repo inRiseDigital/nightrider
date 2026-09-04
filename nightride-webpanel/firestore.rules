@@ -401,23 +401,25 @@ service cloud.firestore {
         // gates to true on create — touched() dereferences resource.data,
         // which is null pre-create — so a brand-new document still gets the
         // full sweep.
-        let listingTouched = resource == null || touched(venueListingFields());
+        let listingTouched = resource == null || touched(venueProfileFields());
         let verificationTouched = resource == null || touched(['verification']);
         return d.keys().hasAll([
               'name', 'geo', 'geohash', 'city', 'countryCode', 'source', 'status', 'verified'
             ])
           && d.name is string && d.name.size() > 0
+          && d.get('address', '') is string
           && d.geo is latlng
           && d.geohash is string && d.geohash.size() > 0
           && d.city is string && d.countryCode is string
           && d.source in ['admin', 'organizer', 'osm']
           && d.status in ['active', 'closed']
           && d.verified is bool
-          // ── Listing fields (mirror VenueProfile). Editing them here is
-          // denied outright below — they must route through venueEdits — so
-          // this only validates shape, never authorship. Element shapes
-          // *inside* hours/exceptions/socialLinks/photos are NOT validated:
-          // rules cannot iterate a list. Same limitation as
+          // ── Profile fields (mirror VenueProfile). Only `name`/`address`
+          // (venueReviewedFields()) are denied outright below and must route
+          // through venueEdits — everything else here is a direct write, so
+          // this validates shape regardless of who touched it. Element
+          // shapes *inside* hours/exceptions/socialLinks/photos are NOT
+          // validated: rules cannot iterate a list. Same limitation as
           // organizerReview's script.lines; the client checks it, and
           // Firestore's 1 MB document limit is the only server-side
           // backstop. ──
@@ -522,14 +524,23 @@ service cloud.firestore {
                 'verification', 'editors', 'editorUids'];
       }
 
-      // Listing fields that mirror VenueProfile (A2). Structural, not a UI
-      // convention: denying these on the venue document is what makes
-      // "listing edits are reviewable" true regardless of client behaviour —
-      // they can only reach the venue document via venueEdits' admin-only
-      // approval path below.
-      function venueListingFields() {
+      // Profile fields that mirror VenueProfile (A2), minus `name`/`address`.
+      // Validation scope for venueShapeOk()'s listing sweep — these are
+      // direct writes (owner/manager), not gated by venueReviewedFields()
+      // below, but their shape is still checked on every write that touches
+      // one of them.
+      function venueProfileFields() {
         return ['about', 'socialLinks', 'genres', 'dressCode', 'agePolicy', 'tableLink',
                 'cover', 'capacity', 'amenities', 'hours', 'exceptions', 'photos', 'timeZone'];
+      }
+
+      // The only fields a direct organizer write may not touch. Structural,
+      // not a UI convention: denying these on the venue document is what
+      // makes "renaming/re-addressing a venue is reviewable" true regardless
+      // of client behaviour — they can only reach the venue document via
+      // venueEdits' admin-only approval path below.
+      function venueReviewedFields() {
+        return ['name', 'address'];
       }
 
       function organizerCreateOk() {
@@ -567,7 +578,7 @@ service cloud.firestore {
                ||
                (roleIn(resource, ['owner', 'manager'])
                  && !changedKeys.hasAny(venuePinnedFields())
-                 && !changedKeys.hasAny(venueListingFields())
+                 && !changedKeys.hasAny(venueReviewedFields())
                  && (!changedKeys.hasAny(['live']) || liveOk()))
              );
       }
@@ -700,7 +711,11 @@ service cloud.firestore {
           && d.status == 'pending'
           && d.submittedBy == request.auth.uid
           && d.submittedAt == request.time
-          && d.get('reviewedBy', null) == null;
+          && d.get('reviewedBy', null) == null
+          // Only name/address are reviewable now (venueReviewedFields()) —
+          // everything else is a direct venue-doc write, so a draft can never
+          // carry more than these two.
+          && d.get('listing', {}).keys().hasOnly(['name', 'address']);
       }
 
       allow read: if isAdmin() || canEditVenue(venueId, ['owner', 'manager']);

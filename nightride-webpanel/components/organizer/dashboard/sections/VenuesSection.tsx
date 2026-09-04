@@ -199,22 +199,19 @@ export function VenuesSection() {
                 className="mb-6 max-w-[640px] text-[13px]"
                 style={{ borderColor: "var(--m3-warn)", color: "var(--m3-on)" }}
               >
-                Submitted for review — these listing fields show what you submitted and can&apos;t
-                be edited again until an admin approves or rejects it. Withdraw the submission
-                below to make further changes.
+                Name/address change submitted for review — those two fields show what you
+                submitted and can&apos;t be edited again until an admin approves or rejects it.
+                Everything else on this venue still saves normally. Withdraw the submission
+                below to make further changes to the name or address.
               </Card>
             )}
 
-            {/* Listing fields (not the menu — that publishes immediately and
-                is never part of a `venueEdits` submission) become read-only
-                while a submission is pending review; `<fieldset disabled>`
-                propagates to every native input/select/textarea/button
-                inside without threading a prop through each one. */}
-            <fieldset disabled={venuePendingReview} className={venuePendingReview ? "opacity-70" : undefined}>
-              {venueTab === "profile" && <ProfileTab />}
-              {venueTab === "hours" && <HoursTab />}
-              {venueTab === "links" && <LinksTab />}
-            </fieldset>
+            {/* Only name/address require review — everything else here is a
+                direct save, so nothing below is disabled while a rename is
+                pending; ProfileTab disables just those two fields itself. */}
+            {venueTab === "profile" && <ProfileTab />}
+            {venueTab === "hours" && <HoursTab />}
+            {venueTab === "links" && <LinksTab />}
             {venueTab === "menu" && <VenueMenuSection />}
 
             {/* Menu edits publish immediately, so that tab has nothing to save. */}
@@ -257,17 +254,15 @@ function SaveBar() {
           Unsaved changes
         </span>
       )}
-      {!venuePendingReview && (
-        <FilledButton
-          onClick={() => saveVenue(editingVenue)}
-          disabled={!venueDirty}
-          loading={venueBusy}
-          tonal={!venueDirty}
-          className={venueDirty ? undefined : "cursor-default hover:opacity-100"}
-        >
-          Save changes
-        </FilledButton>
-      )}
+      <FilledButton
+        onClick={() => saveVenue(editingVenue)}
+        disabled={!venueDirty}
+        loading={venueBusy}
+        tonal={!venueDirty}
+        className={venueDirty ? undefined : "cursor-default hover:opacity-100"}
+      >
+        Save changes
+      </FilledButton>
       {(venueDirty || venuePendingReview) && (
         <OutlinedButton onClick={() => discardVenue(editingVenue)} disabled={venueBusy}>
           {venuePendingReview ? "Withdraw submission" : "Discard"}
@@ -279,10 +274,10 @@ function SaveBar() {
       >
         {venueActionError ||
           (venuePendingReview
-            ? "Submitted for review — the published listing won't change until an admin acts on it."
+            ? "Name/address change submitted for review — everything else saves immediately."
             : venueDirty
               ? "Unsaved edits are only visible to you until you save."
-              : "Edits to a verified venue are reviewed before going live.")}
+              : "Menu, hours, links, and photos save immediately. Renaming or re-addressing a venue is reviewed before going live.")}
       </p>
     </div>
   );
@@ -292,6 +287,7 @@ function ProfileTab() {
   const {
     profile,
     editingVenue,
+    venuePendingReview,
     toggleVenueSetValue,
     setVenueField,
     addSocialLink,
@@ -305,11 +301,13 @@ function ProfileTab() {
         <TextField
           label="Venue name"
           value={profile.name}
+          disabled={venuePendingReview}
           onChange={(e) => setVenueField(editingVenue, "name", e.target.value)}
         />
         <TextField
           label="Address"
           value={profile.address}
+          disabled={venuePendingReview}
           onChange={(e) => setVenueField(editingVenue, "address", e.target.value)}
         />
         <div className="grid grid-cols-2 gap-4">

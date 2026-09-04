@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { computeVenueProfile, isVenueDirty, listingFieldsOf, withLiveFields } from "./venues";
+import {
+  applyPendingListing,
+  computeVenueProfile,
+  isVenueDirty,
+  isVenueIdentityDirty,
+  listingFieldsOf,
+  toVenueDirectFields,
+  toVenueEditListing,
+  withLiveFields,
+} from "./venues";
 import type { VenueProfile } from "../types";
 
 const MOCK_VENUE: VenueProfile = {
@@ -185,5 +194,68 @@ describe("listingFieldsOf", () => {
     expect(stripped).not.toHaveProperty("openVerifyStep");
     expect(stripped).not.toHaveProperty("menu");
     expect(stripped.name).toBe(MOCK_VENUE.name);
+  });
+});
+
+describe("isVenueIdentityDirty — only name/address require admin review", () => {
+  const saved = MOCK_VENUE;
+
+  it("is false with no draft", () => {
+    expect(isVenueIdentityDirty(undefined, saved)).toBe(false);
+  });
+
+  it("is false when name/address are unchanged, even if other fields are dirty", () => {
+    const draft = { ...saved, about: "Changed", hours: [], capacity: 999 };
+    expect(isVenueIdentityDirty(draft, saved)).toBe(false);
+  });
+
+  it("is true when name changed", () => {
+    const draft = { ...saved, name: "New Name" };
+    expect(isVenueIdentityDirty(draft, saved)).toBe(true);
+  });
+
+  it("is true when address changed", () => {
+    const draft = { ...saved, address: "New Address" };
+    expect(isVenueIdentityDirty(draft, saved)).toBe(true);
+  });
+});
+
+describe("toVenueEditListing — the venueEdits.listing shape", () => {
+  it("carries exactly name and address, nothing else", () => {
+    const listing = toVenueEditListing(MOCK_VENUE);
+    expect(listing).toEqual({ name: MOCK_VENUE.name, address: MOCK_VENUE.address });
+  });
+});
+
+describe("toVenueDirectFields — the direct venue-doc write, minus name/address", () => {
+  it("omits name and address (those route through venueEdits instead)", () => {
+    const fields = toVenueDirectFields(MOCK_VENUE, { timeZone: "Asia/Dubai" });
+    expect(fields).not.toHaveProperty("name");
+    expect(fields).not.toHaveProperty("address");
+    expect(fields.about).toBe(MOCK_VENUE.about);
+    expect(fields.hours).toEqual(MOCK_VENUE.hours);
+    expect(fields.photos).toEqual(MOCK_VENUE.photos);
+    expect(fields.cover).toEqual({ min: MOCK_VENUE.coverMin, max: MOCK_VENUE.coverMax, currency: MOCK_VENUE.currency });
+    expect(fields.timeZone).toBe("Asia/Dubai");
+  });
+});
+
+describe("applyPendingListing — overlays only the reviewed fields (name/address)", () => {
+  it("overlays name/address from a pending submission, leaving everything else at saved", () => {
+    const overlaid = applyPendingListing(MOCK_VENUE, { name: "Pending Name", address: "Pending Address" });
+    expect(overlaid.name).toBe("Pending Name");
+    expect(overlaid.address).toBe("Pending Address");
+    expect(overlaid.about).toBe(MOCK_VENUE.about);
+    expect(overlaid.hours).toEqual(MOCK_VENUE.hours);
+  });
+
+  it("falls back to saved when the listing is malformed or partial", () => {
+    const overlaid = applyPendingListing(MOCK_VENUE, { name: 42 });
+    expect(overlaid.name).toBe(MOCK_VENUE.name);
+    expect(overlaid.address).toBe(MOCK_VENUE.address);
+  });
+
+  it("falls back to saved entirely when listing is undefined", () => {
+    expect(applyPendingListing(MOCK_VENUE, undefined)).toEqual(MOCK_VENUE);
   });
 });

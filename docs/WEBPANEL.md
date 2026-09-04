@@ -50,7 +50,8 @@ what most of them render. Once wired, `Overview`, `Tonight`, `Events`,
 `Calendar`, `Venues`, `Team`, `Inbox`, `Reviews`, and `Settings` read real
 Firestore collections that already exist and are already written by some
 producer — `events`, `venues` (including `live`, `editors`/`editorUids`, and
-listing edits via `venueEdits`), `venueReports`, `users/{uid}/inbox`, and
+name/address edits via `venueEdits` — every other profile field is a direct
+write), `venueReports`, `users/{uid}/inbox`, and
 `team`/`venueInvites` (client-write denied; the dashboard reads a seeded roster
 until `/api/organizer/team` exists).
 

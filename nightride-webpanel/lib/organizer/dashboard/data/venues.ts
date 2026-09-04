@@ -317,6 +317,16 @@ export function isVenueDirty(draft: VenueProfile | undefined, saved: VenueProfil
 }
 
 /**
+ * True once `name` or `address` differ from saved — the only two fields that
+ * require admin review (`venueReviewedFields()`, `firestore.rules`). Distinct
+ * from `isVenueDirty`: the Save button gates on "anything changed", this
+ * gates on "does saving also need a `venueEdits` submission".
+ */
+export function isVenueIdentityDirty(draft: VenueProfile | undefined, saved: VenueProfile): boolean {
+  return !!draft && (draft.name !== saved.name || draft.address !== saved.address);
+}
+
+/**
  * Finding 4: nothing read `venueEdits/{venueId}` back, so Save appeared to
  * discard the organizer's work. This overlays a pending `venueEdits.listing`
  * onto the last-saved profile the same way `withLiveFields` overlays a local
@@ -328,49 +338,38 @@ export function isVenueDirty(draft: VenueProfile | undefined, saved: VenueProfil
  */
 export function applyPendingListing(saved: VenueProfile, listing: Record<string, unknown> | undefined): VenueProfile {
   const l = listing ?? {};
-  const cover = (l.cover ?? {}) as Record<string, unknown>;
   return {
     ...saved,
-    about: typeof l.about === "string" ? l.about : saved.about,
-    socialLinks: Array.isArray(l.socialLinks) ? parseSocialLinks(l.socialLinks) : saved.socialLinks,
-    genres: Array.isArray(l.genres) ? l.genres.filter((g): g is string => typeof g === "string") : saved.genres,
-    dressCode: typeof l.dressCode === "string" ? l.dressCode : saved.dressCode,
-    agePolicy: typeof l.agePolicy === "string" ? l.agePolicy : saved.agePolicy,
-    tableLink: typeof l.tableLink === "string" ? l.tableLink : saved.tableLink,
-    coverMin: typeof cover.min === "number" ? cover.min : saved.coverMin,
-    coverMax: typeof cover.max === "number" ? cover.max : saved.coverMax,
-    currency: typeof cover.currency === "string" ? cover.currency : saved.currency,
-    capacity: typeof l.capacity === "number" ? l.capacity : saved.capacity,
-    amenities: Array.isArray(l.amenities) ? l.amenities.filter((a): a is string => typeof a === "string") : saved.amenities,
-    hours: Array.isArray(l.hours) ? parseHours(l.hours) : saved.hours,
-    exceptions: Array.isArray(l.exceptions) ? parseExceptions(l.exceptions) : saved.exceptions,
-    photos: Array.isArray(l.photos) ? l.photos.filter((p): p is string => typeof p === "string") : saved.photos,
+    name: typeof l.name === "string" ? l.name : saved.name,
+    address: typeof l.address === "string" ? l.address : saved.address,
   };
 }
 
 /**
- * The reviewable listing fields only, shaped for `venueEdits/{venueId}.listing`
- * — exactly `venueListingFields()` (`firestore.rules`), in document shape
- * (`cover: { min, max, currency }`, never `coverMin`/`coverMax`/`currency`).
- *
- * This is deliberately NOT `listingFieldsOf(p)`: that helper returns a raw
- * `VenueProfile` slice (UI shape, and it includes `name`/`address`, which are
- * NOT listing fields — see `venueShapeOk()`'s top-level `hasAll` in
- * `firestore.rules`). Collapsing the two produced a version of this file that
- * broke `venues.test.ts`'s round-trip assertion that `name` survives
- * `toVenueDocFields` — that test is correct, and `name`/`address` belong only
- * in the venue document, never in `venueEdits.listing`. `toVenueDocFields`
- * below is the document-shaped mapper; this is the listing-only one. Keep
- * both.
- *
- * `timeZone` is one of the thirteen `venueListingFields()` keys but is not
- * part of `VenueProfile` — it lives on `VenueMeta` and the editor has no
- * control for it (Constraint 7: `types.ts`'s UI shapes don't change for
- * this). `ctx.timeZone` threads the venue's current zone through so the
- * submitted draft carries it forward unchanged rather than a fabricated `""`
- * that would blank it out the moment an admin approves the draft.
+ * The reviewable fields only, shaped for `venueEdits/{venueId}.listing` —
+ * exactly `venueReviewedFields()` (`firestore.rules`): `name` and `address`.
+ * Everything else the organizer edits is a direct write via
+ * `toVenueDirectFields` below, no review.
  */
-export function toVenueEditListing(p: VenueProfile, ctx: { timeZone: string }): Record<string, unknown> {
+export function toVenueEditListing(p: VenueProfile): Record<string, unknown> {
+  return { name: p.name, address: p.address };
+}
+
+/**
+ * The direct-write profile fields, shaped for `venues/{id}` — exactly
+ * `venueProfileFields()` (`firestore.rules`), in document shape
+ * (`cover: { min, max, currency }`, never `coverMin`/`coverMax`/`currency`).
+ * Deliberately NOT a raw-remainder spread of `ctx.raw` (unlike
+ * `toVenueDocFields`, the create-path mapper): this is a targeted `updateDoc`
+ * of exactly these keys, so it can't re-send `editors`/`geo`/`verification`/
+ * `live` on every profile save.
+ *
+ * `timeZone` is one of these fields but is not part of `VenueProfile` — it
+ * lives on `VenueMeta` and the editor has no control for it (Constraint 7:
+ * `types.ts`'s UI shapes don't change for this). `ctx.timeZone` threads the
+ * venue's current zone through unchanged.
+ */
+export function toVenueDirectFields(p: VenueProfile, ctx: { timeZone: string }): Record<string, unknown> {
   return {
     about: p.about,
     socialLinks: p.socialLinks,

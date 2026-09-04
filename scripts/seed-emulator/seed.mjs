@@ -1717,32 +1717,15 @@ const ALL_VENUE_REPORTS = [...VENUE_REPORTS, ...EXTRA_VENUE_REPORTS];
 
 const VENUE_EDITS = [
   {
-    // Document id IS the venue id — the reviewable listing draft.
+    // Document id IS the venue id — the reviewable draft. Only `name`/
+    // `address` are ever gated (venueReviewedFields() in firestore.rules) —
+    // every other profile field (about, hours, photos, ...) is a direct
+    // write straight to the venue document, no review.
     venueId: VENUE_ID.sirens,
     status: "pending",
     listing: {
-      about:
-        "Rooftop techno and house on the Marina skyline. Open-air terrace, resident DJs Thu–Sat, and a strict door policy after 23:00. Now serving a late-night tapas menu.",
-      socialLinks: [
-        { network: "instagram", value: "@sirensdubai" },
-        { network: "tiktok", value: "@sirensdubai" },
-      ],
-      genres: ["Techno", "House"],
-      dressCode: "Smart Casual",
-      agePolicy: "21+",
-      cover: { min: 50, max: 150, currency: "AED" },
-      capacity: 450,
-      amenities: ["Rooftop", "Cloakroom", "Late-night kitchen"],
-      hours: mockHours(["Mon", "Tue"], "22:00", "04:00"),
-      exceptions: [{ label: "Eid Al Adha — Private Hire", date: "2026-08-19", closed: true }],
-      photos: [
-        emulatorDownloadUrl("venuePhotos/sirens/hero.jpg"),
-        emulatorDownloadUrl("venuePhotos/sirens/gallery/0.jpg"),
-        emulatorDownloadUrl("venuePhotos/sirens/gallery/1.jpg"),
-        emulatorDownloadUrl("venuePhotos/sirens/gallery/2.jpg"),
-        emulatorDownloadUrl("venuePhotos/sirens/gallery/3.jpg"),
-      ],
-      timeZone: "Asia/Dubai",
+      name: "Sirens Rooftop Dubai",
+      address: "Marina Walk, Building 12, Dubai Marina, Dubai, UAE",
     },
     submittedBy: TEAM_UID.manager,
     submittedAt: T("2026-08-10T09:00:00Z"),

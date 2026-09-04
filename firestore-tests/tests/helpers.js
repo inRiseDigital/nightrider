@@ -231,7 +231,7 @@ export function baseVenueEdit(overrides = {}) {
   return {
     venueId: 'venue1',
     status: 'pending',
-    listing: { about: 'A great place.', genres: ['house'] },
+    listing: { name: 'New Venue Name', address: 'New Address' },
     submittedBy: 'organizer-uid',
     submittedAt: new Date(),
     reviewedBy: null,

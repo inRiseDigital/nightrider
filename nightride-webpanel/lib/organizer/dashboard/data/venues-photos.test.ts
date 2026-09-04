@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { setPhotoAt, toVenueDocFields } from "./venues";
+import { setPhotoAt, toVenueDirectFields, toVenueDocFields } from "./venues";
 import type { VenueProfile } from "../types";
 
 /**
@@ -7,11 +7,12 @@ import type { VenueProfile } from "../types";
  * droppable in any order (nothing enforces filling them front-to-back), so
  * `store.tsx`'s `commitSlotImage`/`removeSlotImage` must never leave
  * `photos[]` sparse — a hole spreads into a real `undefined`
- * (`[...sparse][0] === undefined`), and `toVenueEditListing`'s bare
- * `{ ...p }` would carry that straight into `saveVenue`'s batch write, which
- * the Firestore SDK rejects outright (no `ignoreUndefinedProperties` set
- * anywhere in `lib/firebase.ts`) — a Storage upload that already succeeded
- * would then fail to save with an opaque error.
+ * (`[...sparse][0] === undefined`), and `toVenueDirectFields` (photos are a
+ * direct venue-doc write, not part of `venueEdits`) would carry that straight
+ * into `saveVenue`'s batch write, which the Firestore SDK rejects outright
+ * (no `ignoreUndefinedProperties` set anywhere in `lib/firebase.ts`) — a
+ * Storage upload that already succeeded would then fail to save with an
+ * opaque error.
  */
 describe("setPhotoAt", () => {
   it("sets index 0 on an empty/undefined array without padding", () => {
@@ -49,34 +50,41 @@ describe("setPhotoAt", () => {
     expect(setPhotoAt(["a", "b", "c"], 1, "")).toEqual(["a", "", "c"]);
   });
 
-  it("what saveVenue would actually write (toVenueDocFields) carries no undefined after an out-of-order fill", () => {
-    const base: VenueProfile = {
-      verified: true,
-      name: "New Venue",
-      city: "Dubai, UAE",
-      address: "",
-      about: "",
-      socialLinks: [],
-      genres: [],
-      dressCode: "Casual",
-      agePolicy: "18+",
-      coverMin: 0,
-      coverMax: 0,
-      currency: "$",
-      capacity: 0,
-      amenities: [],
-      hours: [],
-      exceptions: [],
-      menu: [],
-      tableLink: "",
-      photos: setPhotoAt(undefined, 3, "gallery-2.jpg"),
-    };
-    const fields = toVenueDocFields(base, { raw: {} });
+  const PHOTO_TEST_VENUE: VenueProfile = {
+    verified: true,
+    name: "New Venue",
+    city: "Dubai, UAE",
+    address: "",
+    about: "",
+    socialLinks: [],
+    genres: [],
+    dressCode: "Casual",
+    agePolicy: "18+",
+    coverMin: 0,
+    coverMax: 0,
+    currency: "$",
+    capacity: 0,
+    amenities: [],
+    hours: [],
+    exceptions: [],
+    menu: [],
+    tableLink: "",
+    photos: setPhotoAt(undefined, 3, "gallery-2.jpg"),
+  };
+
+  it("what venue creation would write (toVenueDocFields) carries no undefined after an out-of-order fill", () => {
+    const fields = toVenueDocFields(PHOTO_TEST_VENUE, { raw: {} });
     // The exact bug this test guards: a sparse `photos` array spread into
     // the write payload would put `undefined` at indices 0-2, which
     // `JSON.stringify` (a stand-in for what Firestore's SDK inspects) turns
     // into `null` — this asserts there is nothing to turn into anything,
     // because there are no holes.
+    expect(fields.photos).toEqual(["", "", "", "gallery-2.jpg"]);
+    expect((fields.photos as string[]).every((v) => v !== undefined)).toBe(true);
+  });
+
+  it("what saveVenue would actually write (toVenueDirectFields) carries no undefined after an out-of-order fill", () => {
+    const fields = toVenueDirectFields(PHOTO_TEST_VENUE, { timeZone: "Asia/Dubai" });
     expect(fields.photos).toEqual(["", "", "", "gallery-2.jpg"]);
     expect((fields.photos as string[]).every((v) => v !== undefined)).toBe(true);
   });

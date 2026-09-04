@@ -468,7 +468,8 @@ venues/{venueId} {
   verified: bool
   status: 'active' | 'closed'
 
-  // Listing (mirrors VenueProfile). Edits route through venueEdits, never here.
+  // Profile (mirrors VenueProfile). Direct writes by owner/manager — only
+  // `name`/`address` above require an admin-reviewed venueEdits submission.
   about: string                      // <= 2000
   socialLinks: [{ network: string, value: string }]                 // <= 8
   genres: string[]                   // <= 10
@@ -697,7 +698,7 @@ function exists, the dashboard reads a seeded roster.
 venueEdits/{venueId} {                // document id IS the venue id
   venueId: string
   status: 'pending' | 'approved' | 'rejected'
-  listing: {...}                      // every venue listing field from above
+  listing: { name: string, address: string }   // only the two reviewed fields
   submittedBy: string
   submittedAt: Timestamp              // == request.time, enforced
   reviewedBy: string | null
@@ -706,12 +707,14 @@ venueEdits/{venueId} {                // document id IS the venue id
 }
 ```
 
-This is the reviewable draft for the listing fields on `venues` — `about`,
-`socialLinks`, `genres`, `hours`, and the rest — because those fields are
-denied on the venue document itself and can only be changed by going through
-here. The document id being the venue id, rather than an auto-id, is the whole
-design: saving a draft is one idempotent `setDoc`, discarding it is one
-`deleteDoc`, the admin review queue is a plain single-collection query
+This is the reviewable draft for `venues.name`/`venues.address` — the only two
+fields denied on the venue document itself, so a rename or re-address can only
+land by going through here. Everything else an organizer edits (`about`,
+`socialLinks`, `genres`, `hours`, `photos`, and the rest) is a direct write to
+the venue document; it was never part of this collection's `listing`. The
+document id being the venue id, rather than an auto-id, is the whole design:
+saving a draft is one idempotent `setDoc`, discarding it is one `deleteDoc`,
+the admin review queue is a plain single-collection query
 (`status == 'pending'`), and the join back to the venue is free because the id
 already is the join key.
 

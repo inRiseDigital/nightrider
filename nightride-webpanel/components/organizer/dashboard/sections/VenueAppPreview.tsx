@@ -241,12 +241,13 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
 export function VenueAppPreview() {
   // The phone shows the *published* listing — drafted edits only appear here
   // once the save bar commits them. Menu images are live either way, since
-  // menu edits bypass the draft entirely — but hero/gallery photos ARE
-  // listing fields (they route through `commitSlotImage` into the venue's
-  // draft, same as any other profile field), so their pickers must be
-  // gated by `venuePendingReview` exactly like the fieldset around the
-  // Profile/Hours/Links tabs.
-  const { savedProfile, editingVenue, events, images, requestRemoveImage, venueMeta, venuePendingReview } =
+  // menu edits bypass the draft entirely. Hero/gallery photos route through
+  // `commitSlotImage` into the venue's draft too, same as any other profile
+  // field — but only `name`/`address` require admin review now
+  // (`venueReviewedFields()`), so their pickers are never gated on
+  // `venuePendingReview`; a rename pending review doesn't block a photo
+  // upload.
+  const { savedProfile, editingVenue, events, images, requestRemoveImage, venueMeta } =
     useOrganizerDashboard();
   const profile = savedProfile;
   const now = useNow();
@@ -257,7 +258,7 @@ export function VenueAppPreview() {
 
   const hero = heroSlotId(editingVenue);
   const gallery = gallerySlotIds(editingVenue);
-  const heroUpload = useImageUpload(hero, venuePendingReview);
+  const heroUpload = useImageUpload(hero);
 
   const dayIdx = now ? mondayFirstIndex(now) : 0;
   const todayISO = now ? toISODate(now) : "";
@@ -602,7 +603,6 @@ export function VenueAppPreview() {
                     key={slotId}
                     slotId={slotId}
                     onRemove={requestRemoveImage}
-                    disabled={venuePendingReview}
                   />
                 ))}
               </div>

@@ -345,7 +345,7 @@ describe('venues/{venueId}', () => {
     await assertFails(setDoc(doc(ctx.firestore(), 'venues/v72b'), venue));
   });
 
-  it('73a. manager edits a listing field on the venue document -> DENY (must route through venueEdits)', async () => {
+  it('73a. manager edits a profile field on the venue document -> ALLOW (only name/address route through venueEdits)', async () => {
     const org = uid('org');
     const manager = uid('manager');
     await seedUsers({
@@ -357,7 +357,103 @@ describe('venues/{venueId}', () => {
       baseVenue({ ownerUid: org, editorUids: [org, manager], editors: { [org]: 'owner', [manager]: 'manager' } }),
     );
     const ctx = testEnv.authenticatedContext(manager);
-    await assertFails(updateDoc(doc(ctx.firestore(), 'venues/v73a'), { about: 'New description' }));
+    await assertSucceeds(updateDoc(doc(ctx.firestore(), 'venues/v73a'), { about: 'New description' }));
+  });
+
+  it('73a-i. manager edits hours/photos/socialLinks/tableLink directly -> ALLOW', async () => {
+    const org = uid('org');
+    const manager = uid('manager');
+    await seedUsers({
+      [org]: baseUser({ organizerStatus: 'approved' }),
+      [manager]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue(
+      'v73a1',
+      baseVenue({ ownerUid: org, editorUids: [org, manager], editors: { [org]: 'owner', [manager]: 'manager' } }),
+    );
+    const ctx = testEnv.authenticatedContext(manager);
+    const hours = Array.from({ length: 7 }, (_, i) => ({ day: i, open: '20:00', close: '04:00', closed: false }));
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'venues/v73a1'), {
+        hours,
+        photos: ['https://example.com/hero.jpg'],
+        socialLinks: [{ network: 'instagram', value: '@testvenue' }],
+        tableLink: 'https://example.com/book',
+      }),
+    );
+  });
+
+  it('73a-ii. manager edits name directly -> DENY (must route through venueEdits)', async () => {
+    const org = uid('org');
+    const manager = uid('manager');
+    await seedUsers({
+      [org]: baseUser({ organizerStatus: 'approved' }),
+      [manager]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue(
+      'v73a2',
+      baseVenue({ ownerUid: org, editorUids: [org, manager], editors: { [org]: 'owner', [manager]: 'manager' } }),
+    );
+    const ctx = testEnv.authenticatedContext(manager);
+    await assertFails(updateDoc(doc(ctx.firestore(), 'venues/v73a2'), { name: 'New Name' }));
+  });
+
+  it('73a-iii. manager edits address directly -> DENY (must route through venueEdits)', async () => {
+    const org = uid('org');
+    const manager = uid('manager');
+    await seedUsers({
+      [org]: baseUser({ organizerStatus: 'approved' }),
+      [manager]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue(
+      'v73a3',
+      baseVenue({ ownerUid: org, editorUids: [org, manager], editors: { [org]: 'owner', [manager]: 'manager' } }),
+    );
+    const ctx = testEnv.authenticatedContext(manager);
+    await assertFails(updateDoc(doc(ctx.firestore(), 'venues/v73a3'), { address: 'New Address' }));
+  });
+
+  it('73a-iv. manager writes an oversized "about" directly -> DENY (venueShapeOk sweep still runs on a direct write)', async () => {
+    const org = uid('org');
+    const manager = uid('manager');
+    await seedUsers({
+      [org]: baseUser({ organizerStatus: 'approved' }),
+      [manager]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue(
+      'v73a4',
+      baseVenue({ ownerUid: org, editorUids: [org, manager], editors: { [org]: 'owner', [manager]: 'manager' } }),
+    );
+    const ctx = testEnv.authenticatedContext(manager);
+    await assertFails(updateDoc(doc(ctx.firestore(), 'venues/v73a4'), { about: 'x'.repeat(2001) }));
+  });
+
+  it('73a-v. manager writes a 9-element "hours" directly -> DENY (venueShapeOk sweep still runs on a direct write)', async () => {
+    const org = uid('org');
+    const manager = uid('manager');
+    await seedUsers({
+      [org]: baseUser({ organizerStatus: 'approved' }),
+      [manager]: baseUser({ organizerStatus: 'approved' }),
+    });
+    await seedVenue(
+      'v73a5',
+      baseVenue({ ownerUid: org, editorUids: [org, manager], editors: { [org]: 'owner', [manager]: 'manager' } }),
+    );
+    const ctx = testEnv.authenticatedContext(manager);
+    const hours = Array.from({ length: 9 }, (_, i) => ({ day: i, open: '20:00', close: '04:00', closed: false }));
+    await assertFails(updateDoc(doc(ctx.firestore(), 'venues/v73a5'), { hours }));
+  });
+
+  it('73a-vi. admin renames a venue directly -> ALLOW (approval path)', async () => {
+    const org = uid('org');
+    await seedUsers({ [org]: baseUser({ organizerStatus: 'approved' }) });
+    await seedVenue('v73a6', baseVenue({ ownerUid: org }));
+    const admin = uid('admin');
+    await seedUsers({ [admin]: baseUser({ isAdmin: true }) });
+    const ctx = testEnv.authenticatedContext(admin);
+    await assertSucceeds(
+      updateDoc(doc(ctx.firestore(), 'venues/v73a6'), { name: 'Approved New Name', address: 'Approved New Address' }),
+    );
   });
 
   it('73b. door-staff editor sets live.emergencyActive: true -> ALLOW', async () => {

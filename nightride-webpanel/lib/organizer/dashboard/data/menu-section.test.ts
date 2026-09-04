@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMenuSection, toMenuSectionFields } from "./venues";
+import { diffMenuSections, parseMenuSection, toMenuSectionFields } from "./venues";
 import type { MenuSection } from "../types";
 
 const section: MenuSection = {
@@ -71,5 +71,41 @@ describe("parseMenuSection(toMenuSectionFields(section)) round-trip", () => {
       { id: "ok", name: "", price: 0, desc: "", size: "", serves: "", tags: [], nights: [], soldOut: false },
     ]);
     expect(back.items[0].image).toBe("");
+  });
+});
+
+const otherSection: MenuSection = { id: "ms2", name: "Drinks", items: [] };
+
+describe("diffMenuSections — what saveVenue commits for the menu tab", () => {
+  it("is empty when current matches baseline exactly", () => {
+    expect(diffMenuSections([section], [section])).toEqual({ toWrite: [], toDelete: [] });
+  });
+
+  it("writes a brand-new section not present in baseline", () => {
+    const { toWrite, toDelete } = diffMenuSections([section, otherSection], [section]);
+    expect(toWrite).toEqual([otherSection]);
+    expect(toDelete).toEqual([]);
+  });
+
+  it("writes a section whose content changed, ignores unchanged siblings", () => {
+    const changed = { ...section, name: "Renamed section" };
+    const { toWrite, toDelete } = diffMenuSections([changed, otherSection], [section, otherSection]);
+    expect(toWrite).toEqual([changed]);
+    expect(toDelete).toEqual([]);
+  });
+
+  it("deletes a section removed from current", () => {
+    const { toWrite, toDelete } = diffMenuSections([section], [section, otherSection]);
+    expect(toWrite).toEqual([]);
+    expect(toDelete).toEqual([otherSection.id]);
+  });
+
+  it("handles a simultaneous add, edit, and delete", () => {
+    const changed = { ...section, items: [] };
+    const added: MenuSection = { id: "ms3", name: "New", items: [] };
+    const { toWrite, toDelete } = diffMenuSections([changed, added], [section, otherSection]);
+    expect(toWrite).toEqual(expect.arrayContaining([changed, added]));
+    expect(toWrite).toHaveLength(2);
+    expect(toDelete).toEqual([otherSection.id]);
   });
 });

@@ -11,9 +11,10 @@ import { Card, FilledButton, IconButton, TextField } from "../ui/Primitives";
  * The venue's food & drinks menu — sections of priced items, each with its own
  * photo, availability nights, and sold-out switch.
  *
- * Unlike event submissions, menu edits skip platform review and reach the app
- * immediately, which is why there is no save/submit step here: every control
- * writes straight to the store.
+ * Menu edits never require admin review (unlike a venue rename/re-address),
+ * but they DO need the Save button now, same as hours/links/photos — every
+ * control here writes to the local draft only; `VenuesSection`'s `SaveBar`
+ * commits it.
  */
 export function VenueMenuSection() {
   const { profile, editingVenue, menuLoading, addMenuSection } = useOrganizerDashboard();
@@ -69,8 +70,7 @@ export function VenueMenuSection() {
 }
 
 function SectionCard({ section }: { section: MenuSection }) {
-  const { editingVenue, setMenuSectionName, removeMenuSection, addMenuItem, flushMenuWrite } =
-    useOrganizerDashboard();
+  const { editingVenue, setMenuSectionName, removeMenuSection, addMenuItem } = useOrganizerDashboard();
 
   return (
     <Card className="flex flex-col gap-4">
@@ -78,7 +78,6 @@ function SectionCard({ section }: { section: MenuSection }) {
         <input
           value={section.name}
           onChange={(e) => setMenuSectionName(editingVenue, section.id, e.target.value)}
-          onBlur={() => flushMenuWrite(editingVenue, section.id)}
           aria-label="Section name"
           className="font-display min-w-0 flex-1 border-b border-transparent bg-transparent py-1 text-xl uppercase tracking-wide text-[var(--m3-on)] outline-none focus:border-[var(--m3-pri)]"
         />
@@ -118,12 +117,10 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
     toggleMenuItemSoldOut,
     toggleMenuItemTag,
     toggleMenuItemNight,
-    flushMenuWrite,
   } = useOrganizerDashboard();
 
   const set = <K extends keyof MenuItem>(field: K, value: MenuItem[K]) =>
     setMenuItemField(editingVenue, sectionId, item.id, field, value);
-  const flush = () => flushMenuWrite(editingVenue, sectionId);
 
   /** Inline affordances all sit on the same 40px row height as a dense field. */
   const boxed =
@@ -152,7 +149,6 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
             surface="var(--m3-surf2)"
             value={item.name}
             onChange={(e) => set("name", e.target.value)}
-            onBlur={flush}
             placeholder="Item name"
             aria-label="Item name"
             className="font-medium"
@@ -163,7 +159,6 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
             <input
               value={item.price}
               onChange={(e) => set("price", Number(e.target.value) || 0)}
-              onBlur={flush}
               type="number"
               min={0}
               placeholder="0"
@@ -197,7 +192,6 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
           surface="var(--m3-surf2)"
           value={item.desc}
           onChange={(e) => set("desc", e.target.value)}
-          onBlur={flush}
           placeholder="Short description guests see under the name"
           aria-label="Item description"
         />
@@ -208,7 +202,6 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
             <input
               value={item.size}
               onChange={(e) => set("size", e.target.value)}
-              onBlur={flush}
               placeholder="Size"
               aria-label="Serving size"
               className={`w-[92px] ${bare}`}
@@ -219,7 +212,6 @@ function ItemCard({ sectionId, item }: { sectionId: string; item: MenuItem }) {
             <input
               value={item.serves}
               onChange={(e) => set("serves", e.target.value)}
-              onBlur={flush}
               placeholder="Serves"
               aria-label="Serves"
               className={`w-14 font-mono ${bare}`}

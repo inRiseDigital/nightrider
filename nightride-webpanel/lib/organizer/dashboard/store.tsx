@@ -168,12 +168,12 @@ export function useOrganizerDashboard() {
      * (hero/gallery) route through `updateVenueListing`'s function form (not
      * `setVenueField`) specifically so a second slot upload started before
      * the first has landed still composes against the in-progress draft
-     * rather than a stale outer snapshot. Menu images write immediately
-     * (menu bypasses the draft entirely, same as every other menu edit).
-     * Event images require the event to already exist (T12 brief's ordering
-     * constraint; the `eventMedia` storage rule has nothing else to
-     * authorize against) and go through the raw-remainder merge every event
-     * write uses, via `patchEventImage`.
+     * rather than a stale outer snapshot. Menu images are a local draft edit
+     * too now (`setMenuItemField`) — the Save button commits them along with
+     * the rest of the menu tab. Event images require the event to already
+     * exist (T12 brief's ordering constraint; the `eventMedia` storage rule
+     * has nothing else to authorize against) and go through the
+     * raw-remainder merge every event write uses, via `patchEventImage`.
      */
     async function commitSlotImage(slotId: string, url: string): Promise<void> {
       const slot = parseSlotId(slotId);
@@ -195,7 +195,6 @@ export function useOrganizerDashboard() {
         );
         if (!section) throw new Error("That menu item no longer exists — reload and try again.");
         venues.setMenuItemField(slot.venueId, section.id, slot.itemId, "image", url);
-        venues.flushMenuWrite(slot.venueId, section.id);
         return;
       }
       // slot.kind === "event"
@@ -207,13 +206,13 @@ export function useOrganizerDashboard() {
     /**
      * Clears a slot's Firestore-field reference. Deliberately does NOT
      * delete the underlying Storage object here: a hero/gallery slot is a
-     * listing field, so "remove" on one only queues a draft change — the
-     * currently PUBLISHED photo (what the live app and this same tile are
-     * showing right now, via `images` above) is still that object until an
-     * admin approves the removal. Deleting it immediately would 404 the
-     * live app's hero shot before the change is even submitted. Orphaned
-     * objects are the named, accepted follow-up (`sweepOrphanImages`) — the
-     * same trade-off the brief makes for uploads, applied symmetrically to
+     * profile field, so "remove" on one only queues a local draft change —
+     * the currently PUBLISHED photo (what the live app and this same tile
+     * are showing right now, via `images` above) is still that object until
+     * the organizer clicks Save. Deleting it immediately would 404 the live
+     * app's hero shot before the change is even saved. Orphaned objects are
+     * the named, accepted follow-up (`sweepOrphanImages`) — the same
+     * trade-off the brief makes for uploads, applied symmetrically to
      * removes.
      */
     async function removeSlotImage(slotId: string): Promise<void> {
@@ -236,7 +235,6 @@ export function useOrganizerDashboard() {
         );
         if (!section) return;
         venues.setMenuItemField(slot.venueId, section.id, slot.itemId, "image", "");
-        venues.flushMenuWrite(slot.venueId, section.id);
         return;
       }
       // slot.kind === "event"
@@ -378,7 +376,6 @@ export function useOrganizerDashboard() {
       toggleEmergency: venues.toggleEmergency,
       flushQueueMinutesNow: venues.flushQueueMinutesNow,
       flushFlashNow: venues.flushFlashNow,
-      flushMenuWrite: venues.flushMenuWrite,
 
       // ---- Performance ----
       perfVenueFilter: perf.perfVenueFilter,

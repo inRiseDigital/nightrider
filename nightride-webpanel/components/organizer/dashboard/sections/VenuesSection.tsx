@@ -214,7 +214,9 @@ export function VenuesSection() {
             {venueTab === "links" && <LinksTab />}
             {venueTab === "menu" && <VenueMenuSection />}
 
-            {/* Menu edits publish immediately, so that tab has nothing to save. */}
+            {/* Covers all four tabs, menu included — `venueDirty` is true
+                whenever either the profile draft or the menu working copy
+                differs from what's saved. */}
             <SaveBar />
           </div>
 
@@ -277,7 +279,7 @@ function SaveBar() {
             ? "Name/address change submitted for review — everything else can still be saved normally."
             : venueDirty
               ? "Unsaved edits are only visible to you until you save."
-              : "The Menu tab saves as you type. Renaming or re-addressing a venue is reviewed before going live — everything else here saves immediately once you click Save.")}
+              : "Renaming or re-addressing a venue is reviewed before going live — everything else here, menu included, saves immediately once you click Save.")}
       </p>
     </div>
   );

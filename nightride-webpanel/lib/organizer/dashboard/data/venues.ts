@@ -389,9 +389,12 @@ export function toVenueDirectFields(p: VenueProfile, ctx: { timeZone: string }):
 
 // ---------------------------------------------------------------------------
 // `venues/{id}/menuSections/{sectionId}` <-> `MenuSection`. A subcollection,
-// not the venue draft: menu edits publish immediately (see rules' `menuSections`
-// match block), so there is no listing/live split here — one document, one
-// read, one write.
+// not a field on the venue document — never admin-reviewed (rules'
+// `menuSections` match block just checks `canEditVenue()`), but it does have
+// its own draft/baseline split (`useVenues.ts`'s `menuByVenue`/
+// `menuBaseline`) so the Save button gates it the same as every other
+// profile field. `diffMenuSections` below is what that Save turns into
+// per-section `setDoc`/`deleteDoc` calls.
 // ---------------------------------------------------------------------------
 
 function parseMenuItem(raw: unknown): MenuItem | null {
@@ -425,6 +428,27 @@ export function parseMenuSection(id: string, data: Record<string, unknown> | und
 /** `MenuSection` -> the fields written to its own `menuSections/{id}` doc. */
 export function toMenuSectionFields(s: MenuSection): Record<string, unknown> {
   return { name: s.name, items: s.items };
+}
+
+/**
+ * What `saveVenue` needs to write for the menu tab: sections in `current`
+ * that are new or changed relative to `baseline` (by id, deep-compared —
+ * covers structural edits down to a single item field), and the ids of
+ * sections in `baseline` no longer in `current` at all. Menu edits are never
+ * admin-reviewed (only `name`/`address` are), so this only decides which
+ * `menuSections/{id}` docs to `setDoc`/`deleteDoc` directly — there is no
+ * draft-vs-published distinction to preserve here the way there is for the
+ * venue doc's own profile fields.
+ */
+export function diffMenuSections(
+  current: MenuSection[],
+  baseline: MenuSection[]
+): { toWrite: MenuSection[]; toDelete: string[] } {
+  const baselineById = new Map(baseline.map((s) => [s.id, s]));
+  const currentIds = new Set(current.map((s) => s.id));
+  const toWrite = current.filter((s) => JSON.stringify(s) !== JSON.stringify(baselineById.get(s.id)));
+  const toDelete = baseline.filter((s) => !currentIds.has(s.id)).map((s) => s.id);
+  return { toWrite, toDelete };
 }
 
 /**

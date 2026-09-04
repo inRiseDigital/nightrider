@@ -23,6 +23,7 @@ import {
   isVenueDirty,
   isVenueIdentityDirty,
   LAUNCH_MARKETS,
+  diffMenuSections,
   parseMenuSection,
   parseTonight,
   parseVenueMeta,
@@ -43,7 +44,7 @@ import {
 } from "../data/refs";
 import { describeFirestoreError } from "../data/errors";
 import { crowdLevelForDoorStatus, liveStatusFor, offerFor, queueStatusForDoorStatus, ticketsAvailableFor } from "../data/enums";
-import type { DoorStatus, MenuItem, TonightState, VenueMeta, VenueProfile, VerifyStepId } from "../types";
+import type { DoorStatus, MenuItem, MenuSection, TonightState, VenueMeta, VenueProfile, VerifyStepId } from "../types";
 import { useAsyncAction } from "./useAsyncAction";
 import { useVenueEditor } from "./useVenueEditor";
 import { useLatest } from "./useLatest";
@@ -193,8 +194,15 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
 
   const rawDocsRef = useLatest(rawDocs);
 
-  // ---- Menu: one-shot per venue, refetched after every write ----
+  // ---- Menu: one-shot per venue. `menuByVenue` is the working copy every
+  // control edits locally; `menuBaseline` is what's actually persisted as of
+  // the last fetch/save — the pair this hook's `isMenuDirty`/`saveVenue`/
+  // `discardVenue` diff against, the same draft/saved shape every other
+  // profile field uses, just for a subcollection instead of a doc field
+  // (menu never required admin review — see the venue-approval-scope
+  // ruling — it just used to write on every keystroke instead of on Save).
   const [menuByVenue, setMenuByVenue] = useState<Record<string, ReturnType<typeof parseMenuSection>[]>>({});
+  const [menuBaseline, setMenuBaseline] = useState<Record<string, ReturnType<typeof parseMenuSection>[]>>({});
   const [menuLoadingIds, setMenuLoadingIds] = useState<Set<string>>(new Set());
 
   const fetchMenu = useCallback(async (venueId: string) => {
@@ -203,6 +211,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       const snap = await getDocs(venueMenuSectionsCol(venueId));
       const sections = snap.docs.map((d) => parseMenuSection(d.id, d.data() as Record<string, unknown>));
       setMenuByVenue((prev) => ({ ...prev, [venueId]: sections }));
+      setMenuBaseline((prev) => ({ ...prev, [venueId]: sections }));
     } catch (err) {
       showSnack(describeFirestoreError(err), "error");
     } finally {
@@ -404,76 +413,12 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     [updateVenueListing]
   );
 
-  // ---- Menu: writes straight to `menuSections/{id}`, debounced 800ms per
-  // section so typing doesn't fire a write per keystroke, refetched after
-  // every commit so the panel never drifts from what the app actually shows.
-  // Structural edits (add/remove section or item, toggles) go through the
-  // same path — the brief's optimistic/debounced/pessimistic split covers
-  // `live` fields only; menu bypasses the draft entirely (rules: no review),
-  // so this hook applies the same "coalesce writes, refetch after" treatment
-  // uniformly rather than inventing a fourth category.
-  const menuWrites = useRef<
-    Record<string, { timer: ReturnType<typeof setTimeout>; venueId: string; sectionId: string }>
-  >({});
-
-  const commitMenuSection = useCallback(
-    async (venueId: string, sectionId: string, section: ReturnType<typeof parseMenuSection>) => {
-      try {
-        await setDoc(venueMenuSectionDocRef(venueId, sectionId), toMenuSectionFields(section));
-      } catch (err) {
-        showSnack(describeFirestoreError(err), "error");
-      } finally {
-        fetchMenu(venueId);
-      }
-    },
-    [showSnack, fetchMenu]
-  );
-
-  const scheduleMenuWrite = useCallback(
-    (venueId: string, sectionId: string) => {
-      const key = `${venueId}:${sectionId}`;
-      const pending = menuWrites.current;
-      if (pending[key]) clearTimeout(pending[key].timer);
-      const timer = setTimeout(() => {
-        delete pending[key];
-        const section = menuByVenue[venueId]?.find((s) => s.id === sectionId);
-        if (section) commitMenuSection(venueId, sectionId, section);
-      }, 800);
-      pending[key] = { timer, venueId, sectionId };
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [commitMenuSection]
-  );
-
-  const flushMenuWrite = useCallback(
-    (venueId: string, sectionId: string) => {
-      const key = `${venueId}:${sectionId}`;
-      const pending = menuWrites.current[key];
-      if (!pending) return;
-      clearTimeout(pending.timer);
-      delete menuWrites.current[key];
-      const section = menuByVenue[venueId]?.find((s) => s.id === sectionId);
-      if (section) commitMenuSection(venueId, sectionId, section);
-    },
-    [menuByVenue, commitMenuSection]
-  );
-
-  useEffect(
-    () => () => {
-      // Flush-on-unmount: fire every pending menu write; the promise races
-      // the teardown, same best-effort semantics as `useDebouncedWrite`'s.
-      for (const key of Object.keys(menuWrites.current)) {
-        const pending = menuWrites.current[key];
-        clearTimeout(pending.timer);
-        const section = menuByVenue[pending.venueId]?.find((s) => s.id === pending.sectionId);
-        if (section) commitMenuSection(pending.venueId, pending.sectionId, section);
-      }
-      menuWrites.current = {};
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-
+  // ---- Menu: every control mutates `menuByVenue` (the working copy) only.
+  // No per-keystroke write, no debounce — `saveVenue` diffs the working copy
+  // against `menuBaseline` and commits changed/added/removed sections in the
+  // same batch as everything else, and `discardVenue` reverts the working
+  // copy back to the baseline. Still never admin-reviewed (rules: no review
+  // for menu, only `name`/`address`) — this only changes *when* it writes.
   const updateMenuLocal = useCallback(
     (id: string, fn: (sections: ReturnType<typeof parseMenuSection>[]) => ReturnType<typeof parseMenuSection>[]) => {
       setMenuByVenue((prev) => ({ ...prev, [id]: fn(prev[id] ?? []) }));
@@ -481,34 +426,29 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     []
   );
 
+  const isMenuDirty = useCallback(
+    (id: string) => JSON.stringify(menuByVenue[id] ?? []) !== JSON.stringify(menuBaseline[id] ?? []),
+    [menuByVenue, menuBaseline]
+  );
+
   const addMenuSection = useCallback(
     (id: string) => {
       const section = { id: nextMenuId("sec"), name: "New section", items: [] };
       updateMenuLocal(id, (sections) => [...sections, section]);
-      scheduleMenuWrite(id, section.id);
     },
-    [updateMenuLocal, scheduleMenuWrite]
+    [updateMenuLocal]
   );
   const removeMenuSection = useCallback(
     (id: string, sectionId: string) => {
       updateMenuLocal(id, (sections) => sections.filter((s) => s.id !== sectionId));
-      const pending = menuWrites.current[`${id}:${sectionId}`];
-      if (pending) {
-        clearTimeout(pending.timer);
-        delete menuWrites.current[`${id}:${sectionId}`];
-      }
-      deleteDoc(venueMenuSectionDocRef(id, sectionId))
-        .catch((err) => showSnack(describeFirestoreError(err), "error"))
-        .finally(() => fetchMenu(id));
     },
-    [updateMenuLocal, showSnack, fetchMenu]
+    [updateMenuLocal]
   );
   const setMenuSectionName = useCallback(
     (id: string, sectionId: string, name: string) => {
       updateMenuLocal(id, (sections) => sections.map((s) => (s.id === sectionId ? { ...s, name } : s)));
-      scheduleMenuWrite(id, sectionId);
     },
-    [updateMenuLocal, scheduleMenuWrite]
+    [updateMenuLocal]
   );
 
   const patchMenuItem = useCallback(
@@ -520,9 +460,8 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
             : { ...sec, items: sec.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)) }
         )
       );
-      scheduleMenuWrite(id, sectionId);
     },
-    [updateMenuLocal, scheduleMenuWrite]
+    [updateMenuLocal]
   );
 
   const addMenuItem = useCallback(
@@ -540,18 +479,16 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
               }
         )
       );
-      scheduleMenuWrite(id, sectionId);
     },
-    [updateMenuLocal, scheduleMenuWrite]
+    [updateMenuLocal]
   );
   const removeMenuItem = useCallback(
     (id: string, sectionId: string, itemId: string) => {
       updateMenuLocal(id, (sections) =>
         sections.map((s) => (s.id !== sectionId ? s : { ...s, items: s.items.filter((it) => it.id !== itemId) }))
       );
-      scheduleMenuWrite(id, sectionId);
     },
-    [updateMenuLocal, scheduleMenuWrite]
+    [updateMenuLocal]
   );
   const setMenuItemField = useCallback(
     <K extends keyof MenuItem>(id: string, sectionId: string, itemId: string, field: K, value: MenuItem[K]) =>
@@ -563,11 +500,8 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
     (id: string, sectionId: string, itemId: string) => {
       const item = (venueDrafts[id] ?? venues[id])?.menu.find((s) => s.id === sectionId)?.items.find((it) => it.id === itemId);
       patchMenuItem(id, sectionId, itemId, { soldOut: !item?.soldOut });
-      flushMenuWrite(id, sectionId);
-      const name = item?.name || "Item";
-      showSnack(item?.soldOut ? `${name} is back on the menu.` : `${name} marked sold out.`);
     },
-    [venueDrafts, venues, patchMenuItem, flushMenuWrite, showSnack]
+    [venueDrafts, venues, patchMenuItem]
   );
 
   const toggleMenuItemTag = useCallback(
@@ -584,9 +518,8 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
               }
         )
       );
-      scheduleMenuWrite(id, sectionId);
     },
-    [updateMenuLocal, scheduleMenuWrite]
+    [updateMenuLocal]
   );
   const toggleMenuItemNight = useCallback(
     (id: string, sectionId: string, itemId: string, night: number) => {
@@ -604,28 +537,32 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
               }
         )
       );
-      scheduleMenuWrite(id, sectionId);
     },
-    [updateMenuLocal, scheduleMenuWrite]
+    [updateMenuLocal]
   );
 
-  // ---- Save: profile fields write straight to the venue doc; a name/address
-  // change additionally goes through `venueEdits/{id}` for review. Both in
-  // one batch so a rename can never land without its accompanying
-  // venueEdits submission, or vice versa.
+  // ---- Save: profile fields write straight to the venue doc, menu sections
+  // write straight to `menuSections/{id}`, and a name/address change
+  // additionally goes through `venueEdits/{id}` for review — all in one
+  // batch, so a rename can never land without its accompanying venueEdits
+  // submission, a menu edit can never land without the profile edit made
+  // alongside it, or vice versa.
   const saveVenue = useCallback(
     async (id: string) => {
       const draft = venueDrafts[id];
-      if (!draft) {
+      const menuChanged = isMenuDirty(id);
+      if (!draft && !menuChanged) {
         showSnack("No changes to save.");
         return;
       }
       const saved = venues[id];
-      const identityDirty = saved ? isVenueIdentityDirty(draft, saved) : false;
+      const identityDirty = draft && saved ? isVenueIdentityDirty(draft, saved) : false;
       const ok = await run(async () => {
         const batch = writeBatch(getDb());
-        batch.update(venueDocRef(id), toVenueDirectFields(draft, { timeZone: meta[id]?.timeZone ?? "" }));
-        if (identityDirty) {
+        if (draft) {
+          batch.update(venueDocRef(id), toVenueDirectFields(draft, { timeZone: meta[id]?.timeZone ?? "" }));
+        }
+        if (identityDirty && draft) {
           batch.set(venueEditsDocRef(id), {
             venueId: id,
             status: "pending",
@@ -636,27 +573,42 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
             reviewedAt: null,
             note: "",
           });
-          await logActivity(batch, id, uid, "Submitted a name/address change for review");
-        } else {
-          await logActivity(batch, id, uid, "Updated venue profile");
         }
+        let menuWrite: { toWrite: MenuSection[]; toDelete: string[] } | null = null;
+        if (menuChanged) {
+          menuWrite = diffMenuSections(menuByVenue[id] ?? [], menuBaseline[id] ?? []);
+          for (const section of menuWrite.toWrite) {
+            batch.set(venueMenuSectionDocRef(id, section.id), toMenuSectionFields(section));
+          }
+          for (const sectionId of menuWrite.toDelete) {
+            batch.delete(venueMenuSectionDocRef(id, sectionId));
+          }
+        }
+        await logActivity(
+          batch,
+          id,
+          uid,
+          identityDirty
+            ? "Submitted a name/address change for review"
+            : menuChanged
+              ? "Updated the venue menu"
+              : "Updated venue profile"
+        );
         await batch.commit();
-        discard(id);
+        if (draft) discard(id);
+        if (menuWrite) setMenuBaseline((prev) => ({ ...prev, [id]: menuByVenue[id] ?? [] }));
       });
       if (ok) {
-        showSnack(
-          identityDirty
-            ? "Saved — the name/address change was submitted for review."
-            : "Saved."
-        );
+        showSnack(identityDirty ? "Saved — the name/address change was submitted for review." : "Saved.");
       }
     },
-    [venueDrafts, venues, run, discard, showSnack, uid, meta]
+    [venueDrafts, venues, isMenuDirty, menuByVenue, menuBaseline, run, discard, showSnack, uid, meta]
   );
 
   const discardVenue = useCallback(
     async (id: string) => {
-      const action = decideDiscardVenueAction(Boolean(venueDrafts[id]), pendingEditByVenue[id]?.status);
+      const menuChanged = isMenuDirty(id);
+      const action = decideDiscardVenueAction(Boolean(venueDrafts[id]) || menuChanged, pendingEditByVenue[id]?.status);
       if (action.kind === "withdraw") {
         // `firestore.rules`' `venueEdits` `allow delete` permits this
         // exactly while `reviewedBy == null`, i.e. `status: 'pending'`.
@@ -666,9 +618,9 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
         if (ok) {
           // Only name/address were ever part of the submission — revert just
           // those two on the local draft rather than discarding it outright,
-          // so an unrelated in-progress hours/photos edit survives a
+          // so an unrelated in-progress hours/photos/menu edit survives a
           // withdraw (identity edits require review; everything else never
-          // did, and the two can now be dirty at the same time).
+          // did, and all three can now be dirty at the same time).
           if (action.clearDraft) {
             const saved = venues[id];
             if (saved) updateVenueListing(id, (p) => ({ ...p, name: saved.name, address: saved.address }));
@@ -680,10 +632,11 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       }
       if (action.kind === "discardDraft") {
         discard(id);
+        if (menuChanged) setMenuByVenue((prev) => ({ ...prev, [id]: menuBaseline[id] ?? [] }));
         showSnack("Changes discarded.");
       }
     },
-    [venueDrafts, venues, discard, updateVenueListing, showSnack, pendingEditByVenue, run]
+    [venueDrafts, venues, isMenuDirty, menuBaseline, discard, updateVenueListing, showSnack, pendingEditByVenue, run]
   );
 
   // ---- Add venue ----
@@ -981,7 +934,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
   // rather than replacing it wholesale.
   const baseProfile = computeVenueProfile(draft, savedProfile);
   const profile = venuePendingReview ? applyPendingListing(baseProfile, pendingEdit?.listing) : baseProfile;
-  const venueDirty = isVenueDirty(draft, savedProfile);
+  const venueDirty = isVenueDirty(draft, savedProfile) || isMenuDirty(editingVenue);
   const menuLoading = menuLoadingIds.has(editingVenue);
 
   const data = useMemo(
@@ -1061,7 +1014,6 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       toggleMenuItemSoldOut,
       toggleMenuItemTag,
       toggleMenuItemNight,
-      flushMenuWrite,
       toggleVerifyStep,
       setDoorStatus,
       setQueueMinutes,
@@ -1078,7 +1030,7 @@ export function useVenues(uid: string, showSnack: (text: string, tone?: "info" |
       updateVenueListing, toggleVenueSetValue, addSocialLink, removeSocialLink, setSocialLinkField, setHourField,
       toggleDayClosed, addException, removeException, setExceptionField, toggleExceptionClosed,
       addMenuSection, removeMenuSection, setMenuSectionName, addMenuItem, removeMenuItem,
-      setMenuItemField, toggleMenuItemSoldOut, toggleMenuItemTag, toggleMenuItemNight, flushMenuWrite,
+      setMenuItemField, toggleMenuItemSoldOut, toggleMenuItemTag, toggleMenuItemNight,
       toggleVerifyStep, setDoorStatus, setQueueMinutes, setFlashText, setFlashUntil, toggleFlash,
       toggleEmergency, flushQueueMinutesNow, flushFlashNow, venuesLoading, venuesError,
     ]

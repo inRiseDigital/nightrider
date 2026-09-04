@@ -7,13 +7,17 @@ import { useOrganizerDashboard } from "@/lib/organizer/dashboard/store";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { Snackbar } from "./ui/Snackbar";
+import { EventEditor } from "./sections/EventEditor";
 
 /**
  * Sidebar + topbar chrome shared by every organizer dashboard route.
  *
  * The remove-image confirmation and the snackbar live here rather than in the
  * sections so a single instance of each serves every destination, matching the
- * design.
+ * design. `EventEditor` lives here too (not on the events page) because the
+ * "New event" FAB in `Sidebar`/`Topbar` can be clicked from any dashboard
+ * route — it only flips shared context state, so if the dialog isn't mounted
+ * on whatever page the organizer is currently on, nothing visibly opens.
  */
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -53,6 +57,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       </Modal>
 
       <Snackbar />
+      <EventEditor />
     </div>
   );
 }

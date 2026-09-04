@@ -114,3 +114,64 @@ export interface LogEntry {
 export function deriveDisplayStepStatus(rawStatus: StepStatus, applicantClaim: boolean): StepStatus {
   return rawStatus === "active" && applicantClaim ? "submitted" : rawStatus;
 }
+
+// ---------------------------------------------------------------------------
+// events/{eventId} — added for the admin console's Event review queue
+// (Phase 2, data seam). Mirrors docs/FIRESTORE_SCHEMA.md's `events/{eventId}`
+// exactly, trimmed to the fields this console's queue reads/writes. Events are
+// already live when submitted (post-moderation, not a pre-publish gate): the
+// queue only clears `moderation.flag` or archives the event with a reason.
+// ---------------------------------------------------------------------------
+
+export type EventStatus = "draft" | "scheduled" | "in_review" | "published" | "cancelled" | "archived";
+export type EventModerationFlag = "" | "pending" | "clean" | "rejected";
+export type EventSource = "organizer" | "admin" | "scraped";
+
+export interface EventPerformer {
+  name: string;
+  type: "DJ" | "Band" | "Comedian" | "LiveAct" | "Other";
+  bio: string;
+}
+
+export interface EventTicketTier {
+  name: string;
+  price: number;
+  qty: number;
+}
+
+/** admin/producer-owned, pinned — the review queue's own state on the event. */
+export interface EventModeration {
+  flag: EventModerationFlag;
+  requestedAt: Timestamp | null;
+  eta: Timestamp | null;
+  reviewedBy: string | null;
+  note: string;
+}
+
+/** `events/{eventId}` — only the fields the review queue reads. */
+export interface EventDoc {
+  id: string;
+  name: string;
+  description: string;
+  venueId: string | null;
+  venueName: string;
+  city: string;
+  countryCode: string;
+  startAt: Timestamp | null;
+  endAt: Timestamp | null;
+  price: { min: number; max: number; currency: string; isFree: boolean };
+  coverImage: string;
+  genre: string;
+  performers: EventPerformer[];
+  policies: { ageRestriction: number };
+  interestedCount: number;
+  status: EventStatus;
+  source: EventSource;
+  organizerUid: string | null;
+  recurring: boolean;
+  recurrenceLabel: string;
+  tickets: { currency: string; tiers: EventTicketTier[] };
+  moderation: EventModeration;
+  createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
+}
